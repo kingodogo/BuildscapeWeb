@@ -286,11 +286,8 @@ export default function App() {
             
             if (data.reports.length === 0) {
                 setReports(INITIAL_BUGS);
-                try {
-                    await StorageService.saveAll(INITIAL_BUGS, [], config);
-                } catch (e) {
-                    console.error("Failed to seed initial bugs:", e);
-                }
+                // Do not attempt to auto-save initial bugs to server as it requires admin/owner permissions
+                // The database should be seeded manually or via admin panel if needed
             }
             
             if (data.config) {
@@ -448,25 +445,7 @@ export default function App() {
     };
   }, [config.curseforgeSyncInterval, config.curseforgeProjectSlug, config.links?.curseforge]);
 
-  useEffect(() => {
-    if ((reports.length > 0 || suggestions.length > 0) && !isLoading && dataSource === 'cloud') {
-        const timer = setTimeout(async () => {
-            try {
-                await StorageService.saveAll(reports, suggestions, config);
-            } catch (e: any) {
-                console.error("Failed to save data:", e);
-                if (e instanceof StorageError) {
-                    if (e.code !== 'NOT_CONFIGURED' && e.code !== 'NETWORK_ERROR') {
-                        handleNotify(`Failed to save: ${e.message}`, 'error');
-                    }
-                } else {
-                    handleNotify("Failed to save data. Please check your connection.", 'error');
-                }
-            }
-        }, 1000);
-        return () => clearTimeout(timer);
-    }
-  }, [reports, suggestions, config, isLoading, dataSource]);
+
 
   useEffect(() => {
     if (toast) {
