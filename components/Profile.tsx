@@ -1,0 +1,1564 @@
+import React, { useState, useEffect, useRef } from "react";
+import { User, UserReward, KofiRewardItem } from "../types";
+import { User as UserIcon, Save, X, CheckCircle, AlertCircle, Lock, UserCircle, Upload, Image as ImageIcon, Crop, Maximize2, Minimize2, Link as LinkIcon, Unlink, Gamepad2, Coffee, Crown, Mail, Settings, ExternalLink, Gift, Download, Package } from "lucide-react";
+import { AuthService } from "../services/auth";
+import { formatUuid } from "../services/minecraft";
+
+interface ProfileProps {
+  currentUser: User;
+  onUpdate: (user: User) => void;
+  onCancel: () => void;
+  onNotify: (msg: string, type?: 'success' | 'error') => void;
+  kofiUrl?: string; // Ko-fi page URL (e.g., https://ko-fi.com/username)
+  onNavigate?: (view: string) => void; // Navigation callback
+}
+
+export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kofiUrl, onNavigate }: ProfileProps) {
+  const [username, setUsername] = useState(currentUser.username);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [isCheckingUsername, setIsCheckingUsername] = useState(false);
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [usernameError, setUsernameError] = useState("");
+  const [profileIcon, setProfileIcon] = useState<string | undefined>(currentUser.profileIcon);
+  const [profileIconPreview, setProfileIconPreview] = useState<string | undefined>(currentUser.profileIcon);
+  const [originalImage, setOriginalImage] = useState<string | undefined>(currentUser.profileIcon);
+  const [showImageEditor, setShowImageEditor] = useState(false);
+  const [imageToEdit, setImageToEdit] = useState<string | null>(null);
+  const [cropScale, setCropScale] = useState(1);
+  const [cropPosition, setCropPosition] = useState({ x: 0, y: 0 });
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const [streamerMode, setStreamerMode] = useState<boolean>(!!currentUser.streamerMode);
+
+  const maskUsername = (value?: string) => (value && value.length > 0 ? `${value[0]}****` : '****');
+  const maskId = (value?: string) => (value ? 'f734****' : 'f734****');
+  
+  // Minecraft account linking state
+  const [minecraftUsername, setMinecraftUsername] = useState("");
+  const [isLinkingMinecraft, setIsLinkingMinecraft] = useState(false);
+  const [minecraftError, setMinecraftError] = useState("");
+  const [isUnlinkingMinecraft, setIsUnlinkingMinecraft] = useState(false);
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'edit' | 'accounts' | 'rewards'>('edit');
+  
+  // Rewards state
+  const [rewards, setRewards] = useState<UserReward[]>([]);
+  const [isLoadingRewards, setIsLoadingRewards] = useState(false);
+  
+  // Email editing state
+  const [email, setEmail] = useState(currentUser.email || "");
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  
+  // Ko-fi username linking state
+  const [kofiUsername, setKofiUsername] = useState(currentUser.kofiUsername || "");
+  const [isUpdatingKofiUsername, setIsUpdatingKofiUsername] = useState(false);
+  const [kofiUsernameError, setKofiUsernameError] = useState("");
+
+  useEffect(() => {
+    const checkUsername = async () => {
+      if (username === currentUser.username) {
+        setUsernameAvailable(null);
+        setUsernameError("");
+        return;
+      }
+
+      if (username.length < 3) {
+        setUsernameAvailable(false);
+        setUsernameError("Username must be at least 3 characters");
+        return;
+      }
+
+      if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+        setUsernameAvailable(false);
+        setUsernameError("Username can only contain letters, numbers, and underscores");
+        return;
+      }
+
+      setIsCheckingUsername(true);
+      setUsernameError("");
+      
+      try {
+        const available = await AuthService.checkUsernameAvailability(username);
+        setUsernameAvailable(available);
+        if (!available) {
+          setUsernameError("Username is already taken");
+        }
+      } catch (error: any) {
+        setUsernameAvailable(false);
+        setUsernameError(error.message || "Error checking username");
+      } finally {
+        setIsCheckingUsername(false);
+      }
+    };
+
+    const timeoutId = setTimeout(checkUsername, 500);
+    return () => clearTimeout(timeoutId);
+  }, [username, currentUser.username]);
+
+  useEffect(() => {
+    setProfileIcon(currentUser.profileIcon);
+    setProfileIconPreview(currentUser.profileIcon);
+
+    if (currentUser.profileIcon) {
+      setOriginalImage(currentUser.profileIcon);
+    }
+  }, [currentUser.profileIcon]);
+
+  useEffect(() => {
+    setEmail(currentUser.email || "");
+  }, [currentUser.email]);
+
+  useEffect(() => {
+    setKofiUsername(currentUser.kofiUsername || "");
+  }, [currentUser.kofiUsername]);
+
+  useEffect(() => {
+    setStreamerMode(!!currentUser.streamerMode);
+  }, [currentUser.streamerMode]);
+
+  useEffect(() => {
+    if (activeTab === 'rewards' && currentUser) {
+      loadRewards();
+    }
+  }, [activeTab, currentUser]);
+
+  const loadRewards = async () => {
+    if (!currentUser) return;
+    
+    setIsLoadingRewards(true);
+    try {
+      const res = await fetch(`/api/rewards?userId=${currentUser.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setRewards(data.rewards || []);
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        onNotify(errorData.error || "Failed to load rewards", "error");
+      }
+    } catch (error: any) {
+      onNotify("Failed to load rewards", "error");
+    } finally {
+      setIsLoadingRewards(false);
+    }
+  };
+
+  const handleDownloadAsset = async (rewardId: string, downloadUrl?: string) => {
+    if (!downloadUrl) {
+      onNotify("No download URL available", "error");
+      return;
+    }
+
+    try {
+      // Mark as downloaded
+      const res = await fetch('/api/rewards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: currentUser.id,
+          rewardId: rewardId,
+          action: 'markDownloaded'
+        })
+      });
+
+      if (res.ok) {
+        // Open download link
+        window.open(downloadUrl, '_blank');
+        // Update local state
+        setRewards(prev => prev.map(r => 
+          r.id === rewardId ? { ...r, downloaded: true } : r
+        ));
+      }
+    } catch (error: any) {
+      onNotify("Failed to mark as downloaded", "error");
+    }
+  };
+
+  const compressImage = (base64: string, maxWidth: number = 400, maxHeight: number = 400, quality: number = 0.8): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = (width * maxHeight) / height;
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', quality);
+          resolve(compressed);
+        } else {
+          resolve(base64);
+        }
+      };
+      img.src = base64;
+    });
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+
+      if (!file.type.startsWith('image/')) {
+        onNotify("Please select an image file", "error");
+        return;
+      }
+
+      setIsUploading(true);
+      setUploadProgress(0);
+
+      const reader = new FileReader();
+
+      reader.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const progress = Math.round((event.loaded / event.total) * 50); // First 50% for reading
+          setUploadProgress(progress);
+        }
+      };
+
+      reader.onloadend = async () => {
+        if (reader.result) {
+          setUploadProgress(50);
+          let base64 = reader.result as string;
+
+          setOriginalImage(base64);
+
+          if (file.size > 500 * 1024) {
+            setUploadProgress(60);
+            base64 = await compressImage(base64, 400, 400, 0.8);
+            setOriginalImage(base64);
+            setUploadProgress(80);
+          } else {
+            setUploadProgress(80);
+          }
+          
+          setUploadProgress(100);
+
+          setTimeout(() => {
+            setIsUploading(false);
+            setUploadProgress(0);
+
+            setImageToEdit(base64);
+            setShowImageEditor(true);
+            setCropScale(1);
+            setCropPosition({ x: 0, y: 0 });
+          }, 300);
+        } else {
+          setIsUploading(false);
+          setUploadProgress(0);
+        }
+      };
+
+      reader.onerror = () => {
+        setIsUploading(false);
+        setUploadProgress(0);
+        onNotify("Error reading file", "error");
+      };
+
+      reader.readAsDataURL(file);
+    }
+
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleEditIcon = () => {
+
+    const imageToCrop = originalImage || profileIcon;
+    if (imageToCrop) {
+
+      if (!originalImage && profileIcon) {
+        setOriginalImage(profileIcon);
+      }
+      setImageToEdit(imageToCrop);
+      setShowImageEditor(true);
+      setCropScale(1);
+      setCropPosition({ x: 0, y: 0 });
+    }
+  };
+
+  const handleCropAndSave = () => {
+    if (!canvasRef.current || !imageToEdit || !imageRef.current) return;
+
+    const canvas = canvasRef.current;
+    const img = imageRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+
+    canvas.width = 128;
+    canvas.height = 128;
+
+    const container = img.parentElement;
+    if (!container) return;
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+
+    const cropSize = Math.min(containerWidth, containerHeight) / cropScale;
+    const cropX = (containerWidth - cropSize) / 2 - cropPosition.x;
+    const cropY = (containerHeight - cropSize) / 2 - cropPosition.y;
+
+    const imgAspect = img.naturalWidth / img.naturalHeight;
+    const containerAspect = containerWidth / containerHeight;
+
+    let displayedWidth, displayedHeight, offsetX, offsetY;
+
+    if (imgAspect > containerAspect) {
+
+      displayedHeight = containerHeight;
+      displayedWidth = displayedHeight * imgAspect;
+      offsetX = (containerWidth - displayedWidth) / 2;
+      offsetY = 0;
+    } else {
+
+      displayedWidth = containerWidth;
+      displayedHeight = displayedWidth / imgAspect;
+      offsetX = 0;
+      offsetY = (containerHeight - displayedHeight) / 2;
+    }
+
+    const sourceX = ((cropX - offsetX) / displayedWidth) * img.naturalWidth;
+    const sourceY = ((cropY - offsetY) / displayedHeight) * img.naturalHeight;
+    const sourceSize = (cropSize / displayedWidth) * img.naturalWidth;
+
+    ctx.drawImage(
+      img,
+      Math.max(0, sourceX), Math.max(0, sourceY),
+      Math.min(sourceSize, img.naturalWidth - Math.max(0, sourceX)),
+      Math.min(sourceSize, img.naturalHeight - Math.max(0, sourceY)),
+      0, 0, 128, 128
+    );
+
+
+    const finalImage = canvas.toDataURL('image/jpeg', 0.75);
+    setProfileIcon(finalImage);
+    setProfileIconPreview(finalImage);
+    setShowImageEditor(false);
+    setImageToEdit(null);
+    setCropScale(1);
+    setCropPosition({ x: 0, y: 0 });
+  };
+
+  const handleRemoveIcon = () => {
+    setProfileIcon(undefined);
+    setProfileIconPreview(undefined);
+
+    setUsernameError("");
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    setUsernameError("");
+
+    try {
+
+      if (newPassword) {
+        if (newPassword.length < 6) {
+          setUsernameError("Password must be at least 6 characters");
+          setIsSaving(false);
+          return;
+        }
+        if (newPassword !== confirmPassword) {
+          setUsernameError("Passwords do not match");
+          setIsSaving(false);
+          return;
+        }
+        if (!currentPassword) {
+          setUsernameError("Please enter your current password to change it");
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      if (username !== currentUser.username) {
+        if (usernameAvailable === false) {
+          setUsernameError("Username is not available");
+          setIsSaving(false);
+          return;
+        }
+        if (usernameAvailable === null && username !== currentUser.username) {
+          setUsernameError("Please wait for username check to complete");
+          setIsSaving(false);
+          return;
+        }
+      }
+
+      let profileIconUpdate: string | null | undefined = undefined;
+      if (profileIcon !== currentUser.profileIcon) {
+
+        if (profileIcon === undefined && currentUser.profileIcon) {
+          profileIconUpdate = null; // Explicitly set to null to remove
+        } else if (profileIcon !== undefined) {
+          profileIconUpdate = profileIcon; // Setting a new icon
+        }
+      }
+
+      if (profileIconUpdate !== undefined) {
+        setIsUploading(true);
+        setUploadProgress(0);
+      }
+
+      const updatedUser = await AuthService.updateProfile({
+        userId: currentUser.id,
+        username: username !== currentUser.username ? username : undefined,
+        newPassword: newPassword || undefined,
+        currentPassword: newPassword ? currentPassword : undefined,
+        profileIcon: profileIconUpdate,
+      });
+
+      if (profileIconUpdate !== undefined) {
+        setUploadProgress(100);
+        setTimeout(() => {
+          setIsUploading(false);
+          setUploadProgress(0);
+        }, 500);
+      }
+
+      onUpdate(updatedUser);
+      onNotify("Profile updated successfully!", "success");
+
+      setNewPassword("");
+      setConfirmPassword("");
+      setCurrentPassword("");
+
+      if (profileIconUpdate !== undefined) {
+        if (profileIconUpdate === null) {
+          setOriginalImage(undefined);
+        } else {
+          setOriginalImage(profileIconUpdate);
+        }
+      }
+    } catch (error: any) {
+      setUsernameError(error.message || "Failed to update profile");
+      onNotify(error.message || "Failed to update profile", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const hasChanges = username !== currentUser.username || newPassword.length > 0 || profileIcon !== currentUser.profileIcon;
+  const canSave = hasChanges && 
+    (username === currentUser.username || usernameAvailable === true) &&
+    (!newPassword || (newPassword === confirmPassword && currentPassword.length > 0));
+
+  const hasIconChanges = profileIcon !== currentUser.profileIcon;
+
+  return (
+    <div className="h-full overflow-y-auto custom-scrollbar bg-[#121212] py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-[#1e1e1e] border border-gray-800 rounded-xl shadow-lg overflow-hidden">
+          
+          <div className="bg-[#1a1a1a] border-b border-gray-800 px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center">
+                <UserCircle size={20} className="text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white">Profile Settings</h1>
+                <p className="text-sm text-gray-400">Manage your account information</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={async () => {
+                  try {
+                    const next = !streamerMode;
+                    const updatedUser = await AuthService.updateProfile({
+                      userId: currentUser.id,
+                      streamerMode: next
+                    });
+                    setStreamerMode(next);
+                    onUpdate(updatedUser);
+                    onNotify(next ? "Streamer Mode enabled" : "Streamer Mode disabled", "success");
+                  } catch (error: any) {
+                    onNotify(error.message || "Failed to toggle streamer mode", "error");
+                  }
+                }}
+                className={`px-3 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                  streamerMode
+                    ? 'bg-amber-500/20 border-amber-500 text-amber-200 hover:bg-amber-500/30'
+                    : 'bg-gray-800 border-gray-700 text-gray-200 hover:bg-gray-700'
+                }`}
+              >
+                {streamerMode ? 'Streamer: On' : 'Streamer: Off'}
+              </button>
+              <button
+                onClick={onCancel}
+                className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-2 border-b border-gray-800 px-6 bg-[#1a1a1a]">
+            <button
+              onClick={() => setActiveTab('edit')}
+              className={`px-4 py-3 font-semibold text-sm transition-all border-b-2 ${
+                activeTab === 'edit'
+                  ? 'text-white border-green-500'
+                  : 'text-gray-400 border-transparent hover:text-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Settings size={16} />
+                Edit Profile
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('accounts')}
+              className={`px-4 py-3 font-semibold text-sm transition-all border-b-2 ${
+                activeTab === 'accounts'
+                  ? 'text-white border-green-500'
+                  : 'text-gray-400 border-transparent hover:text-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <LinkIcon size={16} />
+                Link Accounts
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('rewards')}
+              className={`px-4 py-3 font-semibold text-sm transition-all border-b-2 ${
+                activeTab === 'rewards'
+                  ? 'text-white border-green-500'
+                  : 'text-gray-400 border-transparent hover:text-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Gift size={16} />
+                Rewards
+              </div>
+            </button>
+          </div>
+
+          
+          <div className="p-6 space-y-6">
+            {/* Edit Profile Tab */}
+            {activeTab === 'edit' && (
+              <>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-3 flex items-center gap-2">
+                <ImageIcon size={16} />
+                Profile Icon
+              </label>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  {profileIconPreview ? (
+                    <img 
+                      src={profileIconPreview} 
+                      alt="Profile" 
+                      className="w-20 h-20 rounded-full object-cover border-2 border-gray-700"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center border-2 border-gray-700">
+                      <UserCircle size={32} className="text-white" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleImageSelect}
+                    accept="image/*"
+                    className="hidden"
+                    disabled={isUploading}
+                  />
+                  
+                  {isUploading && (
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-gray-400">Uploading...</span>
+                        <span className="text-xs text-gray-400">{uploadProgress}%</span>
+                      </div>
+                      <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="bg-green-500 h-full transition-all duration-300 ease-out"
+                          style={{ width: `${uploadProgress}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors flex items-center gap-2"
+                    >
+                      <Upload size={16} />
+                      {profileIconPreview ? 'Change Icon' : 'Upload Icon'}
+                    </button>
+                    {profileIconPreview && (
+                      <>
+                        {hasIconChanges && (
+                          <button
+                            onClick={handleEditIcon}
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                          >
+                            <Crop size={16} />
+                            Crop
+                          </button>
+                        )}
+                        <button
+                          onClick={handleRemoveIcon}
+                          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                        >
+                          <X size={16} />
+                          Remove
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">Max size: 2MB. Recommended: Square image (e.g., 200x200px)</p>
+                </div>
+              </div>
+            </div>
+
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                <UserIcon size={16} />
+                Username
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={streamerMode ? maskUsername(username) : username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className={`w-full bg-[#121212] border ${
+                    usernameError || usernameAvailable === false
+                      ? 'border-red-500'
+                      : usernameAvailable === true
+                      ? 'border-green-500'
+                      : 'border-gray-700'
+                  } rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors`}
+                  placeholder="Enter username"
+                  disabled={streamerMode}
+                />
+                {isCheckingUsername && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="w-5 h-5 border-2 border-gray-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+                {!isCheckingUsername && username !== currentUser.username && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    {usernameAvailable === true && (
+                      <CheckCircle size={20} className="text-green-500" />
+                    )}
+                    {usernameAvailable === false && (
+                      <AlertCircle size={20} className="text-red-500" />
+                    )}
+                  </div>
+                )}
+              </div>
+              {usernameError && (
+                <p className="mt-1.5 text-sm text-red-400 flex items-center gap-1">
+                  <AlertCircle size={14} />
+                  {usernameError}
+                </p>
+              )}
+              {usernameAvailable === true && username !== currentUser.username && (
+                <p className="mt-1.5 text-sm text-green-400 flex items-center gap-1">
+                  <CheckCircle size={14} />
+                  Username is available
+                </p>
+              )}
+            </div>
+
+            {/* Email Editing */}
+            <div className="border-t border-gray-800 pt-6">
+              <label className="block text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
+                <Mail size={16} />
+                Email Address
+              </label>
+              
+              <div className="bg-[#121212] rounded-lg p-4 space-y-3">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1.5">Email</label>
+                  <input
+                    type="email"
+                    value={streamerMode ? maskUsername(email) : email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setEmailError("");
+                    }}
+                    className={`w-full bg-[#1a1a1a] border ${
+                      emailError ? 'border-red-500' : 'border-gray-700'
+                    } rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors`}
+                    placeholder="Enter your email address"
+                    disabled={isUpdatingEmail || streamerMode}
+                  />
+                  {emailError && (
+                    <p className="mt-1.5 text-sm text-red-400 flex items-center gap-1">
+                      <AlertCircle size={14} />
+                      {emailError}
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-2">
+                    Your email address for account notifications and account recovery.
+                  </p>
+                </div>
+                
+                <button
+                  onClick={async () => {
+                    if (!email.trim()) {
+                      setEmailError("Email cannot be empty");
+                      return;
+                    }
+                    
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(email.trim())) {
+                      setEmailError("Please enter a valid email address");
+                      return;
+                    }
+                    
+                    if (email.trim() === currentUser.email) {
+                      setEmailError("");
+                      onNotify("Email unchanged", "success");
+                      return;
+                    }
+                    
+                    setIsUpdatingEmail(true);
+                    setEmailError("");
+                    
+                    try {
+                      const updatedUser = await AuthService.updateProfile({
+                        userId: currentUser.id,
+                        email: email.trim(),
+                      });
+                      
+                      onUpdate(updatedUser);
+                      onNotify("Email updated successfully!", "success");
+                    } catch (error: any) {
+                      const errorMsg = error.message || "Failed to update email";
+                      setEmailError(errorMsg);
+                      onNotify(errorMsg, "error");
+                    } finally {
+                      setIsUpdatingEmail(false);
+                    }
+                  }}
+                  disabled={streamerMode || isUpdatingEmail || !email.trim() || email.trim() === currentUser.email}
+                  className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isUpdatingEmail ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      Update Email
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+            
+            <div className="border-t border-gray-800 pt-6">
+              <label className="block text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
+                <Lock size={16} />
+                Change Password
+              </label>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1.5">Current Password</label>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full bg-[#121212] border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                    placeholder="Enter current password"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1.5">New Password</label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full bg-[#121212] border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                    placeholder="Enter new password (min 6 characters)"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1.5">Confirm New Password</label>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className={`w-full bg-[#121212] border ${
+                      newPassword && newPassword !== confirmPassword
+                        ? 'border-red-500'
+                        : newPassword && newPassword === confirmPassword
+                        ? 'border-green-500'
+                        : 'border-gray-700'
+                    } rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors`}
+                    placeholder="Confirm new password"
+                  />
+                  {newPassword && newPassword !== confirmPassword && (
+                    <p className="mt-1.5 text-sm text-red-400">Passwords do not match</p>
+                  )}
+                  {newPassword && newPassword === confirmPassword && newPassword.length >= 6 && (
+                    <p className="mt-1.5 text-sm text-green-400">Passwords match</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Save Button for Edit Profile */}
+            <div className="flex gap-3 pt-4 border-t border-gray-800">
+              <button
+                onClick={onCancel}
+                className="flex-1 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={!canSave || isSaving}
+                className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+                  canSave && !isSaving
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                {isSaving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save size={16} />
+                    Save Changes
+                  </>
+                )}
+              </button>
+            </div>
+              </>
+            )}
+
+            {/* Link Accounts Tab */}
+            {activeTab === 'accounts' && (
+              <>
+            {/* Minecraft Account Linking */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
+                <Gamepad2 size={16} />
+                Minecraft Account
+              </label>
+              
+              {currentUser.minecraftUsername && currentUser.minecraftUuid ? (
+                <div className="bg-[#121212] rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm text-gray-400 mb-1">Linked Account</div>
+                      <div className="text-base font-medium text-white">
+                        {streamerMode ? maskUsername(currentUser.minecraftUsername) : currentUser.minecraftUsername}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1 font-mono">
+                        {streamerMode ? maskId(currentUser.minecraftUuid) : formatUuid(currentUser.minecraftUuid)}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle size={20} className="text-green-500" />
+                      <span className="text-xs text-green-400">Linked</span>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={async () => {
+                      if (!confirm('Are you sure you want to unlink your Minecraft account?')) return;
+                      
+                      setIsUnlinkingMinecraft(true);
+                      setMinecraftError("");
+                      
+                      try {
+                        const updatedUser = await AuthService.unlinkMinecraftAccount(currentUser.id);
+                        onUpdate(updatedUser);
+                        onNotify("Minecraft account unlinked successfully", "success");
+                      } catch (error: any) {
+                        const errorMsg = error.message || "Failed to unlink Minecraft account";
+                        setMinecraftError(errorMsg);
+                        onNotify(errorMsg, "error");
+                      } finally {
+                        setIsUnlinkingMinecraft(false);
+                      }
+                    }}
+                    disabled={isUnlinkingMinecraft}
+                    className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isUnlinkingMinecraft ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Unlinking...
+                      </>
+                    ) : (
+                      <>
+                        <Unlink size={16} />
+                        Unlink Account
+                      </>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-[#121212] rounded-lg p-4 space-y-3">
+                  <div className="text-sm text-gray-400 mb-2">Link your Minecraft account to enable in-game access</div>
+                  
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1.5">Minecraft Username</label>
+                    <input
+                      type="text"
+                      value={minecraftUsername}
+                      onChange={(e) => {
+                        setMinecraftUsername(e.target.value);
+                        setMinecraftError("");
+                      }}
+                      placeholder="Enter your Minecraft username"
+                      className={`w-full bg-[#1a1a1a] border ${
+                        minecraftError ? 'border-red-500' : 'border-gray-700'
+                      } rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors`}
+                      disabled={isLinkingMinecraft}
+                    />
+                  </div>
+                  
+                  {minecraftError && (
+                    <p className="text-sm text-red-400 flex items-center gap-1">
+                      <AlertCircle size={14} />
+                      {minecraftError}
+                    </p>
+                  )}
+                  
+                  <button
+                    onClick={async () => {
+                      if (!minecraftUsername.trim()) {
+                        setMinecraftError("Please enter your Minecraft username");
+                        return;
+                      }
+                      
+                      setIsLinkingMinecraft(true);
+                      setMinecraftError("");
+                      
+                      try {
+                        // Link via our API (server will verify with Mojang API)
+                        const updatedUser = await AuthService.linkMinecraftAccount(
+                          currentUser.id,
+                          minecraftUsername.trim()
+                        );
+                        
+                        onUpdate(updatedUser);
+                        setMinecraftUsername("");
+                        onNotify("Minecraft account linked successfully!", "success");
+                      } catch (error: any) {
+                        let errorMsg = "Failed to link Minecraft account";
+                        
+                        // Handle different error types from the server
+                        if (error.message) {
+                          if (error.message.includes("not found")) {
+                            errorMsg = `Minecraft account "${minecraftUsername}" not found. Please check your username.`;
+                          } else if (error.message.includes("Invalid Minecraft username")) {
+                            errorMsg = error.message;
+                          } else if (error.message.includes("already linked")) {
+                            errorMsg = error.message;
+                          } else {
+                            errorMsg = error.message;
+                          }
+                        }
+                        
+                        setMinecraftError(errorMsg);
+                        onNotify(errorMsg, "error");
+                      } finally {
+                        setIsLinkingMinecraft(false);
+                      }
+                    }}
+                    disabled={isLinkingMinecraft || !minecraftUsername.trim()}
+                    className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLinkingMinecraft ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        Linking...
+                      </>
+                    ) : (
+                      <>
+                        <LinkIcon size={16} />
+                        Link Minecraft Account
+                      </>
+                    )}
+                  </button>
+                  
+                  <p className="text-xs text-gray-500">
+                    Your Minecraft username will be verified via Mojang's API. This allows server admins to grant you access based on your linked account.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Ko-fi Account Linking */}
+            <div className="border-t border-gray-800 pt-6">
+              <label className="block text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
+                <Coffee size={16} />
+                Ko-fi Account Linking
+              </label>
+              
+              <div className="bg-[#121212] rounded-lg p-4 space-y-3">
+                {currentUser.kofiUsername ? (
+                  <>
+                    <div className="bg-green-900/20 border border-green-700/50 rounded-lg p-3">
+                      <div className="text-xs text-green-300 flex items-center gap-2 mb-2">
+                        <CheckCircle size={14} />
+                        <span className="font-medium">Ko-fi Account Linked</span>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        Linked username: <span className="font-mono text-gray-300">{streamerMode ? maskUsername(currentUser.kofiUsername) : currentUser.kofiUsername}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!confirm('Unlink your Ko-fi account? You will need to link it again to receive subscription rewards.')) return;
+                        
+                        setIsUpdatingKofiUsername(true);
+                        setKofiUsernameError("");
+                        
+                        try {
+                          const updatedUser = await AuthService.updateKofiUsername(
+                            currentUser.id,
+                            ""
+                          );
+                          
+                          onUpdate(updatedUser);
+                          setKofiUsername("");
+                          onNotify("Ko-fi account unlinked", "success");
+                        } catch (error: any) {
+                          const errorMsg = error.message || "Failed to unlink Ko-fi account";
+                          setKofiUsernameError(errorMsg);
+                          onNotify(errorMsg, "error");
+                        } finally {
+                          setIsUpdatingKofiUsername(false);
+                        }
+                      }}
+                      disabled={isUpdatingKofiUsername}
+                      className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Unlink size={16} />
+                      Unlink Ko-fi Account
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-3 mb-3">
+                      <p className="text-xs text-blue-300 mb-2">
+                        Enter your Ko-fi username. When you subscribe on Ko-fi, your account will be automatically linked based on your username.
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1.5">Ko-fi Username</label>
+                      <input
+                        type="text"
+                        value={kofiUsername}
+                        onChange={(e) => {
+                          setKofiUsername(e.target.value);
+                          setKofiUsernameError("");
+                        }}
+                        className={`w-full bg-[#1a1a1a] border ${
+                          kofiUsernameError ? 'border-red-500' : 'border-gray-700'
+                        } rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors`}
+                        placeholder="Enter your Ko-fi username"
+                        disabled={isUpdatingKofiUsername}
+                      />
+                      {kofiUsernameError && (
+                        <p className="mt-1.5 text-sm text-red-400 flex items-center gap-1">
+                          <AlertCircle size={14} />
+                          {kofiUsernameError}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-500 mt-2">
+                        This should match your Ko-fi username (the name shown on your Ko-fi profile). Your subscription will be automatically linked when you make a payment.
+                      </p>
+                    </div>
+                    
+                    <button
+                      onClick={async () => {
+                        if (!kofiUsername.trim()) {
+                          setKofiUsernameError("Username cannot be empty");
+                          return;
+                        }
+                        
+                        const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+                        if (!usernameRegex.test(kofiUsername.trim())) {
+                          setKofiUsernameError("Invalid username format. Only letters, numbers, underscores, and hyphens are allowed.");
+                          return;
+                        }
+                        
+                        setIsUpdatingKofiUsername(true);
+                        setKofiUsernameError("");
+                        
+                        try {
+                          const updatedUser = await AuthService.updateKofiUsername(
+                            currentUser.id,
+                            kofiUsername.trim()
+                          );
+                          
+                          onUpdate(updatedUser);
+                          onNotify("Ko-fi username linked successfully! Your account will be connected when you subscribe.", "success");
+                        } catch (error: any) {
+                          const errorMsg = error.message || "Failed to link Ko-fi username";
+                          setKofiUsernameError(errorMsg);
+                          onNotify(errorMsg, "error");
+                        } finally {
+                          setIsUpdatingKofiUsername(false);
+                        }
+                      }}
+                      disabled={isUpdatingKofiUsername || !kofiUsername.trim()}
+                      className="w-full px-4 py-2 bg-[#FF5E5B] hover:bg-[#ff4d49] text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isUpdatingKofiUsername ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          Linking...
+                        </>
+                      ) : (
+                        <>
+                          <Coffee size={16} />
+                          Link Ko-fi Account
+                        </>
+                      )}
+                    </button>
+                    
+                    {kofiUrl && kofiUrl !== "#" && kofiUrl.trim() !== "" && (
+                      <a
+                        href={kofiUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                      >
+                        <ExternalLink size={16} />
+                        Visit Ko-fi Page
+                      </a>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Ko-fi Subscription Status */}
+            <div className="border-t border-gray-800 pt-6">
+              <label className="block text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
+                <Crown size={16} />
+                Subscription Status
+              </label>
+              
+              {currentUser.kofiSubscription?.isActive ? (
+                <div className="bg-[#121212] rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm text-gray-400 mb-1">Active Subscription</div>
+                      {currentUser.kofiSubscription.tierName && (
+                        <div className="text-base font-medium text-amber-400 flex items-center gap-2">
+                          <Crown size={16} />
+                          {currentUser.kofiSubscription.tierName}
+                        </div>
+                      )}
+                      {currentUser.kofiSubscription.amount && currentUser.kofiSubscription.currency && (
+                        <div className="text-sm text-gray-300 mt-1">
+                          {currentUser.kofiSubscription.amount} {currentUser.kofiSubscription.currency}
+                          {currentUser.kofiSubscription.nextPaymentDate && ' / month'}
+                        </div>
+                      )}
+                      {currentUser.kofiSubscription.lastPaymentDate && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          Last payment: {new Date(currentUser.kofiSubscription.lastPaymentDate).toLocaleDateString()}
+                        </div>
+                      )}
+                      {currentUser.kofiSubscription.nextPaymentDate && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          Next payment: {new Date(currentUser.kofiSubscription.nextPaymentDate).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle size={20} className="text-green-500" />
+                      <span className="text-xs text-green-400">Active</span>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-green-900/20 border border-green-700/50 rounded-lg p-3">
+                    <p className="text-xs text-green-300">
+                      ✓ Your subscription is active! You will receive in-game rewards when playing with the mod installed.
+                    </p>
+                  </div>
+                  
+                  {kofiUrl && kofiUrl !== "#" && kofiUrl.trim() !== "" && (
+                    <a
+                      href={kofiUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full px-4 py-2 bg-[#FF5E5B] hover:bg-[#ff4d49] text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 mt-2"
+                    >
+                      <Coffee size={16} />
+                      Manage Subscription
+                      <ExternalLink size={14} />
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-[#121212] rounded-lg p-4 space-y-3">
+                  <div className="text-sm text-gray-400">
+                    No active subscription found
+                  </div>
+                  <div className="bg-amber-900/20 border border-amber-700/50 rounded-lg p-3">
+                    <p className="text-xs text-amber-300 mb-2">
+                      {currentUser.kofiUsername 
+                        ? `Make a payment using your linked Ko-fi username (${currentUser.kofiUsername}) to activate your subscription.`
+                        : "Link your Ko-fi username above, then make a payment. Your subscription will be automatically linked based on your username."
+                      }
+                    </p>
+                  </div>
+                  {kofiUrl && kofiUrl !== "#" && kofiUrl.trim() !== "" ? (
+                    <a
+                      href={kofiUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full px-4 py-3 bg-[#FF5E5B] hover:bg-[#ff4d49] text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Coffee size={18} />
+                      Subscribe on Ko-fi
+                      <ExternalLink size={16} />
+                    </a>
+                  ) : (
+                    <>
+                      <button
+                        disabled
+                        className="w-full px-4 py-3 bg-gray-700 text-gray-400 rounded-lg font-medium cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        <Coffee size={18} />
+                        Subscribe on Ko-fi
+                        <ExternalLink size={16} />
+                      </button>
+                      <div className="bg-gray-800/50 rounded-lg p-2">
+                        <div className="text-xs text-gray-400">
+                          ⚠️ Ko-fi URL not configured. Please contact the administrator to set up the Ko-fi link in the admin panel.
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Account Info */}
+            <div className="border-t border-gray-800 pt-6">
+              <div className="bg-[#121212] rounded-lg p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">Role</span>
+                  <span className={`text-sm font-medium ${
+                    currentUser.role === 'owner' ? 'text-purple-400' :
+                    currentUser.role === 'admin' ? 'text-blue-400' :
+                    'text-gray-300'
+                  }`}>
+                    {currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-gray-500">User ID</span>
+                  <span className="text-sm text-gray-300 font-mono text-xs">
+                    {streamerMode ? maskId(currentUser.id) : currentUser.id}
+                  </span>
+                </div>
+              </div>
+            </div>
+              </>
+            )}
+
+            {/* Rewards Tab */}
+            {activeTab === 'rewards' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
+                    <Gift size={16} />
+                    Your Rewards
+                  </label>
+                  
+                  {isLoadingRewards ? (
+                    <div className="bg-[#121212] rounded-lg p-8 text-center">
+                      <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                      <p className="text-gray-400">Loading rewards...</p>
+          </div>
+                  ) : rewards.length === 0 ? (
+                    <div className="bg-[#121212] rounded-lg p-8 text-center">
+                      <Package className="mx-auto text-gray-500 mb-4" size={48} />
+                      <h3 className="text-lg font-semibold text-gray-400 mb-2">No Rewards Yet</h3>
+                      <p className="text-sm text-gray-500 mb-4">
+                        Redeem codes or subscribe to receive rewards
+                      </p>
+                      <button
+                        onClick={() => {
+                          if (onNavigate) {
+                            onNavigate('redeem');
+                          } else {
+                            // Fallback: use hash navigation without full page reload
+                            window.location.hash = '#redeem';
+                            window.dispatchEvent(new HashChangeEvent('hashchange'));
+                          }
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+                      >
+                        <Gift size={16} />
+                        Redeem Code
+                      </button>
+        </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {rewards.map((reward) => (
+                        <div key={reward.id} className="bg-[#121212] rounded-lg p-4 border border-gray-700">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                                  reward.source === 'code' ? 'bg-blue-900/30 text-blue-400 border border-blue-700' :
+                                  reward.source === 'kofi' ? 'bg-[#FF5E5B]/20 text-[#FF5E5B] border border-[#FF5E5B]/50' :
+                                  reward.source === 'membership' ? 'bg-purple-900/30 text-purple-400 border border-purple-700' :
+                                  'bg-gray-700/50 text-gray-300 border border-gray-600'
+                                }`}>
+                                  {reward.source === 'code' ? 'Code' :
+                                   reward.source === 'kofi' ? 'Ko-fi' :
+                                   reward.source === 'membership' ? 'Membership' : 'Manual'}
+                                </span>
+      </div>
+                              <div className="space-y-2">
+                                {reward.rewards.map((item, index) => (
+                                  <div key={index} className="bg-[#1a1a1a] rounded p-3">
+                                    <div className="font-medium text-white">{item.displayName}</div>
+                                    {item.description && (
+                                      <div className="text-sm text-gray-400 mt-1">{item.description}</div>
+                                    )}
+                                    {(item.type === 'custom' && item.customData) || reward.downloadUrl ? (
+                                      <div className="mt-2">
+                                        {(() => {
+                                          let downloadUrl = reward.downloadUrl;
+                                          if (!downloadUrl && item.customData) {
+                                            try {
+                                              const customData = JSON.parse(item.customData);
+                                              downloadUrl = customData.downloadUrl;
+                                            } catch (e) {
+                                              // Invalid JSON, ignore
+                                            }
+                                          }
+                                          
+                                          if (downloadUrl) {
+                                            return (
+                                              <button
+                                                onClick={() => handleDownloadAsset(reward.id, downloadUrl)}
+                                                className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium flex items-center gap-2"
+                                              >
+                                                <Download size={14} />
+                                                {reward.downloaded ? 'Download Again' : 'Download'}
+                                              </button>
+                                            );
+                                          }
+                                          return null;
+                                        })()}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-3 pt-3 border-t border-gray-800">
+                            Granted: {new Date(reward.grantedAt).toLocaleString()}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      
+      {showImageEditor && imageToEdit && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#1e1e1e] border border-gray-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Crop size={20} />
+                  Edit Profile Icon
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowImageEditor(false);
+                    setImageToEdit(null);
+                    setCropScale(1);
+                    setCropPosition({ x: 0, y: 0 });
+                  }}
+                  className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                
+                <div className="relative bg-black rounded-lg overflow-hidden border border-gray-700" style={{ aspectRatio: '1/1', maxHeight: '400px' }}>
+                  <img
+                    ref={imageRef}
+                    src={imageToEdit}
+                    alt="Preview"
+                    className="w-full h-full object-contain"
+                    style={{
+                      transform: `scale(${cropScale}) translate(${cropPosition.x}px, ${cropPosition.y}px)`,
+                      transformOrigin: 'center center',
+                      transition: 'transform 0.1s ease-out'
+                    }}
+                    onLoad={(e) => {
+                      imageRef.current = e.currentTarget;
+                    }}
+                  />
+                  
+                  <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute inset-0 bg-black/50" style={{
+                      clipPath: `inset(${(100 - 100 / cropScale) / 2}% ${(100 - 100 / cropScale) / 2}% ${(100 - 100 / cropScale) / 2}% ${(100 - 100 / cropScale) / 2}%)`
+                    }}></div>
+                    <div className="absolute inset-0 border-2 border-white" style={{
+                      top: `${(100 - 100 / cropScale) / 2}%`,
+                      left: `${(100 - 100 / cropScale) / 2}%`,
+                      width: `${100 / cropScale}%`,
+                      height: `${100 / cropScale}%`
+                    }}></div>
+                  </div>
+                </div>
+
+                
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-medium text-gray-300">
+                        Zoom: {Math.round(cropScale * 100)}%
+                      </label>
+                      <button
+                        onClick={() => setCropScale(1)}
+                        className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                      >
+                        Reset Zoom
+                      </button>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="3"
+                      step="0.01"
+                      value={cropScale}
+                      onChange={(e) => setCropScale(parseFloat(e.target.value))}
+                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-300">Position X</label>
+                        <button
+                          onClick={() => setCropPosition(prev => ({ ...prev, x: 0 }))}
+                          className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                        >
+                          Reset Horizontal
+                        </button>
+                      </div>
+                      <input
+                        type="range"
+                        min="-100"
+                        max="100"
+                        step="5"
+                        value={cropPosition.x}
+                        onChange={(e) => setCropPosition(prev => ({ ...prev, x: parseInt(e.target.value) }))}
+                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-gray-300">Position Y</label>
+                        <button
+                          onClick={() => setCropPosition(prev => ({ ...prev, y: 0 }))}
+                          className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                        >
+                          Reset Vertical
+                        </button>
+                      </div>
+                      <input
+                        type="range"
+                        min="-100"
+                        max="100"
+                        step="5"
+                        value={cropPosition.y}
+                        onChange={(e) => setCropPosition(prev => ({ ...prev, y: parseInt(e.target.value) }))}
+                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 pt-4 border-t border-gray-800">
+                    <button
+                      onClick={() => {
+                        setShowImageEditor(false);
+                        setImageToEdit(null);
+                        setCropScale(1);
+                        setCropPosition({ x: 0, y: 0 });
+                      }}
+                      className="flex-1 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleCropAndSave}
+                      className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Save size={16} />
+                      Apply & Save
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      
+      <canvas ref={canvasRef} className="hidden" />
+    </div>
+  );
+}
+

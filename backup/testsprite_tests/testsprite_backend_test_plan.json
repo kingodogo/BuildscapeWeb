@@ -1,0 +1,52 @@
+[
+  {
+    "id": "TC001",
+    "title": "verify_bug_report_submission_and_metadata_storage",
+    "description": "Test the bug report submission API to ensure it accepts detailed metadata including version, severity, and status, and correctly persists the data in MongoDB."
+  },
+  {
+    "id": "TC002",
+    "title": "validate_feature_suggestion_submission_and_priority_tracking",
+    "description": "Test the feature suggestion API endpoint to verify that suggestions can be submitted with proper categorization and priority, and are stored accurately."
+  },
+  {
+    "id": "TC003",
+    "title": "test_user_authentication_and_role_based_access_control",
+    "description": "Verify the user authentication endpoints for login, registration, and profile management, ensuring role-based access control restricts or grants features appropriately."
+  },
+  {
+    "id": "TC004",
+    "title": "admin_panel_crud_operations_for_bugs_suggestions_users_and_changelogs",
+    "description": "Test the admin panel APIs to perform create, read, update, and delete operations on bugs, suggestions, user accounts, and changelogs, ensuring data integrity and UI consistency."
+  },
+  {
+    "id": "TC005",
+    "title": "kofi_webhook_processing_and_subscription_status_update",
+    "description": "Test the Ko-fi webhook API to verify payment verification, subscription status updates on user profiles, and proper logging of webhook events."
+  },
+  {
+    "id": "TC006",
+    "title": "minecraft_account_linking_and_verification_via_mojang_api",
+    "description": "Test the API endpoints for linking Minecraft accounts to user profiles using Mojang API validation and verify the linked account status retrieval."
+  },
+  {
+    "id": "TC007",
+    "title": "minecraft_mod_subscription_reward_retrieval_and_granting",
+    "description": "Test the Minecraft mod integration endpoints to ensure subscription tier rewards and manual rewards are correctly retrieved and granted upon player login."
+  },
+  {
+    "id": "TC008",
+    "title": "ai_bug_report_analysis_and_tagging",
+    "description": "Test the AI bug analysis API to confirm automated processing, classification, and prioritization of incoming bug reports using Google Gemini AI."
+  },
+  {
+    "id": "TC009",
+    "title": "curseforge_api_mod_information_fetching",
+    "description": "Test the CurseForge integration API to verify accurate retrieval and display of mod information from the CurseForge API."
+  },
+  {
+    "id": "TC010",
+    "title": "user_profile_subscription_status_and_reward_display",
+    "description": "Test the user profile API to ensure subscription statuses and rewarded items are correctly displayed on the website and synchronized with Minecraft gameplay."
+  }
+]

@@ -1,0 +1,12 @@
+# Redirect all /api/* requests to Netlify Functions
+/api/admin/redeem-codes /.netlify/functions/admin-redeem-codes 200
+/api/admin/code-redemptions /.netlify/functions/admin-code-redemptions 200
+/api/ai/enhance-wiki /.netlify/functions/ai-enhance-wiki 200
+/api/v1/supporters/tiers /.netlify/functions/v1-supporters-tiers 200
+/api/v1/supporters/connect /.netlify/functions/v1-supporters-connect 200
+/api/v1/supporters/status /.netlify/functions/v1-supporters-status 200
+/api/v1/supporters/cosmetics /.netlify/functions/v1-supporters-cosmetics 200
+/api/* /.netlify/functions/:splat 200
+
+# Handle SPA routing - serve index.html for all non-API routes
+/* /index.html 200

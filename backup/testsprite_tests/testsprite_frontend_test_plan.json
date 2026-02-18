@@ -1,0 +1,587 @@
+[
+  {
+    "id": "TC001",
+    "title": "User Registration Success",
+    "description": "Verify that a new user can successfully register with valid credentials.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Open the registration page."
+      },
+      {
+        "type": "action",
+        "description": "Enter valid email, username, and password."
+      },
+      {
+        "type": "action",
+        "description": "Submit the registration form."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify registration success message is displayed and user is redirected to login page."
+      }
+    ]
+  },
+  {
+    "id": "TC002",
+    "title": "User Registration with Existing Email",
+    "description": "Verify system handles registration attempts using an already registered email address gracefully.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Open the registration page."
+      },
+      {
+        "type": "action",
+        "description": "Enter an email already registered in the system."
+      },
+      {
+        "type": "action",
+        "description": "Submit the registration form."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify appropriate error message is shown indicating the email is already in use."
+      }
+    ]
+  },
+  {
+    "id": "TC003",
+    "title": "User Login Success",
+    "description": "Verify that registered users can login using correct credentials.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to the login page."
+      },
+      {
+        "type": "action",
+        "description": "Input valid username/email and password."
+      },
+      {
+        "type": "action",
+        "description": "Click the login button."
+      },
+      {
+        "type": "assertion",
+        "description": "Check that user is successfully logged in and redirected to the dashboard."
+      }
+    ]
+  },
+  {
+    "id": "TC004",
+    "title": "User Login Failure with Incorrect Password",
+    "description": "Verify that the system prevents login with incorrect password.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to login page."
+      },
+      {
+        "type": "action",
+        "description": "Input valid username/email with incorrect password."
+      },
+      {
+        "type": "action",
+        "description": "Click the login button."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify error message indicating invalid credentials is displayed."
+      }
+    ]
+  },
+  {
+    "id": "TC005",
+    "title": "Role-Based Access Control Enforcement",
+    "description": "Verify that users with different roles have appropriate access to features and admin panel sections.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as a standard user."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify admin panel and restricted features are not accessible."
+      },
+      {
+        "type": "action",
+        "description": "Log out and log in as an admin user."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify full access to admin panel tabs including bugs, suggestions, user management, changelogs, and Ko-fi integration."
+      }
+    ]
+  },
+  {
+    "id": "TC006",
+    "title": "Bug Report Submission with Valid Data",
+    "description": "Verify users can create bug reports with complete metadata including version, severity, and status.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as a valid user."
+      },
+      {
+        "type": "action",
+        "description": "Open the bug report submission form."
+      },
+      {
+        "type": "action",
+        "description": "Fill out required fields including bug title, description, mod version, severity level, and initial status."
+      },
+      {
+        "type": "action",
+        "description": "Submit the bug report."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify bug report is saved and listed with correct metadata in bug list."
+      }
+    ]
+  },
+  {
+    "id": "TC007",
+    "title": "Bug Report Submission with Missing Required Fields",
+    "description": "Verify that the bug report form validation works and prevents submission if required fields are missing.",
+    "category": "error handling",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Open the bug report form."
+      },
+      {
+        "type": "action",
+        "description": "Attempt to submit the form with empty mandatory fields such as title or description."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify validation errors are displayed and form submission is blocked."
+      }
+    ]
+  },
+  {
+    "id": "TC008",
+    "title": "Suggestion Submission with Category and Priority",
+    "description": "Verify that users can submit feature suggestions with appropriate categorization and priority levels.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Open the suggestion submission form."
+      },
+      {
+        "type": "action",
+        "description": "Fill out suggestion description, select category and priority."
+      },
+      {
+        "type": "action",
+        "description": "Submit the suggestion."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify suggestion appears in the suggestions list with correct details."
+      }
+    ]
+  },
+  {
+    "id": "TC009",
+    "title": "User Profile Update and Minecraft Account Linking",
+    "description": "Verify that users can link their Minecraft accounts via the Mojang API and that account linking status updates correctly.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in and navigate to profile settings."
+      },
+      {
+        "type": "action",
+        "description": "Enter a valid Minecraft username to link."
+      },
+      {
+        "type": "action",
+        "description": "Submit link request."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify linking is successful and Minecraft account status is reflected on the profile page."
+      }
+    ]
+  },
+  {
+    "id": "TC010",
+    "title": "User Profile Minecraft Linking with Invalid Username",
+    "description": "Verify that linking fails gracefully with invalid or non-existent Minecraft usernames.",
+    "category": "error handling",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Enter an invalid or non-existent Minecraft username in profile linking."
+      },
+      {
+        "type": "action",
+        "description": "Submit the linking request."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify appropriate error message is shown and linking is not saved."
+      }
+    ]
+  },
+  {
+    "id": "TC011",
+    "title": "Ko-fi Subscription Tier Creation and Update in Admin Panel",
+    "description": "Verify that admins can create, update, and delete Ko-fi subscription tiers via the admin panel without UI issues.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as admin and open Ko-fi integration tab in Admin Panel."
+      },
+      {
+        "type": "action",
+        "description": "Create a new subscription tier with name, price, and reward details."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the new tier appears correctly in the list and persists in the database."
+      },
+      {
+        "type": "action",
+        "description": "Edit the subscription tier details."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify updates are saved and displayed without UI breakage or modal syntax errors."
+      },
+      {
+        "type": "action",
+        "description": "Delete the created subscription tier."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify tier is removed from the list and database."
+      }
+    ]
+  },
+  {
+    "id": "TC012",
+    "title": "Ko-fi Webhook Payment Processing",
+    "description": "Verify that receiving a valid Ko-fi webhook updates user subscription status correctly and logs event for traceability.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Simulate a Ko-fi webhook call with valid payment payload and verification token."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify user subscription status is updated in the database, payment details are recorded, and webhook event is logged."
+      }
+    ]
+  },
+  {
+    "id": "TC013",
+    "title": "Ko-fi Webhook Handling with Invalid Verification Token",
+    "description": "Verify that webhook calls with invalid verification tokens are rejected and logged without altering data.",
+    "category": "security",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Send Ko-fi webhook with an invalid or missing verification token."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify webhook is rejected with an error response and the event is logged for security audit."
+      }
+    ]
+  },
+  {
+    "id": "TC014",
+    "title": "Minecraft API Endpoint - Subscription Reward Verification",
+    "description": "Verify that the Minecraft mod API endpoint correctly validates linked accounts and returns current subscription tiers and manual rewards for the player.",
+    "category": "integration",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Call the Minecraft mod’s subscription API endpoint on player login with a linked Minecraft username."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify response includes correct subscription tier data, manual rewards, and that rewards statuses are updated as granted."
+      }
+    ]
+  },
+  {
+    "id": "TC015",
+    "title": "Minecraft API Endpoint - Unlinked Account Handling",
+    "description": "Verify Minecraft API returns appropriate response when player Minecraft account is not linked to a user.",
+    "category": "error handling",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Call the Minecraft mod API endpoint with a Minecraft username that is not linked."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the API returns a response indicating no linked subscription or rewards without failure."
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "AI Bug Analysis Processing",
+    "description": "Verify that newly submitted bug reports trigger AI analysis and receive automatic prioritization and classification tags.",
+    "category": "integration",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Submit a new bug report with typical descriptive data."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that the AI service processes the bug report and updates the bug record with classification and prioritization metadata."
+      }
+    ]
+  },
+  {
+    "id": "TC017",
+    "title": "Admin Panel Full CRUD on Bug Records",
+    "description": "Verify admin users can view, create, update, and delete bug records through the admin panel interface without UI defects.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as admin and navigate to the bug management tab."
+      },
+      {
+        "type": "action",
+        "description": "Create a new bug entry using the admin interface."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the new bug appears in the bugs list."
+      },
+      {
+        "type": "action",
+        "description": "Edit bug details including status and severity."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the changes persist and are reflected in the UI without modal syntax errors."
+      },
+      {
+        "type": "action",
+        "description": "Delete the created bug record."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify bug is removed both from database and UI."
+      }
+    ]
+  },
+  {
+    "id": "TC018",
+    "title": "Changelog Creation and Editing",
+    "description": "Verify that admins can create and edit version changelogs with markdown formatting correctly via the admin panel.",
+    "category": "functional",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as admin and navigate to changelog section."
+      },
+      {
+        "type": "action",
+        "description": "Create a new changelog entry including markdown formatting in the description."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the changelog entry displays with correct markdown rendering."
+      },
+      {
+        "type": "action",
+        "description": "Edit the changelog and save changes."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify edits are saved and displayed correctly."
+      }
+    ]
+  },
+  {
+    "id": "TC019",
+    "title": "Data Persistence and MongoDB Version Control",
+    "description": "Verify that all bug reports, suggestions, and user profiles are correctly saved in MongoDB with accurate versioning and data integrity.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Create, update, and delete bug reports and suggestions."
+      },
+      {
+        "type": "action",
+        "description": "Update user profiles including role and linked accounts."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify data in MongoDB reflects operations with proper version control and no data loss or corruption."
+      }
+    ]
+  },
+  {
+    "id": "TC020",
+    "title": "CurseForge API Integration - Mod Information Display",
+    "description": "Verify that mod information fetched from the CurseForge API is correctly displayed on the landing hero section and related UI components.",
+    "category": "integration",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Load the landing page with CurseForge integration enabled."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify mod details such as version, description, and download stats are displayed accurately."
+      }
+    ]
+  },
+  {
+    "id": "TC021",
+    "title": "Responsive UI Component Rendering",
+    "description": "Verify that the navigation bar, footer, and hero section render correctly and respond properly to various screen sizes.",
+    "category": "ui",
+    "priority": "Low",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Open the website on desktop, tablet, and mobile device viewports."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify all UI components adapt layout without overlap, truncation, or broken elements."
+      }
+    ]
+  },
+  {
+    "id": "TC022",
+    "title": "Manual Reward Assignment via Admin Panel Ko-fi Tab",
+    "description": "Verify that admins can manually assign rewards to subscribers, and that those rewards are delivered properly on next Minecraft login.",
+    "category": "functional",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Log in as admin and navigate to Ko-fi tab in admin panel."
+      },
+      {
+        "type": "action",
+        "description": "Manually assign a reward to a subscriber user."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the reward is recorded as pending grant."
+      },
+      {
+        "type": "action",
+        "description": "Simulate player login via Minecraft mod querying rewards API."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the manual reward is granted in-game and marked as granted in the database."
+      }
+    ]
+  },
+  {
+    "id": "TC023",
+    "title": "Environment Variable Configuration Validation",
+    "description": "Verify system behaves correctly when required environment variables (e.g., KOFI_VERIFICATION_TOKEN, MONGODB_URI) are set or missing.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Start the system with all required environment variables set correctly."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify system initializes without errors and external integrations function normally."
+      },
+      {
+        "type": "action",
+        "description": "Restart the system with a critical environment variable missing or invalid."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify system logs errors and fails safe without exposing sensitive information."
+      }
+    ]
+  },
+  {
+    "id": "TC024",
+    "title": "User Experience on Bug Report Submission",
+    "description": "Verify that users receive clear success or error feedback when submitting bug reports and linking Minecraft accounts.",
+    "category": "ui",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Submit a new bug report with valid and invalid data respectively."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify visible success message on valid submission and appropriate error messages on invalid submission."
+      },
+      {
+        "type": "action",
+        "description": "Attempt to link Minecraft account with valid and invalid usernames."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify success and error feedback is promptly displayed in the UI."
+      }
+    ]
+  },
+  {
+    "id": "TC025",
+    "title": "System Logs Webhook and Payment History Events",
+    "description": "Verify that webhook event processing and user subscription payment histories are logged comprehensively for auditing and debugging.",
+    "category": "security",
+    "priority": "Medium",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Trigger several Ko-fi webhook events (valid and invalid)."
+      },
+      {
+        "type": "assertion",
+        "description": "Verify that logs capture event details, processing outcomes, and error conditions for traceability."
+      }
+    ]
+  }
+]
