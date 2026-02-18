@@ -25,7 +25,7 @@ export default defineConfig({
       '/api': {
         // In Netlify dev mode, proxy to Netlify dev server (port 8888)
         // Otherwise, proxy to Vercel dev server (port 3000)
-        target: isNetlifyDev ? 'http://localhost:8888' : 'http://localhost:3000',
+        target: process.env.NETLIFY_DEV ? 'http://localhost:8888' : 'http://localhost:8888',
         changeOrigin: true,
       },
     },
