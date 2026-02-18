@@ -29,27 +29,40 @@ export const StorageService = {
                 headers: { 'Content-Type': 'application/json' }
             });
 
+
             if (!res.ok) {
+                // ... (status 503 check remains same) ...
+
+                let errorMessage = `Server error: ${res.status} ${res.statusText}`;
+                try {
+                    const errorData = await res.json();
+                    if (errorData.error) {
+                        errorMessage = errorData.error;
+                        
+                        // Check for specific Supabase/PostgREST schema errors
+                        if (errorMessage.includes("Could not find the table") || 
+                            errorMessage.includes("relation") && errorMessage.includes("does not exist")) {
+                            throw new StorageError(
+                                "Database tables missing. Please run 'supabase-schema.sql' in Supabase SQL Editor (see INSTRUCTIONS.md).",
+                                'NOT_CONFIGURED'
+                            );
+                        }
+
+                        if (errorData.stack && window.location.hostname === 'localhost') {
+                            console.error('Server error details:', errorData);
+                        }
+                    }
+                } catch (e) {
+                    // fall through
+                }
+                
                 if (res.status === 503) {
                     throw new StorageError(
                         "Database services unavailable. Please check server configuration.",
                         'NOT_CONFIGURED'
                     );
                 }
-                // Try to parse error details from response
-                let errorMessage = `Server error: ${res.status} ${res.statusText}`;
-                try {
-                    const errorData = await res.json();
-                    if (errorData.error) {
-                        errorMessage = errorData.error;
-                        // Include stack trace in dev mode if available
-                        if (errorData.stack && window.location.hostname === 'localhost') {
-                            console.error('Server error details:', errorData);
-                        }
-                    }
-                } catch (e) {
-                    // If JSON parsing fails, use default message
-                }
+                
                 throw new StorageError(
                     errorMessage,
                     'SERVER_ERROR'
