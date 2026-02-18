@@ -354,7 +354,7 @@ export default function App() {
                 // Development: show detailed error
                 if (e instanceof StorageError) {
                     if (e.code === 'NOT_CONFIGURED') {
-                        setDbError("Database not configured. Please set up MongoDB Atlas and configure the MONGODB_URI environment variable.");
+                        setDbError("Database services unavailable. Please check server configuration.");
                     } else if (e.code === 'NETWORK_ERROR') {
                         setDbError("Running in local mode. API routes require Netlify dev server. Use 'netlify dev' to test API locally.");
                     } else {

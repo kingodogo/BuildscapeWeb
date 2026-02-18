@@ -32,7 +32,7 @@ export const StorageService = {
             if (!res.ok) {
                 if (res.status === 503) {
                     throw new StorageError(
-                        "Database not configured. Please set up MongoDB Atlas and configure MONGODB_URI environment variable.",
+                        "Database services unavailable. Please check server configuration.",
                         'NOT_CONFIGURED'
                     );
                 }
@@ -85,7 +85,7 @@ export const StorageService = {
             if (!res.ok) {
                 if (res.status === 503) {
                     throw new StorageError(
-                        "Database not configured. Please set up MongoDB Atlas and configure MONGODB_URI environment variable.",
+                        "Database services unavailable. Please check server configuration.",
                         'NOT_CONFIGURED'
                     );
                 }
@@ -117,7 +117,7 @@ export const StorageService = {
             if (!res.ok) {
                 if (res.status === 503) {
                     throw new StorageError(
-                        "Database not configured. Please set up MongoDB Atlas and configure MONGODB_URI environment variable.",
+                        "Database services unavailable. Please check server configuration.",
                         'NOT_CONFIGURED'
                     );
                 }
@@ -148,7 +148,7 @@ export const StorageService = {
             if (!res.ok) {
                 if (res.status === 503) {
                     throw new StorageError(
-                        "Database not configured. Please set up MongoDB Atlas and configure MONGODB_URI environment variable.",
+                        "Database services unavailable. Please check server configuration.",
                         'NOT_CONFIGURED'
                     );
                 }
@@ -180,7 +180,7 @@ export const StorageService = {
             if (!res.ok) {
                 if (res.status === 503) {
                     throw new StorageError(
-                        "Database not configured. Please set up MongoDB Atlas and configure MONGODB_URI environment variable.",
+                        "Database services unavailable. Please check server configuration.",
                         'NOT_CONFIGURED'
                     );
                 }
@@ -211,7 +211,7 @@ export const StorageService = {
             if (!res.ok) {
                 if (res.status === 503) {
                     throw new StorageError(
-                        "Database not configured. Please set up MongoDB Atlas and configure MONGODB_URI environment variable.",
+                        "Database services unavailable. Please check server configuration.",
                         'NOT_CONFIGURED'
                     );
                 }
