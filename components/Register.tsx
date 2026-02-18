@@ -15,7 +15,10 @@ export default function Register({ onLogin, onError, onNavigateLogin }: Register
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +39,12 @@ export default function Register({ onLogin, onError, onNavigateLogin }: Register
       const user = await AuthService.register(username, email, password);
       onLogin(user); 
     } catch (err: any) {
+      // Check for confirmation required "error" (which is actually a success state for signup)
+      if (err instanceof AuthError && err.code === 'CONFIRMATION_REQUIRED') {
+         setSuccess(true);
+         return;
+      }
+
       console.error("Registration error in component:", err);
       let errorMsg = "Registration failed.";
       
@@ -49,12 +58,6 @@ export default function Register({ onLogin, onError, onNavigateLogin }: Register
       }
       
       setError(errorMsg);
-      console.error("Full error details:", {
-        name: err.name,
-        message: err.message,
-        stack: err.stack,
-        code: err.code
-      });
     } finally {
       setIsLoading(false);
     }
@@ -71,6 +74,25 @@ export default function Register({ onLogin, onError, onNavigateLogin }: Register
           <p className="text-gray-500 text-sm mt-2">Join the Buildscape community.</p>
         </div>
 
+        {success ? (
+           <div className="text-center">
+             <div className="bg-green-900/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 border border-green-700/50">
+               <div className="text-green-500 font-bold text-2xl">✓</div>
+             </div>
+             <h3 className="text-xl font-bold text-white mb-2">Check Your Email</h3>
+             <p className="text-gray-400 mb-6">
+               We've sent a verification link to <strong>{email}</strong>.<br/>
+               Please click the link to verify your account and log in.
+             </p>
+             <button 
+               onClick={onNavigateLogin}
+               className="w-full bg-gray-800 hover:bg-gray-700 text-white font-medium py-3 rounded-lg transition-colors border border-gray-700"
+             >
+               Back to Login
+             </button>
+           </div>
+        ) : (
+          <>
         {error && (
           <div className="mb-6 bg-red-900/20 border border-red-900 text-red-400 px-4 py-3 rounded-lg text-sm">
             <div className="flex items-center gap-2 mb-2">
@@ -153,6 +175,8 @@ export default function Register({ onLogin, onError, onNavigateLogin }: Register
             Back to Login
           </button>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

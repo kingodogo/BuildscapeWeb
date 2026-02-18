@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 const SESSION_KEY = 'buildscape_session_v1';
 
 export class AuthError extends Error {
-    constructor(message: string, public code: 'NETWORK_ERROR' | 'SERVER_ERROR' | 'INVALID_CREDENTIALS' | 'NOT_CONFIGURED') {
+    constructor(message: string, public code: 'NETWORK_ERROR' | 'SERVER_ERROR' | 'INVALID_CREDENTIALS' | 'NOT_CONFIGURED' | 'CONFIRMATION_REQUIRED') {
         super(message);
         this.name = 'AuthError';
     }
@@ -93,12 +93,12 @@ export const AuthService = {
             if (error) throw new AuthError(error.message, "SERVER_ERROR");
             if (!data.user) throw new AuthError("Registration failed", "SERVER_ERROR");
             
-            // If email confirmation is required, user might be null or session null. 
-            // We return a "pending" user object or throw info? 
-            // For now assume auto-confirm or return basic info. 
-            // Profile trigger runs async, might not differ immediately.
-            
-            // Wait a moment for trigger? Or just return partial.
+            // If email confirmation is enabled, session will be null
+            if (!data.session && data.user) {
+                // Return a special error that the frontend can catch to show the verification message
+                throw new AuthError("Please check your email to confirm your account.", "CONFIRMATION_REQUIRED");
+            }
+
             return {
                 id: data.user.id,
                 username,
