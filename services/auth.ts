@@ -168,16 +168,32 @@ export const AuthService = {
         return stored ? JSON.parse(stored) : null;
     },
     
-    // Sync session on load
+    // Sync session on load with a live server check
     refreshSession: async (): Promise<User | null> => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user) {
-            localStorage.removeItem(SESSION_KEY);
+        try {
+            // getUser() fetches the user from the server, which is more reliable than getSession()
+            // if the user was deleted from the Supabase dashboard.
+            const { data: { user }, error } = await supabase.auth.getUser();
+            
+            if (error || !user) {
+                console.log("Session invalid or user deleted:", error?.message);
+                AuthService.logout();
+                return null;
+            }
+
+            const profile = await fetchUserProfile(user.id).catch(() => null);
+            if (!profile) {
+                AuthService.logout();
+                return null;
+            }
+
+            localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
+            return profile;
+        } catch (e) {
+            console.error("Auth refresh failed:", e);
+            AuthService.logout();
             return null;
         }
-        const profile = await fetchUserProfile(session.user.id);
-        localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
-        return profile;
     },
 
 

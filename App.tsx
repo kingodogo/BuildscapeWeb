@@ -327,7 +327,8 @@ export default function App() {
 
             setDataSource('cloud');
             
-            const user = AuthService.getCurrentUser();
+            // Perform a live session refresh to check if the user still exists in Supabase
+            const user = await AuthService.refreshSession();
             if (user) setCurrentUser(user);
         } catch (e: any) {
             requestCompleted = true;
