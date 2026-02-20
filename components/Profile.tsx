@@ -226,6 +226,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
     setMinecraftError("");
     try {
       const loginUrl = await AuthService.getMinecraftLoginUrl(REDIRECT_URI);
+      console.log("DEBUG: Login URL from backend:", loginUrl);
       
       const width = 500;
       const height = 650;

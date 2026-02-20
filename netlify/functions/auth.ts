@@ -645,6 +645,7 @@ export const handler = async (event: any, context: any) => {
       if (!redirectUri) return corsResponse(400, { error: "Redirect URI required" });
       try {
         const url = getMicrosoftLoginUrl(redirectUri);
+        console.log(`[AUTH_DEBUG] Generated URL: ${url}`);
         return corsResponse(200, { url });
       } catch (e: any) {
         return corsResponse(500, { error: e.message });
