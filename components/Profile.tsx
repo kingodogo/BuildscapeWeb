@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { User, UserReward, KofiRewardItem } from "../types";
-import { User as UserIcon, Save, X, CheckCircle, AlertCircle, Lock, UserCircle, Upload, Image as ImageIcon, Crop, Maximize2, Minimize2, Link as LinkIcon, Unlink, Gamepad2, Coffee, Crown, Mail, Settings, ExternalLink, Gift, Download, Package } from "lucide-react";
+import { User as UserIcon, Save, X, CheckCircle, AlertCircle, Lock, UserCircle, Upload, Image as ImageIcon, Crop, Maximize2, Minimize2, Link as LinkIcon, Unlink, Gamepad2, Coffee, Crown, Mail, Settings, ExternalLink, Gift, Download, Package, LogOut } from "lucide-react";
 import { AuthService } from "../services/auth";
 import { formatUuid } from "../services/minecraft";
 
@@ -14,6 +14,18 @@ interface ProfileProps {
 }
 
 export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kofiUrl, onNavigate }: ProfileProps) {
+  // If we are in a popup window triggered by OAuth, handle it IMMEDIATELY and render nothing
+  if (typeof window !== 'undefined' && window.opener && window.location.search.includes('code=')) {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if (code) {
+      window.opener.postMessage({ type: 'MS_OAUTH_CODE', code }, window.location.origin);
+      // Small delay to ensure message is sent before closing
+      setTimeout(() => window.close(), 100);
+      return null; 
+    }
+  }
+
   const [username, setUsername] = useState(currentUser.username);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -133,17 +145,6 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
   }, [currentUser.streamerMode]);
 
   useEffect(() => {
-    // If we are in a popup, tell the opener and close
-    if (window.opener && window.location.search.includes('code=')) {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get('code');
-      if (code) {
-        window.opener.postMessage({ type: 'MS_OAUTH_CODE', code }, window.location.origin);
-        window.close();
-        return;
-      }
-    }
-
     if (activeTab === 'rewards' && currentUser) {
       loadRewards();
     }
@@ -1046,6 +1047,16 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                         </>
                       )}
                     </button>
+                    
+                    <div className="flex justify-center">
+                      <button 
+                        onClick={() => window.open('https://login.microsoftonline.com/common/oauth2/v2.0/logout', 'Microsoft Logout', 'width=500,height=600')}
+                        className="text-[10px] text-gray-500 hover:text-red-400 transition-colors flex items-center justify-center gap-1 mt-2"
+                      >
+                        <LogOut size={10} />
+                        Not you? Log out of Microsoft
+                      </button>
+                    </div>
                   </div>
 
                   {minecraftError && (
@@ -1372,16 +1383,10 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                     {currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1)}
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-500">User ID</span>
-                  <span className="text-sm text-gray-300 font-mono text-xs">
-                    {streamerMode ? maskId(currentUser.id) : currentUser.id}
-                  </span>
-                </div>
               </div>
             </div>
-              </>
-            )}
+          </>
+        )}
 
             {/* Rewards Tab */}
             {activeTab === 'rewards' && (
