@@ -7,27 +7,25 @@ export const handler = async (event: any, context: any) => {
     return corsResponse(405, { error: 'Method not allowed' });
   }
 
-  let bodyString = event.body;
+  let rawBody = event.body;
+  if (event.isBase64Encoded) {
+    rawBody = Buffer.from(event.body, 'base64').toString('utf8');
+  }
+
   let webhookData: any;
 
   try {
-    // Parse body. Can be URL-encoded or JSON?
-    // Ko-fi documentation says x-www-form-urlencoded with 'data' field containing JSON string.
     let dataField = '';
     
-    // Check if JSON first (Vercel/Netlify sometimes auto-parses or we receive raw)
-    // If it's URL encoded string:
-    if (typeof bodyString === 'string' && (bodyString.startsWith('data=') || bodyString.includes('&data='))) {
-        const params = new URLSearchParams(bodyString);
+    if (typeof rawBody === 'string' && (rawBody.startsWith('data=') || rawBody.includes('&data='))) {
+        const params = new URLSearchParams(rawBody);
         dataField = params.get('data') || '';
-    } else {
-        // Try parsing as JSON if sent that way
+    } else if (typeof rawBody === 'string') {
         try {
-             const json = JSON.parse(bodyString);
+             const json = JSON.parse(rawBody);
              if (json.data) dataField = typeof json.data === 'string' ? json.data : JSON.stringify(json.data);
-        } catch(e) {
-             // Fallback
-        }
+             else if (json.verification_token) dataField = rawBody; 
+        } catch(e) {}
     }
 
     if (!dataField) return corsResponse(400, { error: 'Missing data field' });
@@ -61,7 +59,10 @@ export const handler = async (event: any, context: any) => {
     const now = Date.now();
 
     // Record Payment (Always, even if no user found)
+    const paymentId = webhookData.message_id || `kofi-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     const { data: paymentRecord, error: paymentError } = await supabaseAdmin.from('kofi_payments').insert({
+        id: paymentId,
         user_id: user?.id || null, // Link if found, otherwise null (unclaimed)
         kofi_username: kofiUsername,
         message_id: webhookData.message_id,

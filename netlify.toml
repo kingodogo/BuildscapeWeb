@@ -10,18 +10,18 @@
   framework = "#custom"
   
 [[redirects]]
-  from = "/api/v1/supporters/connect"
-  to = "/.netlify/functions/v1-supporters-connect"
+  from = "/api/v1/supporters/connect/*"
+  to = "/.netlify/functions/v1-supporters-connect?uuid=:splat"
   status = 200
 
 [[redirects]]
-  from = "/api/v1/supporters/cosmetics"
-  to = "/.netlify/functions/v1-supporters-cosmetics"
+  from = "/api/v1/supporters/cosmetics/*"
+  to = "/.netlify/functions/v1-supporters-cosmetics?uuid=:splat"
   status = 200
 
 [[redirects]]
-  from = "/api/v1/supporters/status"
-  to = "/.netlify/functions/v1-supporters-status"
+  from = "/api/v1/supporters/status/*"
+  to = "/.netlify/functions/v1-supporters-status?uuid=:splat"
   status = 200
 
 [[redirects]]

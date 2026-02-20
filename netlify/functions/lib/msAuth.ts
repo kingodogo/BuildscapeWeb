@@ -12,8 +12,8 @@ export interface MinecraftProfile {
 }
 
 export async function getMinecraftProfileFromCode(code: string, redirectUri: string): Promise<MinecraftProfile> {
-  if (!MICROSOFT_CLIENT_ID || !MICROSOFT_CLIENT_SECRET) {
-    throw new Error('Microsoft OAuth not configured (MICROSOFT_CLIENT_ID or MICROSOFT_CLIENT_SECRET missing)');
+  if (!MICROSOFT_CLIENT_ID || !MICROSOFT_CLIENT_SECRET || MICROSOFT_CLIENT_ID === 'your-client-id-here') {
+    throw new Error('Microsoft OAuth not configured. Please set MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET in Netlify environment variables.');
   }
 
   // 1. Exchange code for Microsoft Access Token
@@ -122,7 +122,9 @@ export async function getMinecraftProfileFromCode(code: string, redirectUri: str
 }
 
 export function getMicrosoftLoginUrl(redirectUri: string): string {
-  if (!MICROSOFT_CLIENT_ID) throw new Error('MICROSOFT_CLIENT_ID missing');
+  if (!MICROSOFT_CLIENT_ID || MICROSOFT_CLIENT_ID === 'your-client-id-here') {
+    throw new Error('Microsoft OAuth not configured on the server.');
+  }
   
   const params = new URLSearchParams({
     client_id: MICROSOFT_CLIENT_ID,

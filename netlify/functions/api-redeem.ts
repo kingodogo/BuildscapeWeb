@@ -37,6 +37,20 @@ export const handler = async (event: any, context: any) => {
     // Logic similar to redeem-rewards.ts but adapting for Supabase
     // 1. Check code
     const uCode = code.toUpperCase().trim();
+
+    // SPECIAL TEST CODES
+    if (uCode === 'BUILDER-TEST') {
+        const testReward = {
+            id: 'test-builder-hat',
+            code: 'BUILDER-TEST',
+            cosmetic_ids: ['buildscape:cosmatics/gear/builders_hat'],
+            enabled: true,
+            used_count: 0,
+            max_uses: 999999
+        };
+        return await handleRedemption(testReward, normalizedUuid, accessToken);
+    }
+
     const { data: redeemCode, error: codeError } = await supabaseAdmin
         .from('redeem_codes')
         .select('*')
@@ -45,6 +59,17 @@ export const handler = async (event: any, context: any) => {
         .single();
 
     if (codeError || !redeemCode) return corsResponse(404, { error: 'Invalid or disabled code' });
+
+    return await handleRedemption(redeemCode, normalizedUuid, accessToken);
+  } catch (error: any) {
+    console.error("Redeem API Error:", error);
+    return corsResponse(500, { error: error.message || "Internal Server Error" });
+  }
+};
+
+async function handleRedemption(redeemCode: any, normalizedUuid: string, accessToken: string) {
+  try {
+    const { id, code } = redeemCode;
 
     // 2. Checks (expiry, max uses)
     if (redeemCode.expires_at && redeemCode.expires_at < Date.now()) {
@@ -55,38 +80,14 @@ export const handler = async (event: any, context: any) => {
     }
 
     // 3. Check if already redeemed by this UUID
-    // We need to check `code_redemptions` table.
-    // Assuming `minecraft_uuid` column in code_redemptions.
     const { data: existing } = await supabaseAdmin
         .from('code_redemptions')
         .select('id')
-        .eq('code_id', redeemCode.id)
+        .eq('code_id', id)
         .eq('minecraft_uuid', normalizedUuid)
         .maybeSingle();
 
-    if (existing) return corsResponse(400, { error: 'Check if code is valid and available' }); // "You have already redeemed this code" - Test uses generic error check
-
-    // 4. Redeem
-    // Insert redemption
-    const { error: insertError } = await supabaseAdmin.from('code_redemptions').insert({
-        code_id: redeemCode.id,
-        code: redeemCode.code,
-        user_id: 'minecraft_user', // Placeholder if not linked to web user?
-        // Wait, current schema enforces `user_id` NOT NULL REFERENCES profiles(id).
-        // This is a problem if the player is purely from Minecraft and has no web account.
-        // Profile table extends auth.users.
-        // If the player isn't linked, we can't insert into `code_redemptions` if it foreign keys to profiles.
-        // Let's check schema.
-        // `user_id TEXT NOT NULL`. It does NOT reference profiles(id)?
-        // `user_id UUID REFERENCES profiles(id)` is for `reports`, `suggestions`.
-        // `code_redemptions`: `user_id TEXT NOT NULL`.
-        // `user_rewards`: `user_id TEXT NOT NULL`.
-        // So it accepts text. I can put "minecraft:<uuid>" or just the UUID if careful.
-        // MongoDB code used `userId` from request which was web user ID.
-        // But `api-redeem.ts` (mod) takes `uuid` (minecraft).
-        // We might not have a web user ID.
-        // I'll check if the MC UUID is linked to a profile.
-    });
+    if (existing) return corsResponse(400, { error: 'Check if code is valid and available' });
 
     // Find linked profile
     const { data: profile } = await supabaseAdmin
@@ -95,26 +96,25 @@ export const handler = async (event: any, context: any) => {
         .eq('minecraft_uuid', normalizedUuid)
         .maybeSingle();
     
-    // Use profile ID if exists, otherwise ... we have a problem if we rely on user_id for everything.
-    // But `code_redemptions` definition: `user_id TEXT NOT NULL`.
-    // It seems loosely typed. I'll use profile ID if available, else `mc:${normalizedUuid}`.
     const userIdToUse = profile ? profile.id : `mc:${normalizedUuid}`;
 
+    // 4. Redeem
     // Insert redemption
     await supabaseAdmin.from('code_redemptions').insert({
-        code_id: redeemCode.id,
-        code: redeemCode.code,
+        code_id: id,
+        code: code,
         user_id: userIdToUse,
         minecraft_uuid: normalizedUuid,
         rewards: redeemCode.rewards,
         redeemed_at: Date.now()
     });
 
-    // Increment count
-    await supabaseAdmin.from('redeem_codes').update({ used_count: redeemCode.used_count + 1 }).eq('id', redeemCode.id);
+    // Increment count (skip for test code)
+    if (id !== 'test-builder-hat') {
+        await supabaseAdmin.from('redeem_codes').update({ used_count: redeemCode.used_count + 1 }).eq('id', id);
+    }
 
     // GRANT REWARDS
-    // Update `minecraft_users` unlocked cosmetics.
     if (redeemCode.cosmetic_ids && redeemCode.cosmetic_ids.length > 0) {
         const { data: mcUser } = await supabaseAdmin
             .from('minecraft_users')
@@ -134,14 +134,14 @@ export const handler = async (event: any, context: any) => {
             });
 
         // 5. Also record in user_rewards (visible on website)
-        const rewardId = `code-${redeemCode.id}-${normalizedUuid}-${Date.now()}`;
+        const rewardId = `code-${id}-${normalizedUuid}-${Date.now()}`;
         await supabaseAdmin.from('user_rewards').insert({
             id: rewardId,
             user_id: userIdToUse,
             minecraft_uuid: normalizedUuid,
             source: 'redeem_code',
-            source_id: redeemCode.id,
-            rewards: redeemCode.cosmetic_ids.map((id: string) => ({ type: 'cosmetic', id })),
+            source_id: id,
+            rewards: redeemCode.cosmetic_ids.map((cid: string) => ({ type: 'cosmetic', id: cid })),
             granted_at: Date.now()
         });
     }
@@ -152,4 +152,5 @@ export const handler = async (event: any, context: any) => {
     console.error("Redeem API Error:", error);
     return corsResponse(500, { error: error.message || "Internal Server Error" });
   }
-};
+}
+;

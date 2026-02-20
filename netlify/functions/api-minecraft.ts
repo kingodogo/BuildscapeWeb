@@ -68,14 +68,25 @@ export const handler = async (event: any, context: any) => {
             throw error;
         }
 
-        // Return cosmetics data
+        // Fetch default cosmetics
+        const { data: defaultCosmetics } = await supabaseAdmin
+            .from('cosmetics')
+            .select('id')
+            .eq('is_default', true);
+
+        const defaultCosmeticIds = (defaultCosmetics || []).map(c => c.id);
+        const userUnlockedIds = mcUser.unlocked_cosmetics || [];
+        
+        // Combine defaults and user-specific unlocked cosmetics
+        const allUnlocked = Array.from(new Set([...defaultCosmeticIds, ...userUnlockedIds]));
+
+        // Return cosmetics data in the format expected by the Java mod
         return corsResponse(200, {
+            unlockedCosmetics: allUnlocked,
+            selectedCosmetics: mcUser.selected_cosmetics || {},
+            defaultCosmetics: defaultCosmeticIds,
             uuid: normalizedUuid,
-            username: session.username,
-            cosmetics: {
-                unlocked: mcUser.unlocked_cosmetics || [],
-                selected: mcUser.selected_cosmetics || {}
-            }
+            username: session.username
         });
     }
 
