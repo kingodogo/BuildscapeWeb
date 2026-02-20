@@ -14,6 +14,47 @@ interface ProfileProps {
 }
 
 export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kofiUrl, onNavigate }: ProfileProps) {
+  // --- POPUP CALLBACK HANDLER ---
+  const isPopup = typeof window !== 'undefined' && !!window.opener;
+  const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  const oauthCodeInUrl = urlParams.get('code');
+  const oauthErrorInUrl = urlParams.get('error');
+
+  useEffect(() => {
+    if (isPopup && (oauthCodeInUrl || oauthErrorInUrl)) {
+      if (oauthCodeInUrl) {
+        window.opener.postMessage({ type: 'MS_OAUTH_CODE', code: oauthCodeInUrl }, window.location.origin);
+        setTimeout(() => window.close(), 1500); // Give user time to see success
+      } else if (oauthErrorInUrl) {
+        window.opener.postMessage({ type: 'MS_OAUTH_ERROR', error: oauthErrorInUrl }, window.location.origin);
+        setTimeout(() => window.close(), 2000);
+      }
+    }
+  }, [isPopup, oauthCodeInUrl, oauthErrorInUrl]);
+
+  if (isPopup && (oauthCodeInUrl || oauthErrorInUrl)) {
+    return (
+      <div className="h-screen bg-[#121212] flex items-center justify-center p-8 text-center">
+        <div className="space-y-6 max-w-sm">
+          <div className="relative w-16 h-16 mx-auto">
+             <div className="absolute inset-0 border-4 border-green-500/20 rounded-full"></div>
+             <div className="absolute inset-0 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-2">
+              {oauthCodeInUrl ? "Authorized!" : "Auth Failed"}
+            </h2>
+            <p className="text-gray-400">
+              {oauthCodeInUrl 
+                ? "Linking your account to Buildscape. This window will close automatically." 
+                : oauthErrorInUrl}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const [username, setUsername] = useState(currentUser.username);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -137,8 +178,8 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
       loadRewards();
     }
     
-    // Check for Microsoft OAuth code in URL when on accounts tab
-    if (activeTab === 'accounts') {
+    // Check for Microsoft OAuth code in URL when on accounts tab (Fallback for non-popup)
+    if (activeTab === 'accounts' && !isPopup) {
       const params = new URLSearchParams(window.location.search);
       const code = params.get('code');
       if (code && !currentUser.minecraftUuid && !isOAuthLinking && !oauthProcessed.current) {
@@ -146,7 +187,24 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
         handleCompleteMicrosoftOAuth(code);
       }
     }
-  }, [activeTab, currentUser]);
+
+    // Listener for popup messages
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'MS_OAUTH_CODE' && event.data.code) {
+        if (!oauthProcessed.current) {
+           oauthProcessed.current = true;
+           handleCompleteMicrosoftOAuth(event.data.code);
+        }
+      } else if (event.data?.type === 'MS_OAUTH_ERROR') {
+         setMinecraftError(event.data.error || "Microsoft login failed");
+         onNotify(event.data.error || "Login Failed", "error");
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [activeTab, currentUser, isPopup]);
 
   const handleCompleteMicrosoftOAuth = async (code: string) => {
     onNotify("Verifying Minecraft link...", "success");
@@ -176,7 +234,34 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
     try {
       const redirectUri = window.location.origin + '/profile';
       const loginUrl = await AuthService.getMinecraftLoginUrl(redirectUri);
-      window.location.href = loginUrl;
+      
+      const width = 500;
+      const height = 650;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      
+      const popup = window.open(
+        loginUrl,
+        'Microsoft Login',
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+
+      if (!popup) {
+        // Fallback to current window if popup blocked
+        window.location.href = loginUrl;
+      } else {
+        // Check if closed without success
+        const timer = setInterval(() => {
+          if (popup.closed) {
+            clearInterval(timer);
+            setTimeout(() => {
+              if (!oauthProcessed.current) {
+                setIsLinkingMinecraft(false);
+              }
+            }, 1000);
+          }
+        }, 1000);
+      }
     } catch (error: any) {
       setMinecraftError(error.message || "Could not start Microsoft login");
       onNotify(error.message || "Failed to connect to Microsoft", "error");
