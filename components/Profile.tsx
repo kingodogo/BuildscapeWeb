@@ -146,20 +146,6 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
         handleCompleteMicrosoftOAuth(code);
       }
     }
-
-    // Listener for popup messages
-    const handleMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
-      if (event.data?.type === 'MS_OAUTH_CODE' && event.data.code) {
-        if (!oauthProcessed.current) {
-           oauthProcessed.current = true;
-           handleCompleteMicrosoftOAuth(event.data.code);
-        }
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
   }, [activeTab, currentUser]);
 
   const handleCompleteMicrosoftOAuth = async (code: string) => {
@@ -167,7 +153,8 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
     setIsLinkingMinecraft(true);
     setMinecraftError("");
     try {
-      const redirectUri = window.location.origin + '/profile';
+      // Use the exact base URL (without query params) for redirect verification
+      const redirectUri = window.location.href.split('?')[0].split('#')[0];
       const updatedUser = await AuthService.linkMinecraftOAuth(code, redirectUri);
       onUpdate(updatedUser);
       onNotify("Minecraft account linked via Microsoft successfully!", "success");
@@ -937,40 +924,40 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                     </div>
                   </div>
                   
-                  <button
-                    onClick={async () => {
-                      if (!confirm('Are you sure you want to unlink your Minecraft account?')) return;
-                      
-                      setIsUnlinkingMinecraft(true);
-                      setMinecraftError("");
-                      
-                      try {
-                        const updatedUser = await AuthService.unlinkMinecraftAccount(currentUser.id);
-                        onUpdate(updatedUser);
-                        onNotify("Minecraft account unlinked successfully", "success");
-                      } catch (error: any) {
-                        const errorMsg = error.message || "Failed to unlink Minecraft account";
-                        setMinecraftError(errorMsg);
-                        onNotify(errorMsg, "error");
-                      } finally {
-                        setIsUnlinkingMinecraft(false);
-                      }
-                    }}
-                    disabled={isUnlinkingMinecraft}
-                    className="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isUnlinkingMinecraft ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Unlinking...
-                      </>
-                    ) : (
-                      <>
-                        <LogOut size={16} />
-                        Sign Out (Minecraft Account)
-                      </>
-                    )}
-                  </button>
+                    <button
+                      onClick={async () => {
+                        if (!confirm('Disconnect your Minecraft account?')) return;
+                        
+                        setIsUnlinkingMinecraft(true);
+                        setMinecraftError("");
+                        
+                        try {
+                          const updatedUser = await AuthService.unlinkMinecraftAccount(currentUser.id);
+                          onUpdate(updatedUser);
+                          onNotify("Minecraft account disconnected", "success");
+                        } catch (error: any) {
+                          const errorMsg = error.message || "Failed to disconnect account";
+                          setMinecraftError(errorMsg);
+                          onNotify(errorMsg, "error");
+                        } finally {
+                          setIsUnlinkingMinecraft(false);
+                        }
+                      }}
+                      disabled={isUnlinkingMinecraft}
+                      className="w-full px-4 py-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-800/50 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isUnlinkingMinecraft ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+                          Disconnecting...
+                        </>
+                      ) : (
+                        <>
+                          <Unlink size={16} />
+                          Disconnect Character
+                        </>
+                      )}
+                    </button>
                 </div>
               ) : (
                 <div className="bg-[#121212] rounded-lg p-5 space-y-4">
