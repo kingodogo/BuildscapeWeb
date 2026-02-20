@@ -239,12 +239,16 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Check for unlisted changelog URL parameter
+    // Check for unlisted changelog URL parameter or Microsoft OAuth code
     const params = new URLSearchParams(window.location.search);
     const changelogId = params.get('changelog');
+    const oauthCode = params.get('code');
+    
     if (changelogId) {
-      // Use setCurrentView directly here since we don't want to change the URL (keep query params)
       setCurrentView('changelog');
+    } else if (oauthCode) {
+      // If we have an OAuth code, ensure we stay on the profile page to process it
+      setCurrentView('profile');
     }
   }, []);
 

@@ -14,18 +14,6 @@ interface ProfileProps {
 }
 
 export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kofiUrl, onNavigate }: ProfileProps) {
-  // If we are in a popup window triggered by OAuth, handle it IMMEDIATELY and render nothing
-  if (typeof window !== 'undefined' && window.opener && window.location.search.includes('code=')) {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get('code');
-    if (code) {
-      window.opener.postMessage({ type: 'MS_OAUTH_CODE', code }, window.location.origin);
-      // Small delay to ensure message is sent before closing
-      setTimeout(() => window.close(), 100);
-      return null; 
-    }
-  }
-
   const [username, setUsername] = useState(currentUser.username);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -978,8 +966,8 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                       </>
                     ) : (
                       <>
-                        <Unlink size={16} />
-                        Unlink Account
+                        <LogOut size={16} />
+                        Sign Out (Minecraft Account)
                       </>
                     )}
                   </button>
@@ -998,34 +986,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                         try {
                           const redirectUri = window.location.origin + '/profile';
                           const loginUrl = await AuthService.getMinecraftLoginUrl(redirectUri);
-                          
-                          // Open in a popup
-                          const width = 500;
-                          const height = 650;
-                          const left = window.screenX + (window.outerWidth - width) / 2;
-                          const top = window.screenY + (window.outerHeight - height) / 2;
-                          
-                          const popup = window.open(
-                            loginUrl,
-                            'Microsoft Login',
-                            `width=${width},height=${height},left=${left},top=${top}`
-                          );
-
-                          if (!popup) {
-                            throw new Error("Popup blocked! Please allow popups for this site.");
-                          }
-
-                          // Check if closed
-                          const timer = setInterval(() => {
-                            if (popup.closed) {
-                                clearInterval(timer);
-                                setTimeout(() => {
-                                    if (!oauthProcessed.current) {
-                                        setIsLinkingMinecraft(false);
-                                    }
-                                }, 1000);
-                            }
-                          }, 1000);
+                          window.location.href = loginUrl;
                         } catch (error: any) {
                           setMinecraftError(error.message || "Could not start Microsoft login");
                           onNotify(error.message || "Failed to connect to Microsoft", "error");
@@ -1047,16 +1008,6 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                         </>
                       )}
                     </button>
-                    
-                    <div className="flex justify-center">
-                      <button 
-                        onClick={() => window.open('https://login.microsoftonline.com/common/oauth2/v2.0/logout', 'Microsoft Logout', 'width=500,height=600')}
-                        className="text-[10px] text-gray-500 hover:text-red-400 transition-colors flex items-center justify-center gap-1 mt-2"
-                      >
-                        <LogOut size={10} />
-                        Not you? Log out of Microsoft
-                      </button>
-                    </div>
                   </div>
 
                   {minecraftError && (
