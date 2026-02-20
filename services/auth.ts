@@ -106,33 +106,32 @@ export const AuthService = {
 
     register: async (username: string, email: string, password: string): Promise<User> => {
         try {
-            // Updated to use Instant Email API (Netlify Function + Resend)
-            const res = await fetch('/.netlify/functions/auth?action=signup', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    username, 
-                    email, 
-                    password,
-                    redirectTo: window.location.origin 
-                })
+            // Reverting to direct Supabase Auth integration as requested
+            const { data, error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: { username },
+                    emailRedirectTo: window.location.origin
+                }
             });
 
-            const data = await res.json();
-            
-            if (!res.ok) {
-                const errorMsg = data.error || "Registration failed";
-                if (errorMsg.includes("User already exists")) throw new AuthError("This email is already registered.", "SERVER_ERROR");
-                if (errorMsg.includes("Username already taken")) throw new AuthError("This username is already taken.", "SERVER_ERROR");
-                throw new AuthError(errorMsg, "SERVER_ERROR");
-            }
-            
-            if (data.mock) {
-                console.warn("Dev Mode: Email simulated by backend (no API key).");
-            }
+            if (error) throw error;
+            if (!data.user) throw new Error("Registration failed");
 
-            // The user is created but unconfirmed. We must throw CONFIRMATION_REQUIRED to show the UI.
-            throw new AuthError("Please check your email to confirm your account.", "CONFIRMATION_REQUIRED");
+            // Generate and store OTP so the user can verify manually with a code
+            const otp = Math.floor(100000 + Math.random() * 900000).toString();
+            const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+            // We use a small fetch to a backend helper just to store the OTP (since we need service role for this)
+            // But the EMAIL itself is now sent by Supabase dashboard settings.
+            await fetch('/.netlify/functions/auth?action=storeOtp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: data.user.id, otp, expiresAt })
+            });
+
+            throw new AuthError("Registration successful! Use the code sent to your email to verify.", "CONFIRMATION_REQUIRED");
         } catch (e: any) {
              if (e instanceof AuthError) throw e;
              throw new AuthError(e.message || "Registration failed", "SERVER_ERROR");
@@ -140,19 +139,17 @@ export const AuthService = {
     },
 
     resendConfirmationEmail: async (email: string): Promise<void> => {
-        const res = await fetch('/.netlify/functions/auth?action=resendConfirmation', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                email,
-                redirectTo: window.location.origin
-            })
+        const { error } = await supabase.auth.resend({
+            type: 'signup',
+            email,
+            options: {
+                emailRedirectTo: window.location.origin
+            }
         });
         
-        const data = await res.json();
-        if (!res.ok) {
-            throw new AuthError(data.error || "Failed to resend email", "SERVER_ERROR");
-        }
+        if (error) throw new AuthError(error.message, "SERVER_ERROR");
+
+        // Optionally regenerate OTP via storeOtp helper here if you want it updated on resend
     },
 
     verifyOtp: async (email: string, otp: string): Promise<void> => {
@@ -169,19 +166,10 @@ export const AuthService = {
     },
 
     requestPasswordReset: async (email: string): Promise<void> => {
-        const res = await fetch('/.netlify/functions/auth?action=forgotPassword', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                email,
-                redirectTo: window.location.origin 
-            })
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin + '/reset-password'
         });
-        
-        const data = await res.json();
-        if (!res.ok) {
-            throw new AuthError(data.error || "Failed to request password reset", "SERVER_ERROR");
-        }
+        if (error) throw new AuthError(error.message, "SERVER_ERROR");
     },
 
     logout: async () => {

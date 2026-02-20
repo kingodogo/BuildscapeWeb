@@ -170,165 +170,28 @@ export const handler = async (event: any, context: any) => {
       body = JSON.parse(event.body);
     }
   } catch (e) {
-    // Ignore JSON parse error for empty body
+    // Ignore JSON parse error
   }
 
   // Combine query params and body action
   const requestAction = action || body.action;
 
   try {
-    // --- Public Endpoints (No Auth Required) ---
+    // --- Public Endpoints ---
 
-    // Instant Signup (Bypasses Supabase SMTP + OTP)
-    if (requestAction === 'signup') {
-      const { email, password, username, redirectTo } = body;
-      
-      if (!email || !password || !username) {
-        return corsResponse(400, { error: "Email, password, and username required" });
-      }
+    // Store OTP (Called by client after Supabase Signup to enable manual code entry)
+    if (requestAction === 'storeOtp') {
+      const { userId, otp, expiresAt } = body;
+      if (!userId || !otp) return corsResponse(400, { error: "UserId and OTP required" });
 
-      // Check if user already exists
-      const { data: existingUser } = await supabaseAdmin.from('profiles').select('email').eq('email', email).maybeSingle();
-      if (existingUser) {
-        return corsResponse(400, { error: "User already exists" });
-      }
-
-      const { data: existingUsername } = await supabaseAdmin.from('profiles').select('username').eq('username', username).maybeSingle();
-      if (existingUsername) {
-        return corsResponse(400, { error: "Username already taken" });
-      }
-
-      const redirectUrl = redirectTo || process.env.URL || 'http://localhost:3000'; // Default to user's port per screenshot
-
-      // Generate Link (creates user if not exists)
-      const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'signup',
-        email,
-        password,
-        options: {
-          data: { username },
-          redirectTo: redirectUrl
-        }
-      });
-
-      if (error) throw error;
-
-      const verificationLink = data.properties?.action_link;
-      const userId = data.user?.id;
-
-      if (!verificationLink || !userId) throw new Error("Failed to generate verification data");
-
-      // Generate OTP
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 mins
-
-      // Store OTP in connection_codes
+      // Store in connection_codes so verifyOtp can find it
       await supabaseAdmin.from('connection_codes').insert({
         id: `otp_${userId}_${Date.now()}`,
         uuid: userId,
         code: otp,
-        expires_at: expiresAt,
+        expires_at: expiresAt || new Date(Date.now() + 15 * 60 * 1000).toISOString(),
         used: false
       });
-
-      // Send Professional Email
-      await sendProfessionalEmail(
-        email,
-        "Welcome to Buildscape!",
-        "Verify Your Account",
-        "Thanks for joining the Buildscape community! Use the code below to complete your registration, or simply click the button.",
-        "Verify Account",
-        verificationLink,
-        otp
-      );
-
-      return corsResponse(200, { 
-        success: true, 
-        user: mapProfileToUser(data.user)
-      });
-    }
-
-    // Instant Resend Confirmation (OTP + Link)
-    if (requestAction === 'resendConfirmation') {
-      const { email, redirectTo } = body;
-      if (!email) return corsResponse(400, { error: "Email required" });
-
-      const redirectUrl = redirectTo || process.env.URL || 'http://localhost:5173';
-
-      const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'magiclink', // Use magiclink for re-verification
-        email,
-        options: {
-          redirectTo: redirectUrl
-        }
-      });
-
-      if (error) throw error;
-      
-      const verificationLink = data.properties?.action_link;
-      const userId = data.user?.id;
-
-      if (!verificationLink || !userId) throw new Error("Failed to generate verification data");
-
-      // Generate OTP
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 mins
-
-      // Store OTP
-      await supabaseAdmin.from('connection_codes').insert({
-        id: `otp_${userId}_${Date.now()}`,
-        uuid: userId,
-        code: otp,
-        expires_at: expiresAt,
-        used: false
-      });
-
-      await sendProfessionalEmail(
-        email,
-        "Verify Your Email",
-        "Verification Required",
-        "You requested a new verification code. Please use the code below or click the button to verify your email address.",
-        "Verify Email",
-        verificationLink,
-        otp
-      );
-
-      return corsResponse(200, { success: true });
-    }
-
-    // Request Password Reset
-    if (requestAction === 'forgotPassword') {
-      const { email, redirectTo } = body;
-      if (!email) return corsResponse(400, { error: "Email required" });
-
-      const redirectUrl = redirectTo || process.env.URL || 'http://localhost:5173';
-      
-      // Generate Recovery Link
-      const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'recovery',
-        email,
-        options: {
-          redirectTo: redirectUrl
-        }
-      });
-
-      if (error) throw error;
-
-      const recoveryLink = data.properties?.action_link;
-      if (!recoveryLink) throw new Error("Failed to generate recovery link");
-      
-      // We don't typically use OTP for password reset unless we build a custom flow, 
-      // but standard Supabase recovery is link-based.
-      // We'll send just the link.
-      
-      await sendProfessionalEmail(
-        email,
-        "Reset Your Password",
-        "Password Reset Request",
-        "We received a request to reset your password. Click the button below to choose a new password. If you didn't request this, you can safely ignore this email.",
-        "Reset Password",
-        recoveryLink
-      );
 
       return corsResponse(200, { success: true });
     }
@@ -338,7 +201,7 @@ export const handler = async (event: any, context: any) => {
       const { email, otp } = body;
       if (!email || !otp) return corsResponse(400, { error: "Email and OTP required" });
 
-      // Get user ID from email
+      // Get user ID from email (profiles table)
       const { data: userProfile, error: profileError } = await supabaseAdmin
         .from('profiles')
         .select('id')
