@@ -119,19 +119,8 @@ export const AuthService = {
             if (error) throw error;
             if (!data.user) throw new Error("Registration failed");
 
-            // Generate and store OTP so the user can verify manually with a code
-            const otp = Math.floor(100000 + Math.random() * 900000).toString();
-            const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-
-            // We use a small fetch to a backend helper just to store the OTP (since we need service role for this)
-            // But the EMAIL itself is now sent by Supabase dashboard settings.
-            await fetch('/.netlify/functions/auth?action=storeOtp', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: data.user.id, otp, expiresAt })
-            });
-
-            throw new AuthError("Registration successful! Use the code sent to your email to verify.", "CONFIRMATION_REQUIRED");
+            // Supabase handles OTP generation and email sending automatically
+            throw new AuthError("Registration successful! Use the 8-digit code sent to your email to verify.", "CONFIRMATION_REQUIRED");
         } catch (e: any) {
              if (e instanceof AuthError) throw e;
              throw new AuthError(e.message || "Registration failed", "SERVER_ERROR");
@@ -148,20 +137,17 @@ export const AuthService = {
         });
         
         if (error) throw new AuthError(error.message, "SERVER_ERROR");
-
-        // Optionally regenerate OTP via storeOtp helper here if you want it updated on resend
     },
 
     verifyOtp: async (email: string, otp: string): Promise<void> => {
-        const res = await fetch('/.netlify/functions/auth?action=verifyOtp', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, otp })
+        const { error } = await supabase.auth.verifyOtp({
+            email,
+            token: otp,
+            type: 'signup'
         });
         
-        const data = await res.json();
-        if (!res.ok) {
-            throw new AuthError(data.error || "Verification failed", "SERVER_ERROR");
+        if (error) {
+            throw new AuthError(error.message, "SERVER_ERROR");
         }
     },
 

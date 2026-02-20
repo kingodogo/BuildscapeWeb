@@ -173,77 +173,14 @@ export const handler = async (event: any, context: any) => {
     // Ignore JSON parse error
   }
 
-  // Combine query params and body action
-  const requestAction = action || body.action;
+    // Combine query params and body action
+    const requestAction = action || body.action;
 
-  try {
-    // --- Public Endpoints ---
+    try {
+        // --- Public Endpoints ---
 
-    // Store OTP (Called by client after Supabase Signup to enable manual code entry)
-    if (requestAction === 'storeOtp') {
-      const { userId, otp, expiresAt } = body;
-      if (!userId || !otp) return corsResponse(400, { error: "UserId and OTP required" });
-
-      // Store in connection_codes so verifyOtp can find it
-      await supabaseAdmin.from('connection_codes').insert({
-        id: `otp_${userId}_${Date.now()}`,
-        uuid: userId,
-        code: otp,
-        expires_at: expiresAt || new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-        used: false
-      });
-
-      return corsResponse(200, { success: true });
-    }
-
-    // Verify OTP Action
-    if (requestAction === 'verifyOtp') {
-      const { email, otp } = body;
-      if (!email || !otp) return corsResponse(400, { error: "Email and OTP required" });
-
-      // Get user ID from email (profiles table)
-      const { data: userProfile, error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .select('id')
-        .eq('email', email)
-        .single();
-
-      if (profileError || !userProfile) {
-        return corsResponse(400, { error: "User not found" });
-      }
-
-      // Check OTP
-      const { data: otpRecord, error: otpError } = await supabaseAdmin
-        .from('connection_codes')
-        .select('*')
-        .eq('uuid', userProfile.id)
-        .eq('code', otp)
-        .eq('used', false)
-        .gt('expires_at', new Date().toISOString())
-        .order('created_at', { ascending: false }) // Use latest? created_at not in insert above, using default NOW()
-        .limit(1)
-        .maybeSingle();
-
-      if (otpError || !otpRecord) {
-        return corsResponse(400, { error: "Invalid or expired OTP" });
-      }
-
-      // Mark OTP as used
-      await supabaseAdmin.from('connection_codes').update({ used: true }).eq('id', otpRecord.id);
-
-      // Confirm User Email
-      const { error: confirmError } = await supabaseAdmin.auth.admin.updateUserById(
-        userProfile.id,
-        { email_confirm: true }
-      );
-
-      if (confirmError) throw confirmError;
-
-      return corsResponse(200, { success: true });
-    }
-
-    // Check Username Availability
-    if (requestAction === 'checkUsername') {
+        // Check Username Availability
+        if (requestAction === 'checkUsername') {
       const { username } = body;
       
       if (!username || username.length < 3) {

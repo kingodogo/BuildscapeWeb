@@ -115,7 +115,7 @@ export default function Register({ onLogin, onError, onNavigateLogin }: Register
              </div>
              <h3 className="text-xl font-bold text-white mb-2">Check Your Email</h3>
              <p className="text-gray-400 mb-6 text-sm">
-               We've sent a 6-digit code and a link to <strong>{email}</strong>.<br/>
+               We've sent an 8-digit verification code to <strong>{email}</strong>.<br/>
                Enter the code below to verify your account.
              </p>
              
@@ -123,13 +123,13 @@ export default function Register({ onLogin, onError, onNavigateLogin }: Register
                 <input 
                   type="text" 
                   value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
-                  placeholder="000000"
-                  className="w-48 bg-[#121212] border border-gray-700 rounded-lg p-3 text-center text-2xl font-bold text-white tracking-widest focus:border-green-500 outline-none mx-auto block mb-3"
+                  onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 8))}
+                  placeholder="12345678"
+                  className="w-72 bg-[#121212] border border-gray-700 rounded-lg p-3 text-center text-2xl font-bold text-white tracking-[0.3em] focus:border-green-500 outline-none mx-auto block mb-3"
                 />
                 <button
                   onClick={handleVerifyOtp}
-                  disabled={isVerifying || otp.length !== 6}
+                  disabled={isVerifying || otp.length !== 8}
                   className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isVerifying ? "Verifying..." : "Verify Code"}

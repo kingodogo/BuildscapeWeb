@@ -129,13 +129,13 @@ export default function Login({ onLogin, onError, onNavigateRegister }: LoginPro
                 <input 
                   type="text" 
                   value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
-                  placeholder="000000"
-                  className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-center text-xl font-bold text-white tracking-widest focus:border-yellow-500 outline-none mb-2"
+                  onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 8))}
+                  placeholder="12345678"
+                  className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-center text-xl font-bold text-white tracking-[0.2em] focus:border-yellow-500 outline-none mb-2"
                 />
                 <button
                   onClick={handleVerifyOtp}
-                  disabled={isVerifying || otp.length !== 6}
+                  disabled={isVerifying || otp.length !== 8}
                   className="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded transition-colors w-full disabled:opacity-50"
                 >
                   {isVerifying ? "Verifying..." : "Verify Code"}
