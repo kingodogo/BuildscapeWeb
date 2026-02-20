@@ -135,15 +135,10 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
     
     setIsLoadingRewards(true);
     try {
-      const res = await fetch(`/api/rewards?userId=${currentUser.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setRewards(data.rewards || []);
-      } else {
-        const errorData = await res.json().catch(() => ({}));
-        onNotify(errorData.error || "Failed to load rewards", "error");
-      }
+      const data = await AuthService.fetchWithAuth(`/api/rewards`);
+      setRewards(data.rewards || []);
     } catch (error: any) {
+      console.error("Rewards load error:", error);
       onNotify("Failed to load rewards", "error");
     } finally {
       setIsLoadingRewards(false);
@@ -158,24 +153,20 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
 
     try {
       // Mark as downloaded
-      const res = await fetch('/api/rewards', {
+      await AuthService.fetchWithAuth('/api/rewards', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: currentUser.id,
           rewardId: rewardId,
           action: 'markDownloaded'
         })
       });
 
-      if (res.ok) {
-        // Open download link
-        window.open(downloadUrl, '_blank');
-        // Update local state
-        setRewards(prev => prev.map(r => 
-          r.id === rewardId ? { ...r, downloaded: true } : r
-        ));
-      }
+      // Open download link
+      window.open(downloadUrl, '_blank');
+      // Update local state
+      setRewards(prev => prev.map(r => 
+        r.id === rewardId ? { ...r, downloaded: true } : r
+      ));
     } catch (error: any) {
       onNotify("Failed to mark as downloaded", "error");
     }

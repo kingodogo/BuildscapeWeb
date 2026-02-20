@@ -8,3 +8,4 @@ netlify/functions/dist
 supabase
 .idea
 *.log
+*_TEMPLATE.html

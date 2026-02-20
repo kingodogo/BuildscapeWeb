@@ -289,5 +289,9 @@ export const AuthService = {
             body: JSON.stringify({ action: 'generateKofiLinkToken', userId }) // userId implicit from token but passed for back-compat
         });
         return data.token;
+    },
+
+    fetchWithAuth: async (url: string, options: RequestInit = {}) => {
+        return fetchWithAuth(url, options);
     }
 };

@@ -36,20 +36,12 @@ export default function Redeem({ currentUser, onNavigateLogin, onNavigate, onNot
     setRedeemedRewards(null);
 
     try {
-      const res = await fetch('/api/redeem', {
+      const data = await AuthService.fetchWithAuth('/api/redeem', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          code: code.trim().toUpperCase(),
-          userId: currentUser.id
+          code: code.trim().toUpperCase()
         })
       });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to redeem code");
-      }
 
       setRedeemedRewards(data.rewards || []);
       onNotify(data.message || "Code redeemed successfully!", "success");
