@@ -14,6 +14,13 @@ interface ProfileProps {
 }
 
 export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kofiUrl, onNavigate }: ProfileProps) {
+  // --- OAUTH CONFIG ---
+  // Derive Redirect URI dynamically: match the exact current page URL (sans query/hash)
+  // We use window.location.origin + window.location.pathname to be 100% sure the URI matches Azure
+  const REDIRECT_URI = typeof window !== 'undefined' 
+    ? (window.location.origin + window.location.pathname).replace(/\/$/, '') 
+    : '';
+
   // --- POPUP CALLBACK HANDLER ---
   const isPopup = typeof window !== 'undefined' && !!window.opener;
   const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
@@ -23,36 +30,18 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
   useEffect(() => {
     if (isPopup && (oauthCodeInUrl || oauthErrorInUrl)) {
       if (oauthCodeInUrl) {
-        window.opener.postMessage({ type: 'MS_OAUTH_CODE', code: oauthCodeInUrl }, window.location.origin);
-        setTimeout(() => window.close(), 1500); // Give user time to see success
+        window.opener.postMessage({ type: 'MS_OAUTH_CODE', code: oauthCodeInUrl }, "*");
+        window.close();
       } else if (oauthErrorInUrl) {
-        window.opener.postMessage({ type: 'MS_OAUTH_ERROR', error: oauthErrorInUrl }, window.location.origin);
-        setTimeout(() => window.close(), 2000);
+        const errorDesc = urlParams.get('error_description') || oauthErrorInUrl;
+        window.opener.postMessage({ type: 'MS_OAUTH_ERROR', error: errorDesc }, "*");
+        window.close();
       }
     }
   }, [isPopup, oauthCodeInUrl, oauthErrorInUrl]);
 
   if (isPopup && (oauthCodeInUrl || oauthErrorInUrl)) {
-    return (
-      <div className="h-screen bg-[#121212] flex items-center justify-center p-8 text-center">
-        <div className="space-y-6 max-w-sm">
-          <div className="relative w-16 h-16 mx-auto">
-             <div className="absolute inset-0 border-4 border-green-500/20 rounded-full"></div>
-             <div className="absolute inset-0 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-white mb-2">
-              {oauthCodeInUrl ? "Authorized!" : "Auth Failed"}
-            </h2>
-            <p className="text-gray-400">
-              {oauthCodeInUrl 
-                ? "Linking your account to Buildscape. This window will close automatically." 
-                : oauthErrorInUrl}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
+    return <div className="h-screen bg-[#121212] flex items-center justify-center text-white">Completing Link...</div>;
   }
 
   const [username, setUsername] = useState(currentUser.username);
@@ -197,8 +186,10 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
            handleCompleteMicrosoftOAuth(event.data.code);
         }
       } else if (event.data?.type === 'MS_OAUTH_ERROR') {
-         setMinecraftError(event.data.error || "Microsoft login failed");
-         onNotify(event.data.error || "Login Failed", "error");
+         const errorMsg = event.data.error || "Microsoft login failed";
+         console.error("Microsoft OAuth Error from popup:", errorMsg); // Improved error logging
+         setMinecraftError(errorMsg);
+         onNotify(errorMsg, "error");
       }
     };
 
@@ -212,21 +203,18 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
     setIsLinkingMinecraft(true);
     setMinecraftError("");
     try {
-      // Use exactly the same redirect URI logic
-      const redirectUri = window.location.origin.replace(/\/$/, '') + '/profile';
-      console.log('Completing OAuth with redirectUri:', redirectUri);
-      const updatedUser = await AuthService.linkMinecraftOAuth(code, redirectUri);
+      const updatedUser = await AuthService.linkMinecraftOAuth(code, REDIRECT_URI);
       onUpdate(updatedUser);
-      onNotify("Minecraft account linked via Microsoft successfully!", "success");
+      onNotify("Minecraft account linked!", "success");
       
-      // Clean URL
       if (!isPopup) {
         window.history.replaceState({}, '', '/profile');
       }
     } catch (error: any) {
       console.error('OAuth Completion Error:', error);
-      setMinecraftError(error.message || "Microsoft authentication failed");
-      onNotify(error.message || "Failed to link via Microsoft", "error");
+      const msg = error.message || "Authentication failed";
+      setMinecraftError(msg);
+      onNotify(msg, "error");
     } finally {
       setIsOAuthLinking(false);
       setIsLinkingMinecraft(false);
@@ -237,9 +225,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
     setIsLinkingMinecraft(true);
     setMinecraftError("");
     try {
-      const redirectUri = window.location.origin.replace(/\/$/, '') + '/profile';
-      console.log('Initiating OAuth with redirectUri:', redirectUri);
-      const loginUrl = await AuthService.getMinecraftLoginUrl(redirectUri);
+      const loginUrl = await AuthService.getMinecraftLoginUrl(REDIRECT_URI);
       
       const width = 500;
       const height = 650;
