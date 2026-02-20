@@ -26,16 +26,40 @@ function mapProfile(profile: any): User {
     };
 }
 
-// Helper: Get full profile
+// Helper: Get full profile with "Self-Healing" (creates profile if missing but user exists)
 async function fetchUserProfile(userId: string): Promise<User> {
     const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle(); // Use maybeSingle to avoid error if missing
         
-    if (error || !data) throw error || new Error("Profile not found");
-    return mapProfile(data);
+    if (data) return mapProfile(data);
+
+    // Self-healing: If profile is missing, try to create it from Auth metadata
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user && user.id === userId) {
+        const username = user.user_metadata?.username || user.email?.split('@')[0] || 'User';
+        
+        const { data: newProfile, error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+                id: userId,
+                username: username,
+                email: user.email,
+                role: 'user'
+            })
+            .select()
+            .single();
+
+        if (!insertError && newProfile) {
+            console.log("Self-healed: Profile created for user", userId);
+            return mapProfile(newProfile);
+        }
+    }
+        
+    if (error) throw error;
+    throw new Error("Profile not found and could not be self-healed.");
 }
 
 // Helper: Call Netlify Function with Auth Header
@@ -111,7 +135,11 @@ export const AuthService = {
                 email,
                 password,
                 options: {
-                    data: { username },
+                    data: { 
+                        username,
+                        full_name: username, // Shows up in Supabase "Display name" column
+                        display_name: username 
+                    },
                     emailRedirectTo: window.location.origin
                 }
             });
@@ -247,6 +275,24 @@ export const AuthService = {
         const data = await fetchWithAuth('/.netlify/functions/auth', {
             method: 'PATCH',
             body: JSON.stringify({ action: 'updateKofiUsername', kofiUsername })
+        });
+        const user = data.user;
+        localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+        return user;
+    },
+    
+    requestMinecraftLinkingCode: async (userId: string, minecraftUsername: string): Promise<{code: string; mojangName: string}> => {
+        const data = await fetchWithAuth('/.netlify/functions/auth', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'requestMinecraftCode', minecraftUsername })
+        });
+        return { code: data.code, mojangName: data.mojangName };
+    },
+
+    confirmMinecraftLink: async (userId: string, code: string): Promise<User> => {
+        const data = await fetchWithAuth('/.netlify/functions/auth', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'confirmMinecraftLink', code })
         });
         const user = data.user;
         localStorage.setItem(SESSION_KEY, JSON.stringify(user));

@@ -1,4 +1,3 @@
-
 import { supabaseAdmin } from './lib/supabaseAdmin';
 import { verifyAuthToken, requireAdmin, corsResponse } from './lib/supabaseHelpers';
 
@@ -199,7 +198,62 @@ export const handler = async (event: any, context: any) => {
       return corsResponse(200, { available: !data });
     }
 
-    // Verify Player (Minecraft Server)
+    // Verify Player With Code (Public endpoint for Minecraft Server)
+    if (requestAction === 'verifyPlayerWithCode') {
+      const { code, uuid } = body;
+      if (!code || !uuid) return corsResponse(400, { error: "Code and UUID required" });
+
+      // Find the code record
+      // We search all records because this is a public verification from the server
+      const { data: record, error: findError } = await supabaseAdmin
+        .from('connection_codes')
+        .select('*')
+        .like('code', `MC-%:${uuid}:%`)
+        .single();
+
+      if (findError || !record) return corsResponse(400, { error: "Invalid or expired linking code for this UUID" });
+
+      // Check expiration
+      if (new Date(record.expires_at) < new Date()) {
+        await supabaseAdmin.from('connection_codes').delete().eq('id', record.id);
+        return corsResponse(400, { error: "Linking code expired" });
+      }
+
+      // Check code matching
+      const parts = record.code.split(':');
+      const submittedCodeOnly = code.startsWith('MC-') ? code : `MC-${code}`;
+      
+      if (parts[0] !== submittedCodeOnly) {
+        return corsResponse(400, { error: "Incorrect linking code" });
+      }
+
+      const mUuid = parts[1];
+      const mName = parts[2];
+
+      // Found the user (record.uuid is the profile ID)
+      const { data: updatedProfile, error: updateError } = await supabaseAdmin
+        .from('profiles')
+        .update({
+          minecraft_username: mName,
+          minecraft_uuid: mUuid
+        })
+        .eq('id', record.uuid)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      // Clean up code
+      await supabaseAdmin.from('connection_codes').delete().eq('id', record.id);
+
+      return corsResponse(200, { 
+        success: true, 
+        username: updatedProfile.username,
+        minecraft_username: mName 
+      });
+    }
+
+    // Verify User Session (Public check but typically used after login)
     if (requestAction === 'verifyPlayer') {
       const uuid = event.queryStringParameters?.uuid || body.uuid;
       if (!uuid) return corsResponse(400, { error: "UUID required" });
@@ -410,22 +464,12 @@ export const handler = async (event: any, context: any) => {
       return corsResponse(200, { success: true, user: mapProfileToUser(updatedProfile) });
     }
 
-    // Generate Ko-fi Link Token (kept for backward compat, though logic might change)
+    // Generate Ko-fi Link Token
     if (requestAction === 'generateKofiLinkToken') {
-      // Logic for token generation (using connection_codes table)
-      // Spec says: "connection_codes" table
-      
-      // Clean up old codes
-      await supabaseAdmin.from('connection_codes').delete().eq('uuid', userId); // user_id in this context is uuid? No, profile id.
-
-      // But spec table says: connection_codes(uuid TEXT, code TEXT...).
-      // Is 'uuid' the profile ID (UUID) or Minecraft UUID?
-      // In MongoDB code it was 'kofi_links' collection with userId.
-      // Let's assume it's Profile ID.
-      
       const token = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
       const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       
+      await supabaseAdmin.from('connection_codes').delete().eq('uuid', userId);
       await supabaseAdmin.from('connection_codes').insert({
         uuid: userId,
         code: token,
@@ -433,6 +477,97 @@ export const handler = async (event: any, context: any) => {
       });
       
       return corsResponse(200, { success: true, token });
+    }
+
+    // Request Minecraft Linking Code
+    if (requestAction === 'requestMinecraftCode') {
+      const { minecraftUsername } = body;
+      if (!minecraftUsername) return corsResponse(400, { error: "Minecraft username required" });
+
+      // Mojang lookup
+      const mojangRes = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(minecraftUsername)}`);
+      if (!mojangRes.ok) return corsResponse(400, { error: "Minecraft account not found" });
+      
+      const mojangData = await mojangRes.json();
+      const uuid = mojangData.id;
+
+      // Check if linked to another user
+      const { data: existing } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('minecraft_uuid', uuid)
+        .neq('id', userId)
+        .maybeSingle();
+
+      if (existing) return corsResponse(400, { error: "Minecraft account already linked to another user" });
+
+      // Generate 6-digit code
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 mins
+
+      // Store in connection_codes (reusing the table)
+      // Since 'uuid' column in this table is used for UserID, we'll store the code there.
+      // We'll use a prefix or metadata if we had it, but for now we'll just store and manage it.
+      // We'll delete any existing codes for this user first
+      await supabaseAdmin.from('connection_codes').delete().eq('uuid', userId);
+      
+      await supabaseAdmin.from('connection_codes').insert({
+        uuid: userId,
+        code: `MC-${code}:${uuid}:${mojangData.name}`, // Store UUID and name in the code string for easy retrieval
+        expires_at: expiresAt
+      });
+
+      return corsResponse(200, { success: true, code: `MC-${code}`, mojangName: mojangData.name });
+    }
+
+    // Confirm Minecraft Link (Public endpoint for mod/server or user)
+    if (requestAction === 'confirmMinecraftLink') {
+      const { code } = body; // The code the user entered on the website
+      if (!code) return corsResponse(400, { error: "Code required" });
+
+      // Find the code record
+      const { data: record, error: findError } = await supabaseAdmin
+        .from('connection_codes')
+        .select('*')
+        .eq('uuid', userId)
+        .like('code', `MC-%`)
+        .single();
+
+      if (findError || !record) return corsResponse(400, { error: "Invalid or expired linking code" });
+
+      // Check expiration
+      if (new Date(record.expires_at) < new Date()) {
+        await supabaseAdmin.from('connection_codes').delete().eq('id', record.id);
+        return corsResponse(400, { error: "Linking code expired" });
+      }
+
+      // Format is MC-123456:uuid:username
+      const parts = record.code.split(':');
+      const submittedCodeOnly = code.startsWith('MC-') ? code : `MC-${code}`;
+      
+      if (parts[0] !== submittedCodeOnly) {
+        return corsResponse(400, { error: "Incorrect linking code" });
+      }
+
+      const mUuid = parts[1];
+      const mName = parts[2];
+
+      const { data: updatedProfile, error: updateError } = await supabaseAdmin
+        .from('profiles')
+        .update({
+          minecraft_username: mName,
+          minecraft_uuid: mUuid
+        })
+        .eq('id', userId)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      // Clean up code
+      await supabaseAdmin.from('connection_codes').delete().eq('id', record.id);
+
+      return corsResponse(200, { success: true, user: mapProfileToUser(updatedProfile) });
     }
 
     // Link Minecraft Account

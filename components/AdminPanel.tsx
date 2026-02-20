@@ -1936,7 +1936,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     <button onClick={() => setActiveTab('redeem-rewards')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'redeem-rewards' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Redeem Rewards"><Gift size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Redeem Rewards</span></button>
                     <button onClick={() => setActiveTab('wiki')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'wiki' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Wiki Management"><BookOpen size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Wiki</span></button>
                     <button onClick={() => setActiveTab('config')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'config' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Configuration"><Settings size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Configuration</span></button>
-                    {currentUser.role === 'owner' && (
+                    {(currentUser.role === 'admin' || currentUser.role === 'owner') && (
                         <>
                             <button onClick={() => setActiveTab('users')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'users' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Users"><Users size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Users</span></button>
                             <button onClick={() => setActiveTab('database')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'database' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Database"><Database size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Database</span></button>
@@ -2293,7 +2293,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
             )}
 
             
-            {activeTab === 'users' && currentUser.role === 'owner' && (
+            {activeTab === 'users' && (currentUser.role === 'admin' || currentUser.role === 'owner') && (
                  <div className="flex flex-col h-full min-h-0 w-full min-w-0">
                     
                     <div className="flex gap-2 border-b border-gray-800 flex-shrink-0 pb-2 mb-4 w-full">
@@ -2859,7 +2859,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
             )}
 
             
-            {activeTab === 'database' && currentUser.role === 'owner' && (
+            {activeTab === 'database' && (currentUser.role === 'admin' || currentUser.role === 'owner') && (
                 <div className="flex flex-col h-full min-h-0 w-full min-w-0">
                     
                     <div className="flex gap-2 border-b border-gray-800 flex-shrink-0 pb-2 mb-4 w-full">

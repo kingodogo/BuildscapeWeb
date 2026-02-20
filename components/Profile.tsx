@@ -44,6 +44,9 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
   const [isLinkingMinecraft, setIsLinkingMinecraft] = useState(false);
   const [minecraftError, setMinecraftError] = useState("");
   const [isUnlinkingMinecraft, setIsUnlinkingMinecraft] = useState(false);
+  const [linkingStep, setLinkingStep] = useState<'request' | 'verify'>('request');
+  const [linkingCode, setLinkingCode] = useState("");
+  const [linkingMojangName, setLinkingMojangName] = useState("");
   
   // Tab state
   const [activeTab, setActiveTab] = useState<'edit' | 'accounts' | 'rewards'>('edit');
@@ -921,92 +924,141 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                 </div>
               ) : (
                 <div className="bg-[#121212] rounded-lg p-4 space-y-3">
-                  <div className="text-sm text-gray-400 mb-2">Link your Minecraft account to enable in-game access</div>
+                  <div className="text-sm text-gray-400 mb-2">Link your Minecraft account to enable in-game access and receive rewards</div>
                   
-                  <div>
-                    <label className="block text-xs text-gray-400 mb-1.5">Minecraft Username</label>
-                    <input
-                      type="text"
-                      value={minecraftUsername}
-                      onChange={(e) => {
-                        setMinecraftUsername(e.target.value);
-                        setMinecraftError("");
-                      }}
-                      placeholder="Enter your Minecraft username"
-                      className={`w-full bg-[#1a1a1a] border ${
-                        minecraftError ? 'border-red-500' : 'border-gray-700'
-                      } rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors`}
-                      disabled={isLinkingMinecraft}
-                    />
-                  </div>
-                  
-                  {minecraftError && (
-                    <p className="text-sm text-red-400 flex items-center gap-1">
-                      <AlertCircle size={14} />
-                      {minecraftError}
-                    </p>
+                  {linkingStep === 'request' ? (
+                    <>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1.5">Minecraft Username</label>
+                        <input
+                          type="text"
+                          value={minecraftUsername}
+                          onChange={(e) => {
+                            setMinecraftUsername(e.target.value);
+                            setMinecraftError("");
+                          }}
+                          placeholder="Enter your Minecraft username"
+                          className={`w-full bg-[#1a1a1a] border ${
+                            minecraftError ? 'border-red-500' : 'border-gray-700'
+                          } rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors`}
+                          disabled={isLinkingMinecraft}
+                        />
+                      </div>
+                      
+                      {minecraftError && (
+                        <p className="text-sm text-red-400 flex items-center gap-1">
+                          <AlertCircle size={14} />
+                          {minecraftError}
+                        </p>
+                      )}
+                      
+                      <button
+                        onClick={async () => {
+                          if (!minecraftUsername.trim()) {
+                            setMinecraftError("Please enter your Minecraft username");
+                            return;
+                          }
+                          
+                          setIsLinkingMinecraft(true);
+                          setMinecraftError("");
+                          
+                          try {
+                            const result = await AuthService.requestMinecraftLinkingCode(
+                              currentUser.id,
+                              minecraftUsername.trim()
+                            );
+                            
+                            setLinkingCode(result.code);
+                            setLinkingMojangName(result.mojangName);
+                            setLinkingStep('verify');
+                            onNotify("Linking code generated!", "success");
+                          } catch (error: any) {
+                            setMinecraftError(error.message || "Failed to generate linking code");
+                            onNotify(error.message || "Failed to generate linking code", "error");
+                          } finally {
+                            setIsLinkingMinecraft(false);
+                          }
+                        }}
+                        disabled={isLinkingMinecraft || !minecraftUsername.trim()}
+                        className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isLinkingMinecraft ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <LinkIcon size={16} />
+                            Get Linking Code
+                          </>
+                        )}
+                      </button>
+                    </>
+                  ) : (
+                    <div className="space-y-4 animate-in fade-in duration-300">
+                      <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
+                        <div className="text-xs text-gray-400 uppercase tracking-wider font-bold mb-2">Instructions</div>
+                        <p className="text-sm text-gray-300 mb-4">
+                          To link your account <span className="text-white font-bold">{linkingMojangName}</span>, please join our Minecraft server and run the following command:
+                        </p>
+                        
+                        <div className="bg-black/40 p-3 rounded border border-gray-600 flex items-center justify-between group">
+                          <code className="text-green-400 font-mono text-base break-all">/bs link {linkingCode}</code>
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(`/bs link ${linkingCode}`);
+                              onNotify("Command copied to clipboard!", "success");
+                            }}
+                            className="p-1.5 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
+                          >
+                            <Save size={14} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setLinkingStep('request')}
+                          className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors"
+                        >
+                          Back
+                        </button>
+                        <button
+                          onClick={async () => {
+                            // Try to refresh profile to see if it's updated
+                            setIsLinkingMinecraft(true);
+                            try {
+                              const updatedUser = await AuthService.refreshSession();
+                              if (updatedUser?.minecraftUuid) {
+                                onUpdate(updatedUser);
+                                onNotify("Account linked successfully!", "success");
+                                setLinkingStep('request');
+                                setLinkingCode("");
+                              } else {
+                                onNotify("Account not linked yet. Please run the command in-game first.", "error");
+                              }
+                            } catch (e) {
+                              onNotify("Failed to verify link. Please try again.", "error");
+                            } finally {
+                              setIsLinkingMinecraft(false);
+                            }
+                          }}
+                          disabled={isLinkingMinecraft}
+                          className="flex-[2] px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                        >
+                          {isLinkingMinecraft ? "Verifying..." : "I've run the command"}
+                        </button>
+                      </div>
+                      
+                      <p className="text-[10px] text-gray-500 text-center uppercase tracking-widest">
+                        Code expires in 15 minutes
+                      </p>
+                    </div>
                   )}
                   
-                  <button
-                    onClick={async () => {
-                      if (!minecraftUsername.trim()) {
-                        setMinecraftError("Please enter your Minecraft username");
-                        return;
-                      }
-                      
-                      setIsLinkingMinecraft(true);
-                      setMinecraftError("");
-                      
-                      try {
-                        // Link via our API (server will verify with Mojang API)
-                        const updatedUser = await AuthService.linkMinecraftAccount(
-                          currentUser.id,
-                          minecraftUsername.trim()
-                        );
-                        
-                        onUpdate(updatedUser);
-                        setMinecraftUsername("");
-                        onNotify("Minecraft account linked successfully!", "success");
-                      } catch (error: any) {
-                        let errorMsg = "Failed to link Minecraft account";
-                        
-                        // Handle different error types from the server
-                        if (error.message) {
-                          if (error.message.includes("not found")) {
-                            errorMsg = `Minecraft account "${minecraftUsername}" not found. Please check your username.`;
-                          } else if (error.message.includes("Invalid Minecraft username")) {
-                            errorMsg = error.message;
-                          } else if (error.message.includes("already linked")) {
-                            errorMsg = error.message;
-                          } else {
-                            errorMsg = error.message;
-                          }
-                        }
-                        
-                        setMinecraftError(errorMsg);
-                        onNotify(errorMsg, "error");
-                      } finally {
-                        setIsLinkingMinecraft(false);
-                      }
-                    }}
-                    disabled={isLinkingMinecraft || !minecraftUsername.trim()}
-                    className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isLinkingMinecraft ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        Linking...
-                      </>
-                    ) : (
-                      <>
-                        <LinkIcon size={16} />
-                        Link Minecraft Account
-                      </>
-                    )}
-                  </button>
-                  
                   <p className="text-xs text-gray-500">
-                    Your Minecraft username will be verified via Mojang's API. This allows server admins to grant you access based on your linked account.
+                    Your Minecraft username will be verified via our server integration. This ensures you are the real owner of the account.
                   </p>
                 </div>
               )}
