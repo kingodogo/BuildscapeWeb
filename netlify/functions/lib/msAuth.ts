@@ -47,7 +47,7 @@ export async function getMinecraftProfileFromCode(code: string, redirectUri: str
       Properties: {
         AuthMethod: 'RPS',
         SiteName: 'user.auth.xboxlive.com',
-        RpsTicket: msAccessToken
+        RpsTicket: `d=${msAccessToken}` // Restored "d=" prefix - required for some tenants
       },
       RelyingParty: 'http://auth.xboxlive.com',
       TokenType: 'JWT'
