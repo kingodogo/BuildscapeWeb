@@ -309,6 +309,24 @@ export const AuthService = {
         return user;
     },
 
+    getMinecraftLoginUrl: async (redirectUri: string): Promise<string> => {
+        const data = await fetchWithAuth('/.netlify/functions/auth', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'getMinecraftLoginUrl', redirectUri })
+        });
+        return data.url;
+    },
+
+    linkMinecraftOAuth: async (code: string, redirectUri: string): Promise<User> => {
+        const data = await fetchWithAuth('/.netlify/functions/auth', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'linkMinecraftOAuth', code, redirectUri })
+        });
+        const user = data.user;
+        localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+        return user;
+    },
+
     unlinkMinecraftAccount: async (userId: string): Promise<User> => {
         const data = await fetchWithAuth('/.netlify/functions/auth', {
             method: 'POST',

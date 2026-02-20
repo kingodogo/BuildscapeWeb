@@ -39,27 +39,54 @@ export const handler = async (event: any, context: any) => {
     }
 
     const kofiUsername = webhookData.from_name?.trim();
-    if (!kofiUsername) return corsResponse(200, { message: 'No username found' });
+    const message = webhookData.message?.trim() || "";
+    
+    let user: any = null;
 
-    // Find User (Case Insensitive)
-    const { data: user } = await supabaseAdmin
-        .from('profiles')
-        .select('*')
-        .ilike('kofi_username', kofiUsername)
-        .maybeSingle();
+    // 1. Try to find user by Ko-fi username (Case Insensitive)
+    if (kofiUsername) {
+        const { data: profile } = await supabaseAdmin
+            .from('profiles')
+            .select('*')
+            .ilike('kofi_username', kofiUsername)
+            .maybeSingle();
+        user = profile;
+        
+        // Update exact casing if needed
+        if (user && user.kofi_username !== kofiUsername) {
+            await supabaseAdmin.from('profiles').update({ kofi_username: kofiUsername }).eq('id', user.id);
+        }
+    }
+
+    const now = Date.now();
+
+    // Record Payment (Always, even if no user found)
+    const { data: paymentRecord, error: paymentError } = await supabaseAdmin.from('kofi_payments').insert({
+        user_id: user?.id || null, // Link if found, otherwise null (unclaimed)
+        kofi_username: kofiUsername,
+        message_id: webhookData.message_id,
+        type: webhookData.type,
+        amount: webhookData.amount,
+        currency: webhookData.currency,
+        tier_name: webhookData.tier_name,
+        is_subscription: webhookData.is_subscription_payment || false,
+        is_first_subscription: webhookData.is_first_subscription_payment || false,
+        kofi_transaction_id: webhookData.kofi_transaction_id,
+        email: webhookData.email,
+        from_name: webhookData.from_name,
+        timestamp: now
+    }).select().single();
+
+    if (paymentError) {
+        console.error("Failed to record payment:", paymentError);
+    }
 
     if (!user) {
-        // Log valid payment but no user found
-        console.log(`Payment received for ${kofiUsername} (no user linked)`);
-        return corsResponse(200, { message: 'User not found' });
+        console.log(`Unclaimed payment recorded for ${kofiUsername}`);
+        return corsResponse(200, { message: 'Unclaimed payment recorded' });
     }
 
-    // Update exact casing if needed
-    if (user.kofi_username !== kofiUsername) {
-        await supabaseAdmin.from('profiles').update({ kofi_username: kofiUsername }).eq('id', user.id);
-    }
-
-    // Process Subscription
+    // Process Subscription for matched user
     if (webhookData.type === 'Subscription' || webhookData.type === 'Donation') {
         const now = Date.now();
         let nextPaymentDate = null;
@@ -81,22 +108,46 @@ export const handler = async (event: any, context: any) => {
 
         await supabaseAdmin.from('profiles').update({ kofi_subscription: subscription }).eq('id', user.id);
 
-        // Record Payment
-        await supabaseAdmin.from('kofi_payments').insert({
-            user_id: user.id,
-            kofi_username: kofiUsername,
-            message_id: webhookData.message_id,
-            type: webhookData.type,
-            amount: webhookData.amount,
-            currency: webhookData.currency,
-            tier_name: webhookData.tier_name,
-            is_subscription: webhookData.is_subscription_payment || false,
-            is_first_subscription: webhookData.is_first_subscription_payment || false,
-            kofi_transaction_id: webhookData.kofi_transaction_id,
-            email: webhookData.email,
-            from_name: webhookData.from_name,
-            timestamp: now
-        });
+        // SYNC REWARDS TO MINECRAFT ACCOUNT
+        const mUuid = user.minecraft_uuid;
+        if (mUuid && webhookData.tier_name) {
+            // 1. Get tier cosmetics
+            const { data: tier } = await supabaseAdmin
+                .from('support_tiers')
+                .select('cosmetics')
+                .ilike('name', webhookData.tier_name)
+                .maybeSingle();
+
+            if (tier && tier.cosmetics && tier.cosmetics.length > 0) {
+                // 2. Unlock in minecraft_users
+                const { data: mcUser } = await supabaseAdmin
+                    .from('minecraft_users')
+                    .select('unlocked_cosmetics')
+                    .eq('uuid', mUuid)
+                    .maybeSingle();
+
+                const current = mcUser?.unlocked_cosmetics || [];
+                const newSet = new Set([...current, ...tier.cosmetics]);
+                
+                await supabaseAdmin.from('minecraft_users').upsert({
+                    uuid: mUuid,
+                    unlocked_cosmetics: Array.from(newSet),
+                    updated_at: new Date().toISOString()
+                });
+
+                // 3. Record in user_rewards (visible on website)
+                const rewardId = `kofi-${webhookData.message_id || Date.now()}`;
+                await supabaseAdmin.from('user_rewards').insert({
+                    id: rewardId,
+                    user_id: user.id,
+                    minecraft_uuid: mUuid,
+                    source: 'kofi',
+                    source_id: webhookData.message_id || webhookData.kofi_transaction_id,
+                    rewards: tier.cosmetics.map((id: string) => ({ type: 'cosmetic', id })),
+                    granted_at: now
+                });
+            }
+        }
     }
 
     return corsResponse(200, { success: true });

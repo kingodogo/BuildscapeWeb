@@ -996,12 +996,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
   const saveManualReward = async (reward: ManualReward) => {
       try {
-          const response = await fetch('/api/kofi-rewards', {
+          const data = await AuthService.fetchWithAuth('/api/kofi-rewards', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ reward })
           });
-          if (!response.ok) throw new Error('Failed to save manual reward');
       } catch (error: any) {
           console.error('Failed to save manual reward:', error);
           setToast({ msg: 'Failed to save manual reward', type: 'error' });
@@ -1010,11 +1008,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
   const loadManualRewards = async () => {
       try {
-          const response = await fetch('/api/kofi-rewards');
-          if (response.ok) {
-              const data = await response.json();
-              setManualRewards(data.rewards || []);
-          }
+          const data = await AuthService.fetchWithAuth('/api/kofi-rewards');
+          setManualRewards(data.rewards || []);
       } catch (error: any) {
           console.error('Failed to load manual rewards:', error);
       }
@@ -1053,34 +1048,9 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   const loadRedeemCodes = async () => {
       setLoadingRedeemCodes(true);
       try {
-          console.log('Loading redeem codes from /api/admin/redeem-codes');
-          const response = await fetch('/api/admin/redeem-codes');
-          console.log('Response status:', response.status, response.ok, response.statusText);
-          
-          // Clone response before reading to avoid "body stream already read" error
-          const responseClone = response.clone();
-          
-          if (response.ok) {
-              const data = await response.json();
-              console.log('Received data:', data);
-              setRedeemCodes(data.codes || []);
-              console.log('Set redeem codes:', data.codes?.length || 0);
-          } else {
-              let errorText = `Status ${response.status}: ${response.statusText}`;
-              try {
-                  const errorData = await responseClone.json();
-                  errorText = errorData.error || errorData.message || errorText;
-              } catch (e) {
-                  // If JSON parsing fails, try text
-                  try {
-                      errorText = await responseClone.text() || errorText;
-                  } catch (textError) {
-                      // Use default errorText
-                  }
-              }
-              console.error('Failed to load redeem codes - response not ok:', response.status, errorText);
-              setToast({ msg: `Failed to load redeem codes: ${errorText}`, type: 'error' });
-          }
+          const data = await AuthService.fetchWithAuth('/api/admin/redeem-codes');
+          setRedeemCodes(data.codes || []);
+          console.log('Set redeem codes:', data.codes?.length || 0);
       } catch (error: any) {
           console.error('Failed to load redeem codes - exception:', error);
           setToast({ msg: `Failed to load redeem codes: ${error.message || 'Network error'}`, type: 'error' });
@@ -1103,26 +1073,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
               params.append('endDate', new Date(redemptionDateFilter.end + 'T23:59:59').getTime().toString());
           }
 
-          const response = await fetch(`/api/admin/code-redemptions?${params.toString()}`);
-          const responseClone = response.clone();
-          
-          if (response.ok) {
-              const data = await response.json();
-              setCodeRedemptions(data.redemptions || []);
-          } else {
-              let errorMsg = `Status ${response.status}: ${response.statusText}`;
-              try {
-                  const errorData = await responseClone.json();
-                  errorMsg = errorData.error || errorData.message || errorMsg;
-              } catch (e) {
-                  try {
-                      errorMsg = await responseClone.text() || errorMsg;
-                  } catch (textError) {
-                      // Use default errorMsg
-                  }
-              }
-              setToast({ msg: `Failed to load code redemptions: ${errorMsg}`, type: 'error' });
-          }
+          const data = await AuthService.fetchWithAuth(`/api/admin/code-redemptions?${params.toString()}`);
+          setCodeRedemptions(data.redemptions || []);
       } catch (error: any) {
           console.error('Failed to load code redemptions:', error);
           setToast({ msg: 'Failed to load code redemptions', type: 'error' });
@@ -1167,30 +1119,24 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
               body.id = editingRedeemCode.id;
           }
 
-          const response = await fetch(url, {
+          const data = await AuthService.fetchWithAuth(url, {
               method: method,
-              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(body)
           });
 
-          if (response.ok) {
-              setToast({ msg: editingRedeemCode ? 'Code updated successfully' : 'Code created successfully', type: 'success' });
-              setShowRedeemCodeModal(false);
-              setEditingRedeemCode(null);
-              setNewRedeemCode({
-                  code: '',
-                  description: '',
-                  rewards: [],
-                  maxUses: undefined,
-                  expiresAt: undefined,
-                  requiresMembership: undefined,
-                  enabled: true
-              });
-              loadRedeemCodes();
-          } else {
-              const data = await response.json().catch(() => ({}));
-              setToast({ msg: data.error || 'Failed to save code', type: 'error' });
-          }
+          setToast({ msg: editingRedeemCode ? 'Code updated successfully' : 'Code created successfully', type: 'success' });
+          setShowRedeemCodeModal(false);
+          setEditingRedeemCode(null);
+          setNewRedeemCode({
+              code: '',
+              description: '',
+              rewards: [],
+              maxUses: undefined,
+              expiresAt: undefined,
+              requiresMembership: undefined,
+              enabled: true
+          });
+          loadRedeemCodes();
       } catch (error: any) {
           console.error('Failed to save redeem code:', error);
           setToast({ msg: 'Failed to save redeem code', type: 'error' });
@@ -1203,17 +1149,12 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
       }
 
       try {
-          const response = await fetch(`/api/admin/redeem-codes?id=${id}`, {
+          await AuthService.fetchWithAuth(`/api/admin/redeem-codes?id=${id}`, {
               method: 'DELETE'
           });
 
-          if (response.ok) {
-              setToast({ msg: 'Code deleted successfully', type: 'success' });
-              loadRedeemCodes();
-          } else {
-              const data = await response.json().catch(() => ({}));
-              setToast({ msg: data.error || 'Failed to delete code', type: 'error' });
-          }
+          setToast({ msg: 'Code deleted successfully', type: 'success' });
+          loadRedeemCodes();
       } catch (error: any) {
           console.error('Failed to delete redeem code:', error);
           setToast({ msg: 'Failed to delete redeem code', type: 'error' });
@@ -1223,13 +1164,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   const loadWikiFeatures = async () => {
       setLoadingWikiFeatures(true);
       try {
-          const response = await fetch('/api/wiki');
-          if (response.ok) {
-              const data = await response.json();
-              setWikiFeatures(data.features || []);
-          } else {
-              setToast({ msg: 'Failed to load wiki features', type: 'error' });
-          }
+          const data = await AuthService.fetchWithAuth('/api/wiki');
+          setWikiFeatures(data.features || []);
       } catch (error: any) {
           console.error('Failed to load wiki features:', error);
           setToast({ msg: 'Failed to load wiki features', type: 'error' });
@@ -1304,25 +1240,14 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
           
           try {
             // Upload to cloud storage
-            const response = await fetch('/api/upload', {
+            const data = await AuthService.fetchWithAuth('/api/upload', {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
               body: JSON.stringify({
                 image: reader.result as string,
                 name: file.name || 'wiki-media',
               }),
             });
 
-            setUploadProgress(75);
-
-            if (!response.ok) {
-              const errorData = await response.json().catch(() => ({}));
-              throw new Error(errorData.error || 'Upload failed');
-            }
-
-            const data = await response.json();
             setUploadProgress(100);
 
             // Update media URL and preview
@@ -1385,34 +1310,28 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
               updatedAt: Date.now()
           };
 
-          const response = await fetch(url, {
+          const data = await AuthService.fetchWithAuth(url, {
               method: method,
-              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ feature: featureData })
           });
 
-          if (response.ok) {
-              setToast({ msg: editingWikiFeature ? 'Feature updated successfully' : 'Feature created successfully', type: 'success' });
-              setShowWikiModal(false);
-              setEditingWikiFeature(null);
-              setNewWikiFeature({
-                  title: '',
-                  mcVersions: [],
-                  modVersions: [],
-                  categories: [],
-                  subcategories: [],
-                  description: '',
-                  descriptionType: 'markdown',
-                  media: '',
-                  details: []
-              });
-              setNewDetail('');
-              setMediaPreview('');
-              loadWikiFeatures();
-          } else {
-              const data = await response.json().catch(() => ({}));
-              setToast({ msg: data.error || 'Failed to save feature', type: 'error' });
-          }
+          setToast({ msg: editingWikiFeature ? 'Feature updated successfully' : 'Feature created successfully', type: 'success' });
+          setShowWikiModal(false);
+          setEditingWikiFeature(null);
+          setNewWikiFeature({
+              title: '',
+              mcVersions: [],
+              modVersions: [],
+              categories: [],
+              subcategories: [],
+              description: '',
+              descriptionType: 'markdown',
+              media: '',
+              details: []
+          });
+          setNewDetail('');
+          setMediaPreview('');
+          loadWikiFeatures();
       } catch (error: any) {
           console.error('Failed to save wiki feature:', error);
           setToast({ msg: 'Failed to save wiki feature', type: 'error' });
@@ -1425,17 +1344,12 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
       }
 
       try {
-          const response = await fetch(`/api/wiki?id=${id}`, {
+          await AuthService.fetchWithAuth(`/api/wiki?id=${id}`, {
               method: 'DELETE'
           });
 
-          if (response.ok) {
-              setToast({ msg: 'Feature deleted successfully', type: 'success' });
-              loadWikiFeatures();
-          } else {
-              const data = await response.json().catch(() => ({}));
-              setToast({ msg: data.error || 'Failed to delete feature', type: 'error' });
-          }
+          setToast({ msg: 'Feature deleted successfully', type: 'success' });
+          loadWikiFeatures();
       } catch (error: any) {
           console.error('Failed to delete wiki feature:', error);
           setToast({ msg: 'Failed to delete wiki feature', type: 'error' });

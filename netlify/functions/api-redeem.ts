@@ -132,6 +132,18 @@ export const handler = async (event: any, context: any) => {
                 unlocked_cosmetics: Array.from(newSet),
                 updated_at: new Date().toISOString()
             });
+
+        // 5. Also record in user_rewards (visible on website)
+        const rewardId = `code-${redeemCode.id}-${normalizedUuid}-${Date.now()}`;
+        await supabaseAdmin.from('user_rewards').insert({
+            id: rewardId,
+            user_id: userIdToUse,
+            minecraft_uuid: normalizedUuid,
+            source: 'redeem_code',
+            source_id: redeemCode.id,
+            rewards: redeemCode.cosmetic_ids.map((id: string) => ({ type: 'cosmetic', id })),
+            granted_at: Date.now()
+        });
     }
 
     return corsResponse(200, { success: true, message: 'Code redeemed successfully' });

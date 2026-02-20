@@ -49,7 +49,10 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
   const [linkingMojangName, setLinkingMojangName] = useState("");
   
   // Tab state
-  const [activeTab, setActiveTab] = useState<'edit' | 'accounts' | 'rewards'>('edit');
+  const [activeTab, setActiveTab] = useState<'edit' | 'accounts' | 'rewards'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.has('code') ? 'accounts' : 'edit';
+  });
   
   // Rewards state
   const [rewards, setRewards] = useState<UserReward[]>([]);
@@ -64,6 +67,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
   const [kofiUsername, setKofiUsername] = useState(currentUser.kofiUsername || "");
   const [isUpdatingKofiUsername, setIsUpdatingKofiUsername] = useState(false);
   const [kofiUsernameError, setKofiUsernameError] = useState("");
+  const [isOAuthLinking, setIsOAuthLinking] = useState(false);
 
   useEffect(() => {
     const checkUsername = async () => {
@@ -131,7 +135,37 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
     if (activeTab === 'rewards' && currentUser) {
       loadRewards();
     }
+    
+    // Check for Microsoft OAuth code in URL when on accounts tab
+    if (activeTab === 'accounts') {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      if (code && !currentUser.minecraftUuid && !isOAuthLinking) {
+        handleCompleteMicrosoftOAuth(code);
+      }
+    }
   }, [activeTab, currentUser]);
+
+  const handleCompleteMicrosoftOAuth = async (code: string) => {
+    setIsOAuthLinking(true);
+    setIsLinkingMinecraft(true);
+    setMinecraftError("");
+    try {
+      const redirectUri = window.location.origin + '/profile';
+      const updatedUser = await AuthService.linkMinecraftOAuth(code, redirectUri);
+      onUpdate(updatedUser);
+      onNotify("Minecraft account linked via Microsoft successfully!", "success");
+      // Clean URL
+      const newUrl = window.location.origin + window.location.pathname + (window.location.hash || '');
+      window.history.replaceState({}, '', newUrl);
+    } catch (error: any) {
+      setMinecraftError(error.message || "Microsoft authentication failed");
+      onNotify(error.message || "Failed to link via Microsoft", "error");
+    } finally {
+      setIsOAuthLinking(false);
+      setIsLinkingMinecraft(false);
+    }
+  };
 
   const loadRewards = async () => {
     if (!currentUser) return;
@@ -923,143 +957,103 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                   </button>
                 </div>
               ) : (
-                <div className="bg-[#121212] rounded-lg p-4 space-y-3">
-                  <div className="text-sm text-gray-400 mb-2">Link your Minecraft account to enable in-game access and receive rewards</div>
-                  
-                  {linkingStep === 'request' ? (
-                    <>
-                      <div>
-                        <label className="block text-xs text-gray-400 mb-1.5">Minecraft Username</label>
-                        <input
-                          type="text"
-                          value={minecraftUsername}
-                          onChange={(e) => {
-                            setMinecraftUsername(e.target.value);
-                            setMinecraftError("");
-                          }}
-                          placeholder="Enter your Minecraft username"
-                          className={`w-full bg-[#1a1a1a] border ${
-                            minecraftError ? 'border-red-500' : 'border-gray-700'
-                          } rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors`}
-                          disabled={isLinkingMinecraft}
-                        />
-                      </div>
-                      
-                      {minecraftError && (
-                        <p className="text-sm text-red-400 flex items-center gap-1">
-                          <AlertCircle size={14} />
-                          {minecraftError}
-                        </p>
+                <div className="bg-[#121212] rounded-lg p-5 space-y-4">
+                  <div className="flex flex-col gap-3">
+                    <div className="text-sm text-gray-400">
+                      Sign in with your Microsoft account to instantly verify and link your Minecraft account. This is the most secure and direct method.
+                    </div>
+                    
+                    <button
+                      onClick={async () => {
+                        setIsLinkingMinecraft(true);
+                        setMinecraftError("");
+                        try {
+                          const redirectUri = window.location.origin + '/profile';
+                          const loginUrl = await AuthService.getMinecraftLoginUrl(redirectUri);
+                          window.location.href = loginUrl;
+                        } catch (error: any) {
+                          setMinecraftError(error.message || "Could not start Microsoft login");
+                          onNotify("Failed to connect to Microsoft", "error");
+                          setIsLinkingMinecraft(false);
+                        }
+                      }}
+                      disabled={isLinkingMinecraft}
+                      className="w-full px-5 py-3 bg-white hover:bg-gray-100 text-black rounded-lg font-bold transition-all transform hover:scale-[1.02] flex items-center justify-center gap-3 shadow-lg"
+                    >
+                      {isLinkingMinecraft ? (
+                        <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <>
+                          <svg viewBox="0 0 23 23" className="w-5 h-5">
+                            <path fill="#f3f3f3" d="M0 0h11v11H0z"/><path fill="#f3f3f3" d="M12 0h11v11H12z"/><path fill="#f3f3f3" d="M0 12h11v11H0z"/><path fill="#f3f3f3" d="M12 12h11v11H12z"/>
+                            <path fill="#f25022" d="M11 11H0V0h11v11z"/><path fill="#7fbb00" d="M23 11H12V0h11v11z"/><path fill="#00a1f1" d="M11 23H0V12h11v23z" opacity=".03"/><path fill="#00a1f1" d="M11 23H0V12h11v11z"/><path fill="#ffb900" d="M23 23H12V12h11v11z"/>
+                          </svg>
+                          Sign in with Microsoft
+                        </>
                       )}
-                      
-                      <button
-                        onClick={async () => {
-                          if (!minecraftUsername.trim()) {
-                            setMinecraftError("Please enter your Minecraft username");
-                            return;
-                          }
-                          
-                          setIsLinkingMinecraft(true);
-                          setMinecraftError("");
-                          
-                          try {
-                            const result = await AuthService.requestMinecraftLinkingCode(
-                              currentUser.id,
-                              minecraftUsername.trim()
-                            );
-                            
-                            setLinkingCode(result.code);
-                            setLinkingMojangName(result.mojangName);
-                            setLinkingStep('verify');
-                            onNotify("Linking code generated!", "success");
-                          } catch (error: any) {
-                            setMinecraftError(error.message || "Failed to generate linking code");
-                            onNotify(error.message || "Failed to generate linking code", "error");
-                          } finally {
-                            setIsLinkingMinecraft(false);
-                          }
-                        }}
-                        disabled={isLinkingMinecraft || !minecraftUsername.trim()}
-                        className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {isLinkingMinecraft ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            Processing...
-                          </>
-                        ) : (
-                          <>
-                            <LinkIcon size={16} />
-                            Get Linking Code
-                          </>
-                        )}
-                      </button>
-                    </>
-                  ) : (
-                    <div className="space-y-4 animate-in fade-in duration-300">
-                      <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
-                        <div className="text-xs text-gray-400 uppercase tracking-wider font-bold mb-2">Instructions</div>
-                        <p className="text-sm text-gray-300 mb-4">
-                          To link your account <span className="text-white font-bold">{linkingMojangName}</span>, please join our Minecraft server and run the following command:
-                        </p>
-                        
-                        <div className="bg-black/40 p-3 rounded border border-gray-600 flex items-center justify-between group">
-                          <code className="text-green-400 font-mono text-base break-all">/bs link {linkingCode}</code>
-                          <button 
-                            onClick={() => {
-                              navigator.clipboard.writeText(`/bs link ${linkingCode}`);
-                              onNotify("Command copied to clipboard!", "success");
+                    </button>
+                  </div>
+
+                  {minecraftError && (
+                    <div className="p-3 bg-red-900/20 border border-red-700/50 rounded-lg text-sm text-red-400 flex items-center gap-2">
+                      <AlertCircle size={16} />
+                      {minecraftError}
+                    </div>
+                  )}
+
+                  <div className="relative pt-4 text-center">
+                    <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                      <div className="w-full border-t border-gray-800"></div>
+                    </div>
+                    <span className="relative px-2 bg-[#121212] text-[10px] text-gray-500 uppercase tracking-widest font-bold">
+                      Or manual method (requires server join)
+                    </span>
+                  </div>
+
+                  <div className="pt-2">
+                    {linkingStep === 'request' ? (
+                      <div className="space-y-3">
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={minecraftUsername}
+                            onChange={(e) => setMinecraftUsername(e.target.value)}
+                            placeholder="Enter username"
+                            className="flex-1 bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-2 text-white text-sm"
+                            disabled={isLinkingMinecraft}
+                          />
+                          <button
+                            onClick={async () => {
+                              if (!minecraftUsername.trim()) return;
+                              setIsLinkingMinecraft(true);
+                              try {
+                                const result = await AuthService.requestMinecraftLinkingCode(currentUser.id, minecraftUsername.trim());
+                                setLinkingCode(result.code);
+                                setLinkingMojangName(result.mojangName);
+                                setLinkingStep('verify');
+                              } catch (e: any) {
+                                setMinecraftError(e.message);
+                              } finally {
+                                setIsLinkingMinecraft(false);
+                              }
                             }}
-                            className="p-1.5 hover:bg-gray-700 rounded text-gray-400 hover:text-white transition-colors"
+                            disabled={isLinkingMinecraft || !minecraftUsername.trim()}
+                            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm font-medium transition-colors"
                           >
-                            <Save size={14} />
+                            Manual Link
                           </button>
                         </div>
                       </div>
-
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setLinkingStep('request')}
-                          className="flex-1 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors"
-                        >
-                          Back
-                        </button>
-                        <button
-                          onClick={async () => {
-                            // Try to refresh profile to see if it's updated
-                            setIsLinkingMinecraft(true);
-                            try {
-                              const updatedUser = await AuthService.refreshSession();
-                              if (updatedUser?.minecraftUuid) {
-                                onUpdate(updatedUser);
-                                onNotify("Account linked successfully!", "success");
-                                setLinkingStep('request');
-                                setLinkingCode("");
-                              } else {
-                                onNotify("Account not linked yet. Please run the command in-game first.", "error");
-                              }
-                            } catch (e) {
-                              onNotify("Failed to verify link. Please try again.", "error");
-                            } finally {
-                              setIsLinkingMinecraft(false);
-                            }
-                          }}
-                          disabled={isLinkingMinecraft}
-                          className="flex-[2] px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-                        >
-                          {isLinkingMinecraft ? "Verifying..." : "I've run the command"}
-                        </button>
+                    ) : (
+                      <div className="space-y-3">
+                         <div className="bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                           <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">Server Command</div>
+                           <code className="text-green-400 font-mono text-xs">/bs link {linkingCode}</code>
+                         </div>
+                         <button onClick={() => setLinkingStep('request')} className="text-[10px] text-gray-500 hover:text-gray-300 underline">Cancel manual link</button>
                       </div>
-                      
-                      <p className="text-[10px] text-gray-500 text-center uppercase tracking-widest">
-                        Code expires in 15 minutes
-                      </p>
-                    </div>
-                  )}
-                  
-                  <p className="text-xs text-gray-500">
-                    Your Minecraft username will be verified via our server integration. This ensures you are the real owner of the account.
-                  </p>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -1117,13 +1111,13 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                 ) : (
                   <>
                     <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-3 mb-3">
-                      <p className="text-xs text-blue-300 mb-2">
-                        Enter your Ko-fi username. When you subscribe on Ko-fi, your account will be automatically linked based on your username.
+                      <p className="text-xs text-blue-300">
+                        <strong>New Account?</strong> If you bought a membership before creating this account, simply link your Ko-fi name below to claim your rewards instantly.
                       </p>
                     </div>
                     
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1.5">Ko-fi Username</label>
+                      <label className="block text-xs text-gray-400 mb-1.5">Ko-fi Display Name</label>
                       <input
                         type="text"
                         value={kofiUsername}
@@ -1134,7 +1128,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                         className={`w-full bg-[#1a1a1a] border ${
                           kofiUsernameError ? 'border-red-500' : 'border-gray-700'
                         } rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors`}
-                        placeholder="Enter your Ko-fi username"
+                        placeholder="Enter your Ko-fi name"
                         disabled={isUpdatingKofiUsername}
                       />
                       {kofiUsernameError && (
@@ -1144,20 +1138,14 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                         </p>
                       )}
                       <p className="text-xs text-gray-500 mt-2">
-                        This should match your Ko-fi username (the name shown on your Ko-fi profile). Your subscription will be automatically linked when you make a payment.
+                        Must match your <strong>"From"</strong> name on Ko-fi exactly (case-insensitive).
                       </p>
                     </div>
                     
                     <button
                       onClick={async () => {
                         if (!kofiUsername.trim()) {
-                          setKofiUsernameError("Username cannot be empty");
-                          return;
-                        }
-                        
-                        const usernameRegex = /^[a-zA-Z0-9_-]+$/;
-                        if (!usernameRegex.test(kofiUsername.trim())) {
-                          setKofiUsernameError("Invalid username format. Only letters, numbers, underscores, and hyphens are allowed.");
+                          setKofiUsernameError("Name cannot be empty");
                           return;
                         }
                         
@@ -1171,9 +1159,9 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                           );
                           
                           onUpdate(updatedUser);
-                          onNotify("Ko-fi username linked successfully! Your account will be connected when you subscribe.", "success");
+                          onNotify("Ko-fi account linked! Any past rewards have been claimed.", "success");
                         } catch (error: any) {
-                          const errorMsg = error.message || "Failed to link Ko-fi username";
+                          const errorMsg = error.message || "Failed to link Ko-fi name";
                           setKofiUsernameError(errorMsg);
                           onNotify(errorMsg, "error");
                         } finally {
@@ -1181,17 +1169,17 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                         }
                       }}
                       disabled={isUpdatingKofiUsername || !kofiUsername.trim()}
-                      className="w-full px-4 py-2 bg-[#FF5E5B] hover:bg-[#ff4d49] text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full mt-3 px-4 py-2 bg-[#FF5E5B] hover:bg-[#ff4d49] text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isUpdatingKofiUsername ? (
                         <>
                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          Linking...
+                          Claiming Rewards...
                         </>
                       ) : (
                         <>
                           <Coffee size={16} />
-                          Link Ko-fi Account
+                          Link Name & Claim Rewards
                         </>
                       )}
                     </button>

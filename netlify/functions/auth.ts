@@ -1,5 +1,6 @@
 import { supabaseAdmin } from './lib/supabaseAdmin';
 import { verifyAuthToken, requireAdmin, corsResponse } from './lib/supabaseHelpers';
+import { getMinecraftProfileFromCode, getMicrosoftLoginUrl } from './lib/msAuth';
 
 import nodemailer from 'nodemailer';
 
@@ -442,17 +443,56 @@ export const handler = async (event: any, context: any) => {
       return corsResponse(200, { success: true, user: mapProfileToUser(updatedProfile) });
     }
 
-    // Update Ko-fi Username
+    // Update Ko-fi Username & Claim past rewards
     if (requestAction === 'updateKofiUsername') {
       const { kofiUsername } = body;
       
       // Basic validation
-      if (kofiUsername && !/^[a-zA-Z0-9_-]+$/.test(kofiUsername)) {
+      if (kofiUsername && !/^[a-zA-Z0-9 \._-]+$/.test(kofiUsername)) {
         return corsResponse(400, { error: "Invalid Ko-fi username format" });
       }
 
-      const updates = { kofi_username: kofiUsername || null };
+      const updates: any = { kofi_username: kofiUsername || null };
       
+      // 1. Try to find and claim any past payments
+      if (kofiUsername) {
+        // Find unclaimed payments for this name
+        const { data: pastPayments } = await supabaseAdmin
+          .from('kofi_payments')
+          .select('*')
+          .ilike('kofi_username', kofiUsername)
+          .is('user_id', null)
+          .order('timestamp', { ascending: false });
+
+        if (pastPayments && pastPayments.length > 0) {
+          console.log(`Linking ${pastPayments.length} past payments to user ${userId}`);
+          
+          // Link them
+          await supabaseAdmin
+            .from('kofi_payments')
+            .update({ user_id: userId })
+            .ilike('kofi_username', kofiUsername)
+            .is('user_id', null);
+
+          // Check for active subscription among these
+          const latestSub = pastPayments.find((p: any) => p.is_subscription);
+          if (latestSub) {
+            const d = new Date(latestSub.timestamp);
+            d.setMonth(d.getMonth() + 1);
+            
+            updates.kofi_subscription = {
+              isActive: true, // Assuming it's still active if found or just reactivation
+              tierName: latestSub.tier_name,
+              lastPaymentDate: latestSub.timestamp,
+              nextPaymentDate: d.getTime(),
+              amount: latestSub.amount,
+              currency: latestSub.currency,
+              kofiTransactionId: latestSub.kofi_transaction_id
+            };
+          }
+        }
+      }
+
       const { data: updatedProfile, error: updateError } = await supabaseAdmin
         .from('profiles')
         .update(updates)
@@ -462,21 +502,6 @@ export const handler = async (event: any, context: any) => {
         
       if (updateError) throw updateError;
       return corsResponse(200, { success: true, user: mapProfileToUser(updatedProfile) });
-    }
-
-    // Generate Ko-fi Link Token
-    if (requestAction === 'generateKofiLinkToken') {
-      const token = Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 10);
-      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      
-      await supabaseAdmin.from('connection_codes').delete().eq('uuid', userId);
-      await supabaseAdmin.from('connection_codes').insert({
-        uuid: userId,
-        code: token,
-        expires_at: expiresAt
-      });
-      
-      return corsResponse(200, { success: true, token });
     }
 
     // Request Minecraft Linking Code
@@ -564,6 +589,9 @@ export const handler = async (event: any, context: any) => {
 
       if (updateError) throw updateError;
 
+      // Sync rewards
+      await syncMinecraftRewards(userId, mUuid);
+
       // Clean up code
       await supabaseAdmin.from('connection_codes').delete().eq('id', record.id);
 
@@ -603,7 +631,63 @@ export const handler = async (event: any, context: any) => {
         .single();
 
       if (updateError) throw updateError;
+      
+      // Sync rewards
+      await syncMinecraftRewards(userId, uuid);
+
       return corsResponse(200, { success: true, user: mapProfileToUser(updatedProfile) });
+    }
+
+    // --- Minecraft OAuth Endpoints ---
+    
+    if (requestAction === 'getMinecraftLoginUrl') {
+      const { redirectUri } = body;
+      if (!redirectUri) return corsResponse(400, { error: "Redirect URI required" });
+      try {
+        const url = getMicrosoftLoginUrl(redirectUri);
+        return corsResponse(200, { url });
+      } catch (e: any) {
+        return corsResponse(500, { error: e.message });
+      }
+    }
+
+    if (requestAction === 'linkMinecraftOAuth') {
+      const { code, redirectUri } = body;
+      if (!code || !redirectUri) return corsResponse(400, { error: "Code and Redirect URI required" });
+      
+      try {
+        const mcProfile = await getMinecraftProfileFromCode(code, redirectUri);
+        
+        // Check if already linked to another user
+        const { data: existing } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('minecraft_uuid', mcProfile.id)
+          .neq('id', userId)
+          .maybeSingle();
+
+        if (existing) return corsResponse(400, { error: "Minecraft account already linked to another user" });
+
+        const { data: updatedProfile, error: updateError } = await supabaseAdmin
+          .from('profiles')
+          .update({
+            minecraft_username: mcProfile.name,
+            minecraft_uuid: mcProfile.id
+          })
+          .eq('id', userId)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+
+        // Sync rewards
+        await syncMinecraftRewards(userId, mcProfile.id);
+
+        return corsResponse(200, { success: true, user: mapProfileToUser(updatedProfile) });
+      } catch (e: any) {
+        console.error('linkMinecraftOAuth error:', e);
+        return corsResponse(400, { error: e.message || 'Failed to link Minecraft account via Microsoft' });
+      }
     }
 
     // Unlink Minecraft Account
@@ -685,6 +769,55 @@ export const handler = async (event: any, context: any) => {
     return corsResponse(500, { error: err.message || "Internal Server Error" });
   }
 };
+
+// Helper to sync rewards to Minecraft UUID
+async function syncMinecraftRewards(userId: string, mUuid: string) {
+  try {
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('kofi_subscription')
+      .eq('id', userId)
+      .single();
+
+    if (profile?.kofi_subscription?.isActive && profile.kofi_subscription.tierName) {
+      const { data: tier } = await supabaseAdmin
+        .from('support_tiers')
+        .select('*')
+        .ilike('name', profile.kofi_subscription.tierName)
+        .maybeSingle();
+
+      if (tier?.cosmetics && tier.cosmetics.length > 0) {
+        const { data: mcUser } = await supabaseAdmin
+            .from('minecraft_users')
+            .select('unlocked_cosmetics')
+            .eq('uuid', mUuid)
+            .maybeSingle();
+
+        const current = mcUser?.unlocked_cosmetics || [];
+        const newSet = new Set([...current, ...tier.cosmetics]);
+        
+        await supabaseAdmin.from('minecraft_users').upsert({
+            uuid: mUuid,
+            unlocked_cosmetics: Array.from(newSet),
+            updated_at: new Date().toISOString()
+        });
+
+        const rewardId = `kofi-sync-${userId}-${mUuid}-${profile.kofi_subscription.tierName.toLowerCase().replace(/\s+/g, '-')}`;
+        await supabaseAdmin.from('user_rewards').upsert({
+            id: rewardId,
+            user_id: userId,
+            minecraft_uuid: mUuid,
+            source: 'kofi_sync',
+            source_id: profile.kofi_subscription.tierName,
+            rewards: tier.cosmetics.map((id: string) => ({ type: 'cosmetic', id })),
+            granted_at: Date.now()
+        });
+      }
+    }
+  } catch (err) {
+    console.error("Failed to sync Minecraft rewards:", err);
+  }
+}
 
 // Helper to map DB profile to frontend User object
 function mapProfileToUser(p: any) {

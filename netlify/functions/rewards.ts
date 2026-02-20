@@ -14,15 +14,29 @@ export const handler = async (event: any, context: any) => {
 
   try {
      if (event.httpMethod === 'GET') {
-         const { id: userId } = user; // from token verification
-         // The user ID in user_rewards might be the Profile ID or whatever.
-         // Assuming Profile ID.
+         const { id: userId } = user;
          
-         const { data, error } = await supabaseAdmin
+         // 1. Get the current user's linked Minecraft UUID
+         const { data: profile } = await supabaseAdmin
+             .from('profiles')
+             .select('minecraft_uuid')
+             .eq('id', userId)
+             .single();
+             
+         const mUuid = profile?.minecraft_uuid;
+         
+         // 2. Query rewards tied to either the user ID OR the linked Minecraft UUID
+         const query = supabaseAdmin
              .from('user_rewards')
-             .select('*')
-             .eq('user_id', userId)
-             .order('granted_at', { ascending: false });
+             .select('*');
+             
+         if (mUuid) {
+             query.or(`user_id.eq."${userId}",minecraft_uuid.eq."${mUuid}"`);
+         } else {
+             query.eq('user_id', userId);
+         }
+         
+         const { data, error } = await query.order('granted_at', { ascending: false });
 
          if (error) throw error;
          
