@@ -18,6 +18,7 @@ export default function Login({ onLogin, onError, onNavigateRegister }: LoginPro
   const [resendSuccess, setResendSuccess] = useState(false);
   const [otp, setOtp] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   const handleVerifyOtp = async () => {
     if (!otp || !unconfirmedEmail) return;
@@ -27,8 +28,12 @@ export default function Login({ onLogin, onError, onNavigateRegister }: LoginPro
         alert("Email verified successfully! Logging you in...");
         setUnconfirmedEmail(null); 
         // Auto-retry login
-        const formEvent = { preventDefault: () => {} } as React.FormEvent;
-        handleSubmit(formEvent);
+        try {
+          const user = await AuthService.login(username, password);
+          if (user) onLogin(user);
+        } catch (e) {
+          setError("Verification successful, but login failed. Please enter your password and click Login.");
+        }
     } catch (err: any) {
         console.error("Verification failed:", err);
         setError(err.message || "Invalid code");
@@ -45,10 +50,28 @@ export default function Login({ onLogin, onError, onNavigateRegister }: LoginPro
        await AuthService.resendConfirmationEmail(unconfirmedEmail);
        setResendSuccess(true);
     } catch (err: any) {
+        console.error("Resend error:", err);
         setError(err.message || "Failed to resend confirmation email.");
-        setUnconfirmedEmail(null);
     } finally {
        setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    const isEmail = username.includes('@');
+    if (!username || !isEmail) {
+       alert("Please enter your email address in the 'Username or Email' field to reset your password.");
+       return;
+    }
+
+    setIsResetting(true);
+    try {
+       await AuthService.requestPasswordReset(username);
+       alert("Password reset link sent to " + username);
+    } catch (err: any) {
+       alert("Failed to send reset link: " + err.message);
+    } finally {
+       setIsResetting(false);
     }
   };
 
@@ -64,9 +87,6 @@ export default function Login({ onLogin, onError, onNavigateRegister }: LoginPro
         onLogin(user);
       } else {
         setError("Login failed. Please try again.");
-        if (onError) {
-          onError(new AuthError("Login failed", 'INVALID_CREDENTIALS'));
-        }
       }
     } catch (err: any) {
       if (err instanceof AuthError && err.code === 'EMAIL_NOT_CONFIRMED') {
@@ -78,8 +98,6 @@ export default function Login({ onLogin, onError, onNavigateRegister }: LoginPro
       setError(errorMsg);
       if (onError && err instanceof AuthError) {
         onError(err);
-      } else if (onError) {
-        onError(new AuthError(errorMsg, 'INVALID_CREDENTIALS'));
       }
     } finally {
       setIsLoading(false);
@@ -182,23 +200,20 @@ export default function Login({ onLogin, onError, onNavigateRegister }: LoginPro
 
         <div className="mt-6 text-center pt-6 border-t border-gray-800 space-y-3">
           <button 
-            onClick={() => {
-              const event = new CustomEvent('navigate', { detail: 'forgot-password' });
-              window.dispatchEvent(event);
-            }}
-            disabled={isLoading}
+            onClick={handleForgotPassword}
+            disabled={isLoading || isResetting}
             className="text-blue-400 hover:text-blue-300 text-sm font-medium hover:underline disabled:opacity-50 block w-full"
           >
-            Forgot Password?
+            {isResetting ? "Sending Link..." : "Forgot Password?"}
           </button>
           <div>
             <p className="text-gray-400 text-sm mb-2">New here?</p>
             <button 
-              onClick={onNavigateRegister}
-              disabled={isLoading}
-              className="text-green-500 hover:text-green-400 font-medium hover:underline disabled:opacity-50"
+                onClick={onNavigateRegister}
+                disabled={isLoading}
+                className="text-green-500 hover:text-green-400 font-medium hover:underline disabled:opacity-50"
             >
-              Create an Account
+                Create an Account
             </button>
           </div>
         </div>

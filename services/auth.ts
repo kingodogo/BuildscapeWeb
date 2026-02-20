@@ -168,6 +168,22 @@ export const AuthService = {
         }
     },
 
+    requestPasswordReset: async (email: string): Promise<void> => {
+        const res = await fetch('/.netlify/functions/auth?action=forgotPassword', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                email,
+                redirectTo: window.location.origin 
+            })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) {
+            throw new AuthError(data.error || "Failed to request password reset", "SERVER_ERROR");
+        }
+    },
+
     logout: async () => {
         await supabase.auth.signOut();
         localStorage.removeItem(SESSION_KEY);
@@ -190,12 +206,7 @@ export const AuthService = {
         return profile;
     },
 
-    requestPasswordReset: async (email: string): Promise<void> => {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: window.location.origin + '/reset-password'
-        });
-        if (error) throw new AuthError(error.message, "SERVER_ERROR");
-    },
+
 
     resetPassword: async (newPassword: string): Promise<void> => {
         const { error } = await supabase.auth.updateUser({ password: newPassword });

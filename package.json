@@ -17,8 +17,10 @@
   "dependencies": {
     "@google/genai": "latest",
     "@supabase/supabase-js": "^2.96.0",
+    "@types/nodemailer": "^7.0.10",
     "@vercel/functions": "^1.0.0",
     "lucide-react": "^0.344.0",
+    "nodemailer": "^8.0.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

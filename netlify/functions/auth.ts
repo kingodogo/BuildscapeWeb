@@ -2,35 +2,160 @@
 import { supabaseAdmin } from './lib/supabaseAdmin';
 import { verifyAuthToken, requireAdmin, corsResponse } from './lib/supabaseHelpers';
 
-// Helper to send email via Resend (skips Supabase queue)
-async function sendInstantEmail(to: string, subject: string, html: string) {
-  const apiKey = process.env.RESEND_API_KEY || 're_123'; // Mock for dev if not set to prevent crash, but logs warning
-  
-  if (!process.env.RESEND_API_KEY) {
-    console.warn("RESEND_API_KEY not found. Skipping instant email (Mock Mode).");
-    return true; // Pretend we sent it
+import nodemailer from 'nodemailer';
+
+// Configure Nodemailer Transporter
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+// Helper to send professional HTML email
+async function sendProfessionalEmail(to: string, subject: string, title: string, message: string, buttonText: string, buttonLink: string, otp?: string) {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>${subject}</title>
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body { margin: 0; padding: 0; background-color: #0a0a0a; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #e5e7eb; }
+        .wrapper { width: 100%; table-layout: fixed; background-color: #0a0a0a; padding-bottom: 60px; padding-top: 60px; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #111111; border: 1px solid #1f2937; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); }
+        .header { background: linear-gradient(135deg, #059669 0%, #10b981 100%); padding: 32px; text-align: center; }
+        .header h1 { margin: 0; color: #ffffff; font-size: 28px; font-weight: 800; letter-spacing: -0.025em; text-transform: uppercase; }
+        .content { padding: 48px 40px; text-align: center; }
+        .title { font-size: 24px; font-weight: 700; margin-bottom: 16px; color: #ffffff; letter-spacing: -0.025em; }
+        .message { font-size: 16px; line-height: 1.6; color: #9ca3af; margin-bottom: 32px; font-weight: 400; }
+        .otp-container { background-color: #171717; border: 1px dashed #374151; border-radius: 12px; padding: 24px; margin: 32px 0; text-align: center; }
+        .otp-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #6b7280; margin-bottom: 12px; }
+        .otp-code { font-size: 40px; font-weight: 800; letter-spacing: 0.2em; color: #10b981; margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", font-family: monospace; }
+        .button { display: inline-block; background-color: #10b981; color: #ffffff !important; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 700; font-size: 16px; transition: all 0.2s ease; margin-top: 8px; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2); }
+        .footer { padding: 32px; text-align: center; font-size: 13px; color: #4b5563; border-top: 1px solid #1f2937; }
+        .footer a { color: #10b981; text-decoration: none; font-weight: 500; }
+        .divider { margin: 40px 0; height: 1px; background-color: #1f2937; position: relative; }
+        .divider span { position: absolute; top: -10px; left: 50%; transform: translateX(-50%); background-color: #111111; padding: 0 16px; color: #4b5563; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+        .link-text { margin-top: 24px; font-size: 12px; color: #4b5563; word-break: break-all; }
+      </style>
+    </head>
+    <body>
+      <div class="wrapper">
+        <div class="container">
+          <div class="header">
+            <h1>Buildscape</h1>
+          </div>
+          <div class="content">
+            <div class="title">${title}</div>
+            <div class="message">${message}</div>
+            
+            ${otp ? `
+            <div class="otp-container">
+              <div class="otp-label">Direct Verification Code</div>
+              <div class="otp-code">${otp}</div>
+            </div>
+            ` : ''}
+
+            ${buttonLink ? `
+              ${otp ? '<div class="divider"><span>OR</span></div>' : ''}
+              <a href="${buttonLink}" class="button">${buttonText}</a>
+              <div class="link-text">
+                Button not working? Copy this link:<br>
+                <a href="${buttonLink}" style="color: #10b981;">${buttonLink}</a>
+              </div>
+            ` : ''}
+          </div>
+          <div class="footer">
+            &copy; ${new Date().getFullYear()} Buildscape Tracker. All rights reserved.<br>
+            Sent with &hearts; to ${to}<br>
+            <p>If you didn't request this email, you can safely ignore it.</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  // Try Resend first
+  if (process.env.RESEND_API_KEY) {
+    try {
+      console.log(`Attempting to send email via Resend to ${to}...`);
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.RESEND_API_KEY}`
+        },
+        body: JSON.stringify({
+          from: 'Buildscape <noreply@buildscape.verbi.site>', 
+          to: [to],
+          subject: subject,
+          html: html
+        })
+      });
+
+      if (res.ok) {
+        console.log("Email sent successfully via Resend.");
+        return true;
+      }
+      const errData = await res.json();
+      console.warn("Resend API failed:", errData, "Falling back to SMTP...");
+    } catch (e) {
+      console.warn("Resend API error:", e, "Falling back to SMTP...");
+    }
   }
 
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      from: 'Buildscape <noreply@buildscape.verbi.site>', 
-      to: [to],
-      subject: subject,
-      html: html
-    })
-  });
+  // Fallback to SMTP (Nodemailer)
+  try {
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    const smtpPort = parseInt(process.env.SMTP_PORT || '465');
+    const smtpSecure = process.env.SMTP_SECURE === 'true' || smtpPort === 465;
 
-  if (!res.ok) {
-    const err = await res.json();
-    console.error("Resend API Error:", err);
-    throw new Error("Failed to send email via Resend provider");
+    if (!smtpHost || !smtpUser || !smtpPass) {
+      console.warn("SMTP credentials missing and Resend failed. Cannot send email.");
+      throw new Error("Email service not configured (check SMTP_HOST, SMTP_USER, SMTP_PASS in .env)");
+    }
+
+    const fromName = process.env.SMTP_FROM_NAME || 'Buildscape Support';
+    const fromEmail = process.env.SMTP_FROM || smtpUser;
+
+    console.log(`Attempting to send professional email via SMTP (${smtpHost}:${smtpPort}) to ${to}...`);
+    
+    const mailTransporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecure,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+      // Zoho/Outlook fix: ensure the sender matches exactly
+      tls: {
+          rejectUnauthorized: false
+      }
+    });
+
+    await mailTransporter.sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to,
+      subject,
+      html,
+    });
+    
+    console.log("Email sent successfully via SMTP.");
+    return true;
+  } catch (error: any) {
+    console.error("Critical Email Error:", error);
+    throw new Error(`Email delivery failed: ${error.message}. Please check your SMTP settings.`);
   }
-  return true;
 }
 
 export const handler = async (event: any, context: any) => {
@@ -73,7 +198,7 @@ export const handler = async (event: any, context: any) => {
         return corsResponse(400, { error: "Username already taken" });
       }
 
-      const redirectUrl = redirectTo || process.env.URL || 'http://localhost:5173';
+      const redirectUrl = redirectTo || process.env.URL || 'http://localhost:3000'; // Default to user's port per screenshot
 
       // Generate Link (creates user if not exists)
       const { data, error } = await supabaseAdmin.auth.admin.generateLink({
@@ -106,31 +231,20 @@ export const handler = async (event: any, context: any) => {
         used: false
       });
 
-      // Send Email
-      const emailHtml = `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-          <h2 style="color: #10b981;">Welcome to Buildscape!</h2>
-          <p>Thanks for signing up. Please verify your email address to continue.</p>
-          
-          <div style="background: #f4f4f5; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
-            <p style="margin: 0; font-size: 14px; color: #666;">Your Verification Code</p>
-            <p style="margin: 5px 0 0; font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #000;">${otp}</p>
-          </div>
-
-          <p style="text-align: center;">OR</p>
-
-          <p style="text-align: center;"><a href="${verificationLink}" style="background: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">Verify via Link</a></p>
-          
-          <p style="color: #999; font-size: 12px; margin-top: 30px; text-align: center;">This code expires in 15 minutes.</p>
-        </div>
-      `;
-
-      await sendInstantEmail(email, "Confirm your Buildscape account", emailHtml);
+      // Send Professional Email
+      await sendProfessionalEmail(
+        email,
+        "Welcome to Buildscape!",
+        "Verify Your Account",
+        "Thanks for joining the Buildscape community! Use the code below to complete your registration, or simply click the button.",
+        "Verify Account",
+        verificationLink,
+        otp
+      );
 
       return corsResponse(200, { 
         success: true, 
-        user: mapProfileToUser(data.user),
-        mock: !process.env.RESEND_API_KEY 
+        user: mapProfileToUser(data.user)
       });
     }
 
@@ -142,7 +256,7 @@ export const handler = async (event: any, context: any) => {
       const redirectUrl = redirectTo || process.env.URL || 'http://localhost:5173';
 
       const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-        type: 'magiclink',
+        type: 'magiclink', // Use magiclink for re-verification
         email,
         options: {
           redirectTo: redirectUrl
@@ -169,23 +283,52 @@ export const handler = async (event: any, context: any) => {
         used: false
       });
 
-      const emailHtml = `
-        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-          <h2 style="color: #10b981;">Verify your email</h2>
-          <p>You requested a new verification code for Buildscape.</p>
-          
-          <div style="background: #f4f4f5; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
-            <p style="margin: 0; font-size: 14px; color: #666;">Your Verification Code</p>
-            <p style="margin: 5px 0 0; font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #000;">${otp}</p>
-          </div>
+      await sendProfessionalEmail(
+        email,
+        "Verify Your Email",
+        "Verification Required",
+        "You requested a new verification code. Please use the code below or click the button to verify your email address.",
+        "Verify Email",
+        verificationLink,
+        otp
+      );
 
-          <p style="text-align: center;">OR</p>
+      return corsResponse(200, { success: true });
+    }
 
-          <p style="text-align: center;"><a href="${verificationLink}" style="background: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">Verify via Link</a></p>
-        </div>
-      `;
+    // Request Password Reset
+    if (requestAction === 'forgotPassword') {
+      const { email, redirectTo } = body;
+      if (!email) return corsResponse(400, { error: "Email required" });
 
-      await sendInstantEmail(email, "Verify your Buildscape account", emailHtml);
+      const redirectUrl = redirectTo || process.env.URL || 'http://localhost:5173';
+      
+      // Generate Recovery Link
+      const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'recovery',
+        email,
+        options: {
+          redirectTo: redirectUrl
+        }
+      });
+
+      if (error) throw error;
+
+      const recoveryLink = data.properties?.action_link;
+      if (!recoveryLink) throw new Error("Failed to generate recovery link");
+      
+      // We don't typically use OTP for password reset unless we build a custom flow, 
+      // but standard Supabase recovery is link-based.
+      // We'll send just the link.
+      
+      await sendProfessionalEmail(
+        email,
+        "Reset Your Password",
+        "Password Reset Request",
+        "We received a request to reset your password. Click the button below to choose a new password. If you didn't request this, you can safely ignore this email.",
+        "Reset Password",
+        recoveryLink
+      );
 
       return corsResponse(200, { success: true });
     }
