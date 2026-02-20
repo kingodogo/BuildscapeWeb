@@ -17,7 +17,7 @@ export async function getMinecraftProfileFromCode(code: string, redirectUri: str
   }
 
   // 1. Exchange code for Microsoft Access Token
-  const msTokenRes = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+  const msTokenRes = await fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -26,7 +26,7 @@ export async function getMinecraftProfileFromCode(code: string, redirectUri: str
       code,
       grant_type: 'authorization_code',
       redirect_uri: redirectUri,
-      scope: 'XboxLive.signin'
+      scope: 'XboxLive.signin' // Removed offline_access to avoid tenant errors
     })
   });
 
@@ -47,7 +47,7 @@ export async function getMinecraftProfileFromCode(code: string, redirectUri: str
       Properties: {
         AuthMethod: 'RPS',
         SiteName: 'user.auth.xboxlive.com',
-        RpsTicket: `d=${msAccessToken}`
+        RpsTicket: msAccessToken
       },
       RelyingParty: 'http://auth.xboxlive.com',
       TokenType: 'JWT'
@@ -55,12 +55,18 @@ export async function getMinecraftProfileFromCode(code: string, redirectUri: str
   });
 
   if (!xboxAuthRes.ok) {
-    throw new Error(`failed to authenticate with xbox live: ${xboxAuthRes.statusText}`);
+    const errorBody = await xboxAuthRes.json().catch(() => ({}));
+    console.error('Xbox Auth Error Body:', errorBody);
+    throw new Error(`failed to authenticate with xbox live: ${errorBody.Message || xboxAuthRes.statusText}`);
   }
 
   const xboxAuthData = await xboxAuthRes.json();
   const xboxToken = xboxAuthData.Token;
-  const uhash = xboxAuthData.DisplayClaims.xui[0].uhs;
+  const uhash = xboxAuthData.DisplayClaims?.xui?.[0]?.uhs;
+
+  if (!uhash) {
+    throw new Error('failed to get xbox user hash (uhs)');
+  }
 
   // 3. Exchange Xbox Token for XSTS Token
   const xstsRes = await fetch('https://xsts.auth.xboxlive.com/xsts/authorize', {
@@ -79,9 +85,13 @@ export async function getMinecraftProfileFromCode(code: string, redirectUri: str
   if (!xstsRes.ok) {
     const errorBody = await xstsRes.json().catch(() => ({}));
     console.error('XSTS Error Body:', errorBody);
-    if (xstsRes.status === 401) {
-      throw new Error('this microsoft account does not have an xbox profile');
-    }
+    
+    // Check for specific Xbox/Microsoft error codes
+    const xErr = errorBody.XErr || errorBody.IdentityError;
+    if (xErr === 2148916238) throw new Error('the account is a child account and must be added to a family');
+    if (xErr === 2148916233) throw new Error('this microsoft account does not have an xbox profile');
+    if (xErr === 2148916235) throw new Error('xbox live is not available in your country');
+    
     const errorMsg = errorBody.Message || xstsRes.statusText;
     throw new Error(`failed to get xsts token: ${errorMsg}`);
   }
@@ -99,7 +109,9 @@ export async function getMinecraftProfileFromCode(code: string, redirectUri: str
   });
 
   if (!mcLoginRes.ok) {
-    throw new Error(`failed to login to minecraft: ${mcLoginRes.statusText}`);
+    const errorBody = await mcLoginRes.json().catch(() => ({}));
+    console.error('Minecraft Login Error Body:', errorBody);
+    throw new Error(`failed to login to minecraft: ${errorBody.errorMessage || mcLoginRes.statusText}`);
   }
 
   const mcLoginData = await mcLoginRes.json();
@@ -137,5 +149,5 @@ export function getMicrosoftLoginUrl(redirectUri: string): string {
     prompt: 'select_account'
   });
   
-  return `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params.toString()}`;
+  return `https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?${params.toString()}`;
 }
