@@ -68,6 +68,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
   const [isUpdatingKofiUsername, setIsUpdatingKofiUsername] = useState(false);
   const [kofiUsernameError, setKofiUsernameError] = useState("");
   const [isOAuthLinking, setIsOAuthLinking] = useState(false);
+  const oauthProcessed = useRef(false);
 
   useEffect(() => {
     const checkUsername = async () => {
@@ -140,7 +141,8 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
     if (activeTab === 'accounts') {
       const params = new URLSearchParams(window.location.search);
       const code = params.get('code');
-      if (code && !currentUser.minecraftUuid && !isOAuthLinking) {
+      if (code && !currentUser.minecraftUuid && !isOAuthLinking && !oauthProcessed.current) {
+        oauthProcessed.current = true;
         handleCompleteMicrosoftOAuth(code);
       }
     }
