@@ -149,17 +149,18 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
   }, [activeTab, currentUser]);
 
   const handleCompleteMicrosoftOAuth = async (code: string) => {
+    onNotify("Verifying Minecraft link...", "success");
     setIsOAuthLinking(true);
     setIsLinkingMinecraft(true);
     setMinecraftError("");
     try {
-      // Use a consistent redirect URI (Root is most stable)
-      const redirectUri = window.location.origin + '/';
+      // Use the registered redirect URI (Likely ending in /profile)
+      const redirectUri = window.location.origin + '/profile';
       const updatedUser = await AuthService.linkMinecraftOAuth(code, redirectUri);
       onUpdate(updatedUser);
       onNotify("Minecraft account linked via Microsoft successfully!", "success");
       // Clean URL (remove ?code=...)
-      window.history.replaceState({}, '', window.location.pathname);
+      window.history.replaceState({}, '', '/profile');
     } catch (error: any) {
       setMinecraftError(error.message || "Microsoft authentication failed");
       onNotify(error.message || "Failed to link via Microsoft", "error");
@@ -173,7 +174,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
     setIsLinkingMinecraft(true);
     setMinecraftError("");
     try {
-      const redirectUri = window.location.origin + '/';
+      const redirectUri = window.location.origin + '/profile';
       const loginUrl = await AuthService.getMinecraftLoginUrl(redirectUri);
       window.location.href = loginUrl;
     } catch (error: any) {
