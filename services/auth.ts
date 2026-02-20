@@ -60,12 +60,35 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
 }
 
 export const AuthService = {
-    login: async (email: string, password: string): Promise<User> => {
+    login: async (identifier: string, password: string): Promise<User> => {
         try {
+            let email = identifier;
+            
+            // If identifier doesn't look like an email, treat as username
+            if (!identifier.includes('@')) {
+                const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('email')
+                    .eq('username', identifier)
+                    .single();
+                
+                if (profileError || !profile) {
+                    // Start with a generic error, but if we can't find the username, 
+                    // the subsequent login attempt (if we continued) would fail anyway.
+                    // We'll throw 'Invalid credentials' to avoid username enumeration if desired, 
+                    // or specific error. For now, let's just throw invalid credentials.
+                    throw new AuthError("Invalid username or password", "INVALID_CREDENTIALS");
+                }
+                
+                if (profile.email) {
+                    email = profile.email;
+                }
+            }
+
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
             
             if (error) {
-               if (error.message.includes("Invalid login")) throw new AuthError("Invalid email or password", "INVALID_CREDENTIALS");
+               if (error.message.includes("Invalid login")) throw new AuthError("Invalid username or password", "INVALID_CREDENTIALS");
                throw new AuthError(error.message, "SERVER_ERROR");
             }
             
@@ -86,7 +109,8 @@ export const AuthService = {
                 email,
                 password,
                 options: {
-                    data: { username } // Trigger uses this to create profile
+                    data: { username }, // Trigger uses this to create profile
+                    emailRedirectTo: window.location.origin
                 }
             });
 
@@ -115,6 +139,17 @@ export const AuthService = {
              if (e instanceof AuthError) throw e;
              throw new AuthError(e.message || "Registration failed", "SERVER_ERROR");
         }
+    },
+
+    resendConfirmationEmail: async (email: string): Promise<void> => {
+        const { error } = await supabase.auth.resend({
+            type: 'signup',
+            email,
+            options: {
+                emailRedirectTo: window.location.origin
+            }
+        });
+        if (error) throw new AuthError(error.message, "SERVER_ERROR");
     },
 
     logout: async () => {

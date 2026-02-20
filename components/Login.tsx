@@ -63,13 +63,13 @@ export default function Login({ onLogin, onError, onNavigateRegister }: LoginPro
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5 tracking-wider">Username</label>
+            <label className="block text-xs font-bold text-gray-400 uppercase mb-1.5 tracking-wider">Username or Email</label>
             <input 
               type="text" 
               value={username} 
               onChange={e => setUsername(e.target.value)} 
               className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:border-green-500 outline-none"
-              placeholder="Enter your username"
+              placeholder="Enter your username or email"
               disabled={isLoading}
             />
           </div>

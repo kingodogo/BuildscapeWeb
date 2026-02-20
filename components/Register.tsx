@@ -18,7 +18,10 @@ export default function Register({ onLogin, onError, onNavigateLogin }: Register
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  };
+
+
+  const [isResending, setIsResending] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +66,20 @@ export default function Register({ onLogin, onError, onNavigateLogin }: Register
     }
   };
 
+  const handleResend = async () => {
+    setIsResending(true);
+    setResendSuccess(false);
+    try {
+       await AuthService.resendConfirmationEmail(email);
+       setResendSuccess(true);
+    } catch (err: any) {
+       console.error("Failed to resend:", err);
+       alert("Failed to resend email: " + (err.message || "Unknown error"));
+    } finally {
+       setIsResending(false);
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto custom-scrollbar flex items-center justify-center px-4 py-12">
       <div className="max-w-md w-full bg-[#1e1e1e] p-8 rounded-xl border border-gray-800 shadow-2xl mb-8">
@@ -84,6 +101,15 @@ export default function Register({ onLogin, onError, onNavigateLogin }: Register
                We've sent a verification link to <strong>{email}</strong>.<br/>
                Please click the link to verify your account and log in.
              </p>
+             
+             <button 
+               onClick={handleResend}
+               disabled={isResending}
+               className="text-green-500 hover:text-green-400 text-sm font-medium hover:underline mb-4 block mx-auto disabled:opacity-50"
+             >
+               {isResending ? "Resending..." : (resendSuccess ? "Email Sent!" : "Resend Email")}
+             </button>
+
              <button 
                onClick={onNavigateLogin}
                className="w-full bg-gray-800 hover:bg-gray-700 text-white font-medium py-3 rounded-lg transition-colors border border-gray-700"
