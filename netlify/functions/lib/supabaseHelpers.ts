@@ -15,7 +15,10 @@ export const corsResponse = (statusCode: number, body: any) => {
 };
 
 export const verifyAuthToken = async (event: any) => {
-  const authHeader = event.headers.authorization || event.headers.Authorization;
+  // Normalize all headers to look for authorization case-insensitively
+  const headers = event.headers || {};
+  const authHeader = headers.authorization || headers.Authorization || 
+                    Object.keys(headers).find(k => k.toLowerCase() === 'authorization') ? headers[Object.keys(headers).find(k => k.toLowerCase() === 'authorization')!] : null;
   
   if (!authHeader) {
     return { user: null, error: 'Missing authorization header' };

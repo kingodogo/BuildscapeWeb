@@ -49,7 +49,7 @@ export async function getMinecraftProfileFromCode(code: string, redirectUri: str
         SiteName: 'user.auth.xboxlive.com',
         RpsTicket: `d=${msAccessToken}` // Restored "d=" prefix - required for some tenants
       },
-      RelyingParty: 'http://auth.xboxlive.com',
+      RelyingParty: 'http://auth.xboxlive.com/',
       TokenType: 'JWT'
     })
   });
@@ -77,7 +77,7 @@ export async function getMinecraftProfileFromCode(code: string, redirectUri: str
         SandboxId: 'RETAIL',
         UserTokens: [xboxToken]
       },
-      RelyingParty: 'rp://api.minecraftservices.com',
+      RelyingParty: 'rp://api.minecraftservices.com', // Removed trailing slash
       TokenType: 'JWT'
     })
   });
