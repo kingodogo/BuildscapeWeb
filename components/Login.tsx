@@ -14,10 +14,28 @@ export default function Login({ onLogin, onError, onNavigateRegister }: LoginPro
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
+  const [resendSuccess, setResendSuccess] = useState(false);
+
+  const handleResend = async () => {
+    if (!unconfirmedEmail) return;
+    setIsLoading(true);
+    setResendSuccess(false);
+    try {
+       await AuthService.resendConfirmationEmail(unconfirmedEmail);
+       setResendSuccess(true);
+    } catch (err: any) {
+        setError(err.message || "Failed to resend confirmation email.");
+        setUnconfirmedEmail(null);
+    } finally {
+       setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setUnconfirmedEmail(null);
     setIsLoading(true);
     
     try {
@@ -31,6 +49,11 @@ export default function Login({ onLogin, onError, onNavigateRegister }: LoginPro
         }
       }
     } catch (err: any) {
+      if (err instanceof AuthError && err.code === 'EMAIL_NOT_CONFIRMED') {
+          setUnconfirmedEmail(err.message); // message contains the email
+          return;
+      }
+
       const errorMsg = err instanceof AuthError ? err.message : (err.message || "Invalid username or password. Please try again.");
       setError(errorMsg);
       if (onError && err instanceof AuthError) {
@@ -54,7 +77,30 @@ export default function Login({ onLogin, onError, onNavigateRegister }: LoginPro
           <p className="text-gray-500 text-sm mt-2">Welcome back to Buildscape Tracker</p>
         </div>
 
-        {error && (
+        {unconfirmedEmail ? (
+           <div className="mb-6 bg-yellow-900/20 border border-yellow-900 text-yellow-400 px-4 py-3 rounded-lg text-sm text-center">
+             <div className="flex items-center justify-center gap-2 mb-2">
+               <AlertCircle size={20} />
+               <span className="font-bold text-lg">Verification Required</span>
+             </div>
+             <p className="mb-4">
+               Your email address <strong>{unconfirmedEmail}</strong> has not been verified yet.
+             </p>
+             <button 
+               onClick={handleResend}
+               disabled={isLoading}
+               className="bg-yellow-700 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded transition-colors w-full mb-2 disabled:opacity-50"
+             >
+               {isLoading ? "Resending..." : (resendSuccess ? "Email Sent!" : "Resend Verification Email")}
+             </button>
+             <button 
+               onClick={() => setUnconfirmedEmail(null)}
+               className="text-yellow-500 hover:text-yellow-400 text-xs hover:underline"
+             >
+               Use a different account
+             </button>
+           </div>
+        ) : error && (
           <div className="mb-6 bg-red-900/20 border border-red-900 text-red-400 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
             <AlertCircle size={16} />
             {error}

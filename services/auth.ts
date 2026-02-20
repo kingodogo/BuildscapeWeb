@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 const SESSION_KEY = 'buildscape_session_v1';
 
 export class AuthError extends Error {
-    constructor(message: string, public code: 'NETWORK_ERROR' | 'SERVER_ERROR' | 'INVALID_CREDENTIALS' | 'NOT_CONFIGURED' | 'CONFIRMATION_REQUIRED') {
+    constructor(message: string, public code: 'NETWORK_ERROR' | 'SERVER_ERROR' | 'INVALID_CREDENTIALS' | 'NOT_CONFIGURED' | 'CONFIRMATION_REQUIRED' | 'EMAIL_NOT_CONFIRMED') {
         super(message);
         this.name = 'AuthError';
     }
@@ -89,6 +89,7 @@ export const AuthService = {
             
             if (error) {
                if (error.message.includes("Invalid login")) throw new AuthError("Invalid username or password", "INVALID_CREDENTIALS");
+               if (error.message.includes("Email not confirmed")) throw new AuthError(email, "EMAIL_NOT_CONFIRMED");
                throw new AuthError(error.message, "SERVER_ERROR");
             }
             
