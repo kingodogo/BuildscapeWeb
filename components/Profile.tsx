@@ -133,6 +133,17 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
   }, [currentUser.streamerMode]);
 
   useEffect(() => {
+    // If we are in a popup, tell the opener and close
+    if (window.opener && window.location.search.includes('code=')) {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      if (code) {
+        window.opener.postMessage({ type: 'MS_OAUTH_CODE', code }, window.location.origin);
+        window.close();
+        return;
+      }
+    }
+
     if (activeTab === 'rewards' && currentUser) {
       loadRewards();
     }
@@ -146,6 +157,20 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
         handleCompleteMicrosoftOAuth(code);
       }
     }
+
+    // Listener for popup messages
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'MS_OAUTH_CODE' && event.data.code) {
+        if (!oauthProcessed.current) {
+           oauthProcessed.current = true;
+           handleCompleteMicrosoftOAuth(event.data.code);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, [activeTab, currentUser]);
 
   const handleCompleteMicrosoftOAuth = async (code: string) => {
@@ -972,10 +997,37 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                         try {
                           const redirectUri = window.location.origin + '/profile';
                           const loginUrl = await AuthService.getMinecraftLoginUrl(redirectUri);
-                          window.location.href = loginUrl;
+                          
+                          // Open in a popup
+                          const width = 500;
+                          const height = 650;
+                          const left = window.screenX + (window.outerWidth - width) / 2;
+                          const top = window.screenY + (window.outerHeight - height) / 2;
+                          
+                          const popup = window.open(
+                            loginUrl,
+                            'Microsoft Login',
+                            `width=${width},height=${height},left=${left},top=${top}`
+                          );
+
+                          if (!popup) {
+                            throw new Error("Popup blocked! Please allow popups for this site.");
+                          }
+
+                          // Check if closed
+                          const timer = setInterval(() => {
+                            if (popup.closed) {
+                                clearInterval(timer);
+                                setTimeout(() => {
+                                    if (!oauthProcessed.current) {
+                                        setIsLinkingMinecraft(false);
+                                    }
+                                }, 1000);
+                            }
+                          }, 1000);
                         } catch (error: any) {
                           setMinecraftError(error.message || "Could not start Microsoft login");
-                          onNotify("Failed to connect to Microsoft", "error");
+                          onNotify(error.message || "Failed to connect to Microsoft", "error");
                           setIsLinkingMinecraft(false);
                         }
                       }}
