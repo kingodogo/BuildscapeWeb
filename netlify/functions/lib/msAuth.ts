@@ -17,7 +17,7 @@ export async function getMinecraftProfileFromCode(code: string, redirectUri: str
   }
 
   // 1. Exchange code for Microsoft Access Token
-  const msTokenRes = await fetch('https://login.microsoftonline.com/consumers/oauth2/v2.0/token', {
+  const msTokenRes = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -26,7 +26,7 @@ export async function getMinecraftProfileFromCode(code: string, redirectUri: str
       code,
       grant_type: 'authorization_code',
       redirect_uri: redirectUri,
-      scope: 'XboxLive.signin'
+      scope: 'XboxLive.signin offline_access'
     })
   });
 
@@ -71,7 +71,7 @@ export async function getMinecraftProfileFromCode(code: string, redirectUri: str
         SandboxId: 'RETAIL',
         UserTokens: [xboxToken]
       },
-      RelyingParty: 'rp://api.minecraftservices.com/',
+      RelyingParty: 'rp://api.minecraftservices.com',
       TokenType: 'JWT'
     })
   });
@@ -130,9 +130,9 @@ export function getMicrosoftLoginUrl(redirectUri: string): string {
     client_id: MICROSOFT_CLIENT_ID,
     response_type: 'code',
     redirect_uri: redirectUri,
-    scope: 'XboxLive.signin',
+    scope: 'XboxLive.signin offline_access',
     prompt: 'select_account'
   });
   
-  return `https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?${params.toString()}`;
+  return `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params.toString()}`;
 }
