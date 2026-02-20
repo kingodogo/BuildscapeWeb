@@ -106,36 +106,33 @@ export const AuthService = {
 
     register: async (username: string, email: string, password: string): Promise<User> => {
         try {
-            const { data, error } = await supabase.auth.signUp({
-                email,
-                password,
-                options: {
-                    data: { username }, // Trigger uses this to create profile
-                    emailRedirectTo: window.location.origin
-                }
+            // Updated to use Instant Email API (Netlify Function + Resend)
+            const res = await fetch('/.netlify/functions/auth?action=signup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    username, 
+                    email, 
+                    password,
+                    redirectTo: window.location.origin 
+                })
             });
 
-            if (error) throw new AuthError(error.message, "SERVER_ERROR");
-            if (!data.user) throw new AuthError("Registration failed", "SERVER_ERROR");
+            const data = await res.json();
             
-            // If email confirmation is enabled, session will be null
-            if (!data.session && data.user) {
-                // Return a special error that the frontend can catch to show the verification message
-                throw new AuthError("Please check your email to confirm your account.", "CONFIRMATION_REQUIRED");
+            if (!res.ok) {
+                const errorMsg = data.error || "Registration failed";
+                if (errorMsg.includes("User already exists")) throw new AuthError("This email is already registered.", "SERVER_ERROR");
+                if (errorMsg.includes("Username already taken")) throw new AuthError("This username is already taken.", "SERVER_ERROR");
+                throw new AuthError(errorMsg, "SERVER_ERROR");
+            }
+            
+            if (data.mock) {
+                console.warn("Dev Mode: Email simulated by backend (no API key).");
             }
 
-            return {
-                id: data.user.id,
-                username,
-                email,
-                role: 'user',
-                minecraftUsername: '',
-                minecraftUuid: '',
-                kofiUsername: '',
-                profileIcon: '',
-                streamerMode: false,
-                kofiSubscription: null
-            };
+            // The user is created but unconfirmed. We must throw CONFIRMATION_REQUIRED to show the UI.
+            throw new AuthError("Please check your email to confirm your account.", "CONFIRMATION_REQUIRED");
         } catch (e: any) {
              if (e instanceof AuthError) throw e;
              throw new AuthError(e.message || "Registration failed", "SERVER_ERROR");
@@ -143,14 +140,32 @@ export const AuthService = {
     },
 
     resendConfirmationEmail: async (email: string): Promise<void> => {
-        const { error } = await supabase.auth.resend({
-            type: 'signup',
-            email,
-            options: {
-                emailRedirectTo: window.location.origin
-            }
+        const res = await fetch('/.netlify/functions/auth?action=resendConfirmation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                email,
+                redirectTo: window.location.origin
+            })
         });
-        if (error) throw new AuthError(error.message, "SERVER_ERROR");
+        
+        const data = await res.json();
+        if (!res.ok) {
+            throw new AuthError(data.error || "Failed to resend email", "SERVER_ERROR");
+        }
+    },
+
+    verifyOtp: async (email: string, otp: string): Promise<void> => {
+        const res = await fetch('/.netlify/functions/auth?action=verifyOtp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, otp })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) {
+            throw new AuthError(data.error || "Verification failed", "SERVER_ERROR");
+        }
     },
 
     logout: async () => {

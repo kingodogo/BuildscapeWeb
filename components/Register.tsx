@@ -22,6 +22,23 @@ export default function Register({ onLogin, onError, onNavigateLogin }: Register
 
   const [isResending, setIsResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  const handleVerifyOtp = async () => {
+      setIsVerifying(true);
+      setError("");
+      try {
+          await AuthService.verifyOtp(email, otp);
+          alert("Account verified! You can now log in.");
+          onNavigateLogin();
+      } catch (err: any) {
+          console.error("Verification failed:", err);
+          setError(err.message || "Invalid or expired code.");
+      } finally {
+          setIsVerifying(false);
+      }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,11 +114,30 @@ export default function Register({ onLogin, onError, onNavigateLogin }: Register
                <div className="text-green-500 font-bold text-2xl">✓</div>
              </div>
              <h3 className="text-xl font-bold text-white mb-2">Check Your Email</h3>
-             <p className="text-gray-400 mb-6">
-               We've sent a verification link to <strong>{email}</strong>.<br/>
-               Please click the link to verify your account and log in.
+             <p className="text-gray-400 mb-6 text-sm">
+               We've sent a 6-digit code and a link to <strong>{email}</strong>.<br/>
+               Enter the code below to verify your account.
              </p>
              
+             <div className="mb-6">
+                <input 
+                  type="text" 
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  className="w-48 bg-[#121212] border border-gray-700 rounded-lg p-3 text-center text-2xl font-bold text-white tracking-widest focus:border-green-500 outline-none mx-auto block mb-3"
+                />
+                <button
+                  onClick={handleVerifyOtp}
+                  disabled={isVerifying || otp.length !== 6}
+                  className="bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-6 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isVerifying ? "Verifying..." : "Verify Code"}
+                </button>
+             </div>
+
+             <div className="text-xs text-gray-500 mb-4">OR</div>
+
              <button 
                onClick={handleResend}
                disabled={isResending}

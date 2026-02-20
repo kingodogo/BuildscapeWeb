@@ -2,6 +2,37 @@
 import { supabaseAdmin } from './lib/supabaseAdmin';
 import { verifyAuthToken, requireAdmin, corsResponse } from './lib/supabaseHelpers';
 
+// Helper to send email via Resend (skips Supabase queue)
+async function sendInstantEmail(to: string, subject: string, html: string) {
+  const apiKey = process.env.RESEND_API_KEY || 're_123'; // Mock for dev if not set to prevent crash, but logs warning
+  
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("RESEND_API_KEY not found. Skipping instant email (Mock Mode).");
+    return true; // Pretend we sent it
+  }
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      from: 'Buildscape <noreply@buildscape.verbi.site>', 
+      to: [to],
+      subject: subject,
+      html: html
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    console.error("Resend API Error:", err);
+    throw new Error("Failed to send email via Resend provider");
+  }
+  return true;
+}
+
 export const handler = async (event: any, context: any) => {
   if (event.httpMethod === 'OPTIONS') {
     return corsResponse(200, {});
@@ -22,6 +53,188 @@ export const handler = async (event: any, context: any) => {
 
   try {
     // --- Public Endpoints (No Auth Required) ---
+
+    // Instant Signup (Bypasses Supabase SMTP + OTP)
+    if (requestAction === 'signup') {
+      const { email, password, username, redirectTo } = body;
+      
+      if (!email || !password || !username) {
+        return corsResponse(400, { error: "Email, password, and username required" });
+      }
+
+      // Check if user already exists
+      const { data: existingUser } = await supabaseAdmin.from('profiles').select('email').eq('email', email).maybeSingle();
+      if (existingUser) {
+        return corsResponse(400, { error: "User already exists" });
+      }
+
+      const { data: existingUsername } = await supabaseAdmin.from('profiles').select('username').eq('username', username).maybeSingle();
+      if (existingUsername) {
+        return corsResponse(400, { error: "Username already taken" });
+      }
+
+      const redirectUrl = redirectTo || process.env.URL || 'http://localhost:5173';
+
+      // Generate Link (creates user if not exists)
+      const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'signup',
+        email,
+        password,
+        options: {
+          data: { username },
+          redirectTo: redirectUrl
+        }
+      });
+
+      if (error) throw error;
+
+      const verificationLink = data.properties?.action_link;
+      const userId = data.user?.id;
+
+      if (!verificationLink || !userId) throw new Error("Failed to generate verification data");
+
+      // Generate OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 mins
+
+      // Store OTP in connection_codes
+      await supabaseAdmin.from('connection_codes').insert({
+        id: `otp_${userId}_${Date.now()}`,
+        uuid: userId,
+        code: otp,
+        expires_at: expiresAt,
+        used: false
+      });
+
+      // Send Email
+      const emailHtml = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #10b981;">Welcome to Buildscape!</h2>
+          <p>Thanks for signing up. Please verify your email address to continue.</p>
+          
+          <div style="background: #f4f4f5; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; color: #666;">Your Verification Code</p>
+            <p style="margin: 5px 0 0; font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #000;">${otp}</p>
+          </div>
+
+          <p style="text-align: center;">OR</p>
+
+          <p style="text-align: center;"><a href="${verificationLink}" style="background: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">Verify via Link</a></p>
+          
+          <p style="color: #999; font-size: 12px; margin-top: 30px; text-align: center;">This code expires in 15 minutes.</p>
+        </div>
+      `;
+
+      await sendInstantEmail(email, "Confirm your Buildscape account", emailHtml);
+
+      return corsResponse(200, { 
+        success: true, 
+        user: mapProfileToUser(data.user),
+        mock: !process.env.RESEND_API_KEY 
+      });
+    }
+
+    // Instant Resend Confirmation (OTP + Link)
+    if (requestAction === 'resendConfirmation') {
+      const { email, redirectTo } = body;
+      if (!email) return corsResponse(400, { error: "Email required" });
+
+      const redirectUrl = redirectTo || process.env.URL || 'http://localhost:5173';
+
+      const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'magiclink',
+        email,
+        options: {
+          redirectTo: redirectUrl
+        }
+      });
+
+      if (error) throw error;
+      
+      const verificationLink = data.properties?.action_link;
+      const userId = data.user?.id;
+
+      if (!verificationLink || !userId) throw new Error("Failed to generate verification data");
+
+      // Generate OTP
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 mins
+
+      // Store OTP
+      await supabaseAdmin.from('connection_codes').insert({
+        id: `otp_${userId}_${Date.now()}`,
+        uuid: userId,
+        code: otp,
+        expires_at: expiresAt,
+        used: false
+      });
+
+      const emailHtml = `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #10b981;">Verify your email</h2>
+          <p>You requested a new verification code for Buildscape.</p>
+          
+          <div style="background: #f4f4f5; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; color: #666;">Your Verification Code</p>
+            <p style="margin: 5px 0 0; font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #000;">${otp}</p>
+          </div>
+
+          <p style="text-align: center;">OR</p>
+
+          <p style="text-align: center;"><a href="${verificationLink}" style="background: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">Verify via Link</a></p>
+        </div>
+      `;
+
+      await sendInstantEmail(email, "Verify your Buildscape account", emailHtml);
+
+      return corsResponse(200, { success: true });
+    }
+
+    // Verify OTP Action
+    if (requestAction === 'verifyOtp') {
+      const { email, otp } = body;
+      if (!email || !otp) return corsResponse(400, { error: "Email and OTP required" });
+
+      // Get user ID from email
+      const { data: userProfile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (profileError || !userProfile) {
+        return corsResponse(400, { error: "User not found" });
+      }
+
+      // Check OTP
+      const { data: otpRecord, error: otpError } = await supabaseAdmin
+        .from('connection_codes')
+        .select('*')
+        .eq('uuid', userProfile.id)
+        .eq('code', otp)
+        .eq('used', false)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false }) // Use latest? created_at not in insert above, using default NOW()
+        .limit(1)
+        .maybeSingle();
+
+      if (otpError || !otpRecord) {
+        return corsResponse(400, { error: "Invalid or expired OTP" });
+      }
+
+      // Mark OTP as used
+      await supabaseAdmin.from('connection_codes').update({ used: true }).eq('id', otpRecord.id);
+
+      // Confirm User Email
+      const { error: confirmError } = await supabaseAdmin.auth.admin.updateUserById(
+        userProfile.id,
+        { email_confirm: true }
+      );
+
+      if (confirmError) throw confirmError;
+
+      return corsResponse(200, { success: true });
+    }
 
     // Check Username Availability
     if (requestAction === 'checkUsername') {

@@ -16,6 +16,26 @@ export default function Login({ onLogin, onError, onNavigateRegister }: LoginPro
   const [isLoading, setIsLoading] = useState(false);
   const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
   const [resendSuccess, setResendSuccess] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  const handleVerifyOtp = async () => {
+    if (!otp || !unconfirmedEmail) return;
+    setIsVerifying(true);
+    try {
+        await AuthService.verifyOtp(unconfirmedEmail, otp);
+        alert("Email verified successfully! Logging you in...");
+        setUnconfirmedEmail(null); 
+        // Auto-retry login
+        const formEvent = { preventDefault: () => {} } as React.FormEvent;
+        handleSubmit(formEvent);
+    } catch (err: any) {
+        console.error("Verification failed:", err);
+        setError(err.message || "Invalid code");
+    } finally {
+        setIsVerifying(false);
+    }
+  };
 
   const handleResend = async () => {
     if (!unconfirmedEmail) return;
@@ -86,12 +106,32 @@ export default function Login({ onLogin, onError, onNavigateRegister }: LoginPro
              <p className="mb-4">
                Your email address <strong>{unconfirmedEmail}</strong> has not been verified yet.
              </p>
+             
+             <div className="mb-4">
+                <input 
+                  type="text" 
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-center text-xl font-bold text-white tracking-widest focus:border-yellow-500 outline-none mb-2"
+                />
+                <button
+                  onClick={handleVerifyOtp}
+                  disabled={isVerifying || otp.length !== 6}
+                  className="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-2 px-4 rounded transition-colors w-full disabled:opacity-50"
+                >
+                  {isVerifying ? "Verifying..." : "Verify Code"}
+                </button>
+             </div>
+
+             <div className="text-xs text-yellow-600 mb-2">OR</div>
+
              <button 
                onClick={handleResend}
                disabled={isLoading}
                className="bg-yellow-700 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded transition-colors w-full mb-2 disabled:opacity-50"
              >
-               {isLoading ? "Resending..." : (resendSuccess ? "Email Sent!" : "Resend Verification Email")}
+               {isLoading ? "Resending..." : (resendSuccess ? "Email Sent!" : "Resend Email & Code")}
              </button>
              <button 
                onClick={() => setUnconfirmedEmail(null)}
