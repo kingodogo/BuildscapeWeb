@@ -153,19 +153,32 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
     setIsLinkingMinecraft(true);
     setMinecraftError("");
     try {
-      // Use the exact base URL (without query params) for redirect verification
-      const redirectUri = window.location.href.split('?')[0].split('#')[0];
+      // Use a consistent redirect URI (Root is most stable)
+      const redirectUri = window.location.origin + '/';
       const updatedUser = await AuthService.linkMinecraftOAuth(code, redirectUri);
       onUpdate(updatedUser);
       onNotify("Minecraft account linked via Microsoft successfully!", "success");
-      // Clean URL
-      const newUrl = window.location.origin + window.location.pathname + (window.location.hash || '');
-      window.history.replaceState({}, '', newUrl);
+      // Clean URL (remove ?code=...)
+      window.history.replaceState({}, '', window.location.pathname);
     } catch (error: any) {
       setMinecraftError(error.message || "Microsoft authentication failed");
       onNotify(error.message || "Failed to link via Microsoft", "error");
     } finally {
       setIsOAuthLinking(false);
+      setIsLinkingMinecraft(false);
+    }
+  };
+
+  const handleMicrosoftOAuthRedirect = async () => {
+    setIsLinkingMinecraft(true);
+    setMinecraftError("");
+    try {
+      const redirectUri = window.location.origin + '/';
+      const loginUrl = await AuthService.getMinecraftLoginUrl(redirectUri);
+      window.location.href = loginUrl;
+    } catch (error: any) {
+      setMinecraftError(error.message || "Could not start Microsoft login");
+      onNotify(error.message || "Failed to connect to Microsoft", "error");
       setIsLinkingMinecraft(false);
     }
   };
@@ -967,19 +980,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                     </div>
                     
                     <button
-                      onClick={async () => {
-                        setIsLinkingMinecraft(true);
-                        setMinecraftError("");
-                        try {
-                          const redirectUri = window.location.origin + '/profile';
-                          const loginUrl = await AuthService.getMinecraftLoginUrl(redirectUri);
-                          window.location.href = loginUrl;
-                        } catch (error: any) {
-                          setMinecraftError(error.message || "Could not start Microsoft login");
-                          onNotify(error.message || "Failed to connect to Microsoft", "error");
-                          setIsLinkingMinecraft(false);
-                        }
-                      }}
+                      onClick={handleMicrosoftOAuthRedirect}
                       disabled={isLinkingMinecraft}
                       className="w-full px-5 py-3 bg-white hover:bg-gray-100 text-black rounded-lg font-bold transition-all transform hover:scale-[1.02] flex items-center justify-center gap-3 shadow-lg"
                     >
@@ -1586,6 +1587,21 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
 
       
       <canvas ref={canvasRef} className="hidden" />
+
+      {isOAuthLinking && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[1000] flex items-center justify-center p-6">
+          <div className="max-w-xs w-full bg-[#1a1a1a] border border-gray-800 rounded-2xl p-8 text-center shadow-2xl transform animate-in fade-in zoom-in duration-300">
+            <div className="relative w-16 h-16 mx-auto mb-6">
+              <div className="absolute inset-0 border-4 border-green-500/20 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Linking Account</h3>
+            <p className="text-sm text-gray-400 leading-relaxed">
+              Verifying your Minecraft profile with Microsoft. This will only take a moment.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -247,8 +247,11 @@ export default function App() {
     if (changelogId) {
       setCurrentView('changelog');
     } else if (oauthCode) {
-      // If we have an OAuth code, ensure we stay on the profile page to process it
       setCurrentView('profile');
+      // If we are at root, make sure the user knows we are processing
+      if (window.location.pathname === '/' || window.location.pathname === '/home') {
+        handleNotify("Processing Microsoft Login...", "success");
+      }
     }
   }, []);
 
