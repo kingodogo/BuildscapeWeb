@@ -1,4 +1,5 @@
 import { AIAnalysisResult } from "../types";
+import { supabase } from "../lib/supabase";
 
 export const analyzeBugReport = async (
   title: string,
@@ -9,33 +10,29 @@ export const analyzeBugReport = async (
   analyzedByUser?: string
 ): Promise<AIAnalysisResult> => {
   try {
-    const response = await fetch('/api/gemini', {
+    // Get the current session token to authenticate the request
+    const { data: { session } } = await supabase.auth.getSession();
+    const token = session?.access_token;
+
+    const response = await fetch('/.netlify/functions/gemini', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({
-        title,
-        description,
-        steps,
-        mcVersions,
-      }),
+      body: JSON.stringify({ title, description, steps, mcVersions }),
     });
 
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-
     const result = await response.json();
-    
-    if (result.error && !result.qualityScore) {
+
+    if (!response.ok) {
       return {
         qualityScore: 0,
-        suggestions: [result.suggestions?.[0] || "System configuration missing. Analysis unavailable."],
-        severityAssessment: result.severityAssessment || "Low",
-        summary: result.summary || "System analysis is currently disabled.",
+        suggestions: [result.error || 'AI analysis is currently unavailable.'],
+        severityAssessment: 'Low',
+        summary: result.error || 'AI analysis could not be completed.',
         analyzedBy: analyzedBy || 'automated',
-        analyzedByUser: analyzedByUser,
+        analyzedByUser,
         analyzedAt: Date.now(),
       };
     }
@@ -43,18 +40,19 @@ export const analyzeBugReport = async (
     return {
       ...result,
       analyzedBy: analyzedBy || 'automated',
-      analyzedByUser: analyzedByUser,
+      analyzedByUser,
       analyzedAt: Date.now(),
     } as AIAnalysisResult;
+
   } catch (error) {
     console.error("Error analyzing bug report:", error);
     return {
       qualityScore: 0,
-      suggestions: ["Connection error. Please try again later."],
+      suggestions: ["Please check your connection and try again."],
       severityAssessment: "Medium",
-      summary: "Analysis failed due to a connection error.",
+      summary: "Could not reach the AI service. Please try again.",
       analyzedBy: analyzedBy || 'automated',
-      analyzedByUser: analyzedByUser,
+      analyzedByUser,
       analyzedAt: Date.now(),
     };
   }

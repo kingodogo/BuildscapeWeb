@@ -37,6 +37,7 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
   const [analyzing, setAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState<AIAnalysisResult | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [hasEverAnalyzed, setHasEverAnalyzed] = useState(false);
 
   const toggleMcVersion = (v: string) => {
     if (selectedMcVersions.includes(v)) {
@@ -80,6 +81,9 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
     setLinks(links.filter((_, i) => i !== index));
   };
 
+  // Auto-run analysis when basic info is filled? 
+  // User asked for "auto run when user submit", so let's focus on making that seamless.
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedMcVersions.length === 0 || selectedModVersions.length === 0) {
@@ -87,15 +91,20 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
       return;
     }
 
+    // If no analysis yet, run it now
     if (!aiResult) {
         setAnalyzing(true);
         try {
             const result = await analyzeBugReport(formData.title, formData.description, formData.steps, selectedMcVersions);
             setAiResult(result);
+            setHasEverAnalyzed(true);
         } catch (error) {
             console.error("Analysis failed", error);
+            // We continue even if AI fails, but notify
+            onNotify("AI analysis failed, but you can still submit.", "error");
+        } finally {
+            setAnalyzing(false);
         }
-        setAnalyzing(false);
     }
     setShowConfirmModal(true);
   };
@@ -124,14 +133,21 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
   };
 
   const handleAnalyze = async () => {
-    if (!formData.title || !formData.description) {
-      onNotify("Please fill in Title and Description first.", "error");
+    if (!formData.title || formData.title.length < 5 || !formData.description || formData.description.length < 10) {
+      onNotify("Please provide a title and detailed description (at least 10 chars) before running AI analysis.", "error");
       return;
     }
     setAnalyzing(true);
-    const result = await analyzeBugReport(formData.title, formData.description, formData.steps, selectedMcVersions);
-    setAiResult(result);
-    setAnalyzing(false);
+    try {
+        const result = await analyzeBugReport(formData.title, formData.description, formData.steps, selectedMcVersions);
+        setAiResult(result);
+        setHasEverAnalyzed(true);
+        onNotify("AI Analysis complete!", "success");
+    } catch (error) {
+        onNotify("AI service connection refused. Please try again.", "error");
+    } finally {
+        setAnalyzing(false);
+    }
   };
 
   return (
@@ -151,7 +167,7 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
                 <form onSubmit={handleFormSubmit} className="space-y-6">
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">Issue Title <span className="text-red-400">*</span></label>
-                        <input type="text" required className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 outline-none" placeholder="e.g., Game crashes when breaking Icicle" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} />
+                        <input type="text" required disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 outline-none disabled:opacity-50" placeholder="e.g., Game crashes when breaking Icicle" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} />
                     </div>
 
                     <div className="space-y-4">
@@ -159,7 +175,7 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
                             <label className="block text-sm font-medium text-gray-300 mb-2">Minecraft Versions <span className="text-red-400">*</span></label>
                             <div className="flex flex-wrap gap-2">
                                 {mcVersions.map(v => (
-                                    <button type="button" key={v} onClick={() => toggleMcVersion(v)} className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selectedMcVersions.includes(v) ? 'bg-green-900/30 border-green-500 text-green-300' : 'bg-[#121212] border-gray-700 text-gray-400 hover:border-gray-500'}`}>{v}</button>
+                                    <button type="button" key={v} disabled={analyzing} onClick={() => toggleMcVersion(v)} className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selectedMcVersions.includes(v) ? 'bg-green-900/30 border-green-500 text-green-300' : 'bg-[#121212] border-gray-700 text-gray-400 hover:border-gray-500'} disabled:opacity-50`}>{v}</button>
                                 ))}
                             </div>
                         </div>
@@ -167,7 +183,7 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
                             <label className="block text-sm font-medium text-gray-300 mb-2">Mod Versions <span className="text-red-400">*</span></label>
                             <div className="flex flex-wrap gap-2">
                                 {modVersions.map(v => (
-                                    <button type="button" key={v} onClick={() => toggleModVersion(v)} className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selectedModVersions.includes(v) ? 'bg-blue-900/30 border-blue-500 text-blue-300' : 'bg-[#121212] border-gray-700 text-gray-400 hover:border-gray-500'}`}>v{v}</button>
+                                    <button type="button" key={v} disabled={analyzing} onClick={() => toggleModVersion(v)} className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selectedModVersions.includes(v) ? 'bg-blue-900/30 border-blue-500 text-blue-300' : 'bg-[#121212] border-gray-700 text-gray-400 hover:border-gray-500'} disabled:opacity-50`}>v{v}</button>
                                 ))}
                             </div>
                         </div>
@@ -175,22 +191,22 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
 
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">Reporter Name</label>
-                        <input type="text" className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 outline-none" placeholder="Your IGN or Discord username" value={formData.author} onChange={(e) => setFormData({...formData, author: e.target.value})} />
+                        <input type="text" disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 outline-none disabled:opacity-50" placeholder="Your IGN or Discord username" value={formData.author} onChange={(e) => setFormData({...formData, author: e.target.value})} />
                     </div>
 
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">Tags (Optional)</label>
                         <div className="relative">
                             <Tag className="absolute left-3 top-3 text-gray-500 w-4 h-4" />
-                            <input type="text" className="w-full bg-[#121212] border border-gray-700 rounded-lg pl-9 pr-3 py-3 text-white focus:ring-2 focus:ring-green-500 outline-none" placeholder="e.g. textures, crash, mod-compat (comma separated)" value={formData.tags} onChange={(e) => setFormData({...formData, tags: e.target.value})} />
+                            <input type="text" disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg pl-9 pr-3 py-3 text-white focus:ring-2 focus:ring-green-500 outline-none disabled:opacity-50" placeholder="e.g. textures, crash, mod-compat (comma separated)" value={formData.tags} onChange={(e) => setFormData({...formData, tags: e.target.value})} />
                         </div>
                     </div>
 
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">External Links (Logs, Screenshots, Videos)</label>
                         <div className="flex gap-2 mb-2">
-                            <input type="url" className="flex-1 bg-[#121212] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-green-500 outline-none" placeholder="https://pastebin.com/..." value={newLink} onChange={(e) => setNewLink(e.target.value)} />
-                            <button type="button" onClick={addLink} className="bg-gray-800 hover:bg-gray-700 text-white px-3 rounded-lg border border-gray-600"><Plus size={18} /></button>
+                            <input type="url" disabled={analyzing} className="flex-1 bg-[#121212] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-green-500 outline-none disabled:opacity-50" placeholder="https://pastebin.com/..." value={newLink} onChange={(e) => setNewLink(e.target.value)} />
+                            <button type="button" disabled={analyzing} onClick={addLink} className="bg-gray-800 hover:bg-gray-700 text-white px-3 rounded-lg border border-gray-600 disabled:opacity-50"><Plus size={18} /></button>
                         </div>
                         <p className="text-[10px] text-gray-500 mb-3">Supported: Pastebin, GitHub Gist, mclo.gs, Imgur, YouTube, Twitch, CurseForge, Modrinth.</p>
                         {links.length > 0 && (
@@ -207,12 +223,12 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
 
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">Description <span className="text-red-400">*</span></label>
-                        <textarea required rows={4} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 outline-none resize-none" placeholder="Please describe what happened in detail..." value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
+                        <textarea required rows={4} disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 outline-none resize-none disabled:opacity-50" placeholder="Please describe what happened in detail..." value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
                     </div>
 
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">Steps to Reproduce</label>
-                        <textarea rows={4} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 outline-none resize-none font-mono text-sm" placeholder={`1. Open inventory\n2. Select item...\n3. Place block...`} value={formData.steps} onChange={(e) => setFormData({...formData, steps: e.target.value})} />
+                        <textarea rows={4} disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 outline-none resize-none font-mono text-sm disabled:opacity-50" placeholder={`1. Open inventory\n2. Select item...\n3. Place block...`} value={formData.steps} onChange={(e) => setFormData({...formData, steps: e.target.value})} />
                     </div>
 
                     <div className="flex gap-4 pt-4 border-t border-gray-800">

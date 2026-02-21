@@ -1,4 +1,5 @@
 import { BugReport, AppConfig, Suggestion } from "../types";
+import { supabase } from "../lib/supabase";
 
 const API_URL = '/api/data';
 
@@ -24,9 +25,15 @@ export const StorageService = {
 
     async loadAll(): Promise<{ reports: BugReport[], suggestions: Suggestion[], config: AppConfig | null, source: 'cloud' | 'error' }> {
         try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+
             const res = await fetch(API_URL, {
                 method: 'GET',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                }
             });
 
 
@@ -89,9 +96,15 @@ export const StorageService = {
 
     async saveAll(reports: BugReport[], suggestions: Suggestion[], config: AppConfig): Promise<void> {
         try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+
             const res = await fetch(API_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify({ reports, suggestions, config })
             });
 
@@ -121,9 +134,15 @@ export const StorageService = {
 
     async saveReport(report: BugReport): Promise<void> {
         try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+
             const res = await fetch(API_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify({ report })
             });
 
@@ -153,9 +172,15 @@ export const StorageService = {
 
     async deleteReport(reportId: string): Promise<void> {
         try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+
             const res = await fetch(`${API_URL}?id=${reportId}`, {
                 method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                }
             });
 
             if (!res.ok) {
@@ -184,9 +209,15 @@ export const StorageService = {
 
     async saveSuggestion(suggestion: Suggestion): Promise<void> {
         try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+
             const res = await fetch(API_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify({ suggestion })
             });
 
@@ -216,9 +247,15 @@ export const StorageService = {
 
     async deleteSuggestion(suggestionId: string): Promise<void> {
         try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+
             const res = await fetch(`${API_URL}?id=${suggestionId}&type=suggestion`, {
                 method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                }
             });
 
             if (!res.ok) {

@@ -51,15 +51,36 @@ export const handler = async (event: any, context: any) => {
       });
     }
 
-    // POST: Update data (Admin only)
+    // POST: Update data (Authenticated users for single, Admin for bulk/config)
     if (event.httpMethod === 'POST') {
-      const { authorized, response } = await requireAdmin(event);
-      if (!authorized) return response;
-
       let body: any = {};
       try { body = JSON.parse(event.body || '{}'); } catch(e) {}
       
       const { reports, suggestions, config, report, suggestion, changelogs } = body;
+
+      // Single Report or Suggestion submission: Allow any authenticated user
+      if ((report || suggestion) && !reports && !suggestions && !config && !changelogs) {
+          const { user, error } = await verifyAuthToken(event);
+          if (error || !user) {
+              return corsResponse(401, { error: error || 'Authentication required to submit reports' });
+          }
+          
+          if (report) {
+              const snakeReport = mapToSnakeCase(report);
+              const { error: upsertError } = await supabaseAdmin.from('reports').upsert(snakeReport);
+              if (upsertError) throw upsertError;
+          }
+          if (suggestion) {
+              const snakeSuggestion = mapToSnakeCase(suggestion);
+              const { error: upsertError } = await supabaseAdmin.from('suggestions').upsert(snakeSuggestion);
+              if (upsertError) throw upsertError;
+          }
+          return corsResponse(200, { success: true });
+      }
+
+      // Bulk or Sensitive updates: require Admin
+      const { authorized, response } = await requireAdmin(event);
+      if (!authorized) return response;
 
       // Single Report Update
       if (report) {
