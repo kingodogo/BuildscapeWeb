@@ -19,6 +19,7 @@ export default function Login({ onLogin, onError, onNavigateRegister }: LoginPro
   const [otp, setOtp] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [legacyMessage, setLegacyMessage] = useState<string | null>(null);
 
   const handleVerifyOtp = async () => {
     if (!otp || !unconfirmedEmail) return;
@@ -90,7 +91,11 @@ export default function Login({ onLogin, onError, onNavigateRegister }: LoginPro
       }
     } catch (err: any) {
       if (err instanceof AuthError && err.code === 'EMAIL_NOT_CONFIRMED') {
-          setUnconfirmedEmail(err.message); // message contains the email
+          setUnconfirmedEmail(err.message);
+          return;
+      }
+      if (err instanceof AuthError && err.code === 'LEGACY_USER') {
+          setLegacyMessage(err.message);
           return;
       }
 
@@ -115,7 +120,27 @@ export default function Login({ onLogin, onError, onNavigateRegister }: LoginPro
           <p className="text-gray-500 text-sm mt-2">Welcome back to Buildscape Tracker</p>
         </div>
 
-        {unconfirmedEmail ? (
+        {legacyMessage ? (
+          <div className="mb-6 bg-blue-900/20 border border-blue-700 text-blue-300 px-4 py-4 rounded-lg text-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-2xl">👋</span>
+              <span className="font-bold text-base text-blue-200">Welcome Back!</span>
+            </div>
+            <p className="mb-4 text-blue-300 leading-relaxed">{legacyMessage}</p>
+            <button
+              onClick={onNavigateRegister}
+              className="w-full bg-blue-700 hover:bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg transition-colors mb-2"
+            >
+              Create New Account →
+            </button>
+            <button
+              onClick={() => setLegacyMessage(null)}
+              className="text-blue-500 hover:text-blue-400 text-xs hover:underline w-full text-center"
+            >
+              Back to login
+            </button>
+          </div>
+        ) : unconfirmedEmail ? (
            <div className="mb-6 bg-yellow-900/20 border border-yellow-900 text-yellow-400 px-4 py-3 rounded-lg text-sm text-center">
              <div className="flex items-center justify-center gap-2 mb-2">
                <AlertCircle size={20} />

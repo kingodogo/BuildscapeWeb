@@ -9,3 +9,18 @@ supabase
 .idea
 *.log
 *_TEMPLATE.html
+
+# Migration script outputs (contain sensitive user data)
+scripts/migration-result.txt
+scripts/migration-result.json
+scripts/migration-log.txt
+scripts/mongo-users.json
+scripts/mongo-config.json
+
+# Additional env variants
+.env.*.local
+.env.development
+.env.production
+
+# TypeScript build cache
+*.tsbuildinfo

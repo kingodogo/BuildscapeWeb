@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 const SESSION_KEY = 'buildscape_session_v1';
 
 export class AuthError extends Error {
-    constructor(message: string, public code: 'NETWORK_ERROR' | 'SERVER_ERROR' | 'INVALID_CREDENTIALS' | 'NOT_CONFIGURED' | 'CONFIRMATION_REQUIRED' | 'EMAIL_NOT_CONFIRMED') {
+    constructor(message: string, public code: 'NETWORK_ERROR' | 'SERVER_ERROR' | 'INVALID_CREDENTIALS' | 'NOT_CONFIGURED' | 'CONFIRMATION_REQUIRED' | 'EMAIL_NOT_CONFIRMED' | 'LEGACY_USER') {
         super(message);
         this.name = 'AuthError';
     }
@@ -88,31 +88,56 @@ export const AuthService = {
         try {
             let email = identifier;
             
-            // If identifier doesn't look like an email, treat as username
+            // If identifier doesn't look like an email, resolve username → email
             if (!identifier.includes('@')) {
-                const { data: profile, error: profileError } = await supabase
+                // Check active profiles first
+                const { data: profile } = await supabase
                     .from('profiles')
                     .select('email')
                     .eq('username', identifier)
-                    .single();
+                    .maybeSingle();
                 
-                if (profileError || !profile) {
-                    // Start with a generic error, but if we can't find the username, 
-                    // the subsequent login attempt (if we continued) would fail anyway.
-                    // We'll throw 'Invalid credentials' to avoid username enumeration if desired, 
-                    // or specific error. For now, let's just throw invalid credentials.
-                    throw new AuthError("Invalid username or password", "INVALID_CREDENTIALS");
-                }
-                
-                if (profile.email) {
+                if (profile?.email) {
                     email = profile.email;
+                } else {
+                    // Not found in active profiles — check legacy users by username
+                    const { data: legacy } = await supabase
+                        .from('legacy_users')
+                        .select('email, username')
+                        .ilike('username', identifier)
+                        .maybeSingle();
+
+                    if (legacy) {
+                        throw new AuthError(
+                            `Welcome back, ${legacy.username}! We recently upgraded our database. Please re-register using your email (${legacy.email}) to restore your account — your data and roles will be preserved automatically.`,
+                            'LEGACY_USER'
+                        );
+                    }
+
+                    throw new AuthError("Invalid username or password", "INVALID_CREDENTIALS");
                 }
             }
 
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
             
             if (error) {
-               if (error.message.includes("Invalid login")) throw new AuthError("Invalid username or password", "INVALID_CREDENTIALS");
+               if (error.message.includes("Invalid login")) {
+                    // Check if this email belongs to a legacy (pre-migration) user
+                    const { data: legacy } = await supabase
+                        .from('legacy_users')
+                        .select('username')
+                        .eq('email', email.toLowerCase())
+                        .maybeSingle();
+
+                    if (legacy) {
+                        throw new AuthError(
+                            `Welcome back, ${legacy.username}! We recently upgraded our database. Please re-register with this email address to restore your account — your roles and linked Minecraft account will be restored automatically on first login.`,
+                            'LEGACY_USER'
+                        );
+                    }
+
+                    throw new AuthError("Invalid username or password", "INVALID_CREDENTIALS");
+               }
                if (error.message.includes("Email not confirmed")) throw new AuthError(email, "EMAIL_NOT_CONFIRMED");
                throw new AuthError(error.message, "SERVER_ERROR");
             }
