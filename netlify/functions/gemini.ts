@@ -31,10 +31,7 @@ export const handler = async (event: any) => {
   const API_KEY = process.env.GEMINI_API_KEY || '';
   if (!API_KEY) {
     return corsResponse(503, {
-      qualityScore: 0,
-      suggestions: ['AI analysis is currently unavailable.'],
-      severityAssessment: 'Low',
-      summary: 'AI analysis is not enabled on this server.',
+      error: 'AI analysis is not enabled on this server. (Missing API Key)'
     });
   }
 
@@ -78,11 +75,24 @@ Provide a JSON response with the following schema:
 
   } catch (error: any) {
     console.error('Gemini Error:', error);
+    
+    const errorMessage = error.message?.toLowerCase() || '';
+    const isRateLimit = errorMessage.includes('429') || 
+                        errorMessage.includes('too many requests') || 
+                        errorMessage.includes('quota exceeded') ||
+                        errorMessage.includes('overloaded') ||
+                        error.status === 429;
+
+    if (isRateLimit) {
+      return corsResponse(429, {
+        error: 'The AI service is currently at its limit (Rate Limited). Please wait 1-2 minutes for the quota to reset.',
+        isRateLimit: true
+      });
+    }
+
     return corsResponse(500, {
-      qualityScore: 0,
-      suggestions: ['Please try again in a moment.'],
-      severityAssessment: 'Medium',
-      summary: 'The AI analysis could not be completed. Please try again.',
+      error: 'The AI service encountered an unexpected error.',
+      details: error.message
     });
   }
 };

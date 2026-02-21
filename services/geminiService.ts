@@ -24,17 +24,12 @@ export const analyzeBugReport = async (
     });
 
     const result = await response.json();
-
     if (!response.ok) {
-      return {
-        qualityScore: 0,
-        suggestions: [result.error || 'AI analysis is currently unavailable.'],
-        severityAssessment: 'Low',
-        summary: result.error || 'AI analysis could not be completed.',
-        analyzedBy: analyzedBy || 'automated',
-        analyzedByUser,
-        analyzedAt: Date.now(),
-      };
+        const errorMsg = result.error || 'AI analysis could not be completed.';
+        const err = new Error(errorMsg) as any;
+        err.status = response.status;
+        err.isRateLimit = result.isRateLimit || response.status === 429;
+        throw err;
     }
 
     return {
@@ -44,16 +39,9 @@ export const analyzeBugReport = async (
       analyzedAt: Date.now(),
     } as AIAnalysisResult;
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error analyzing bug report:", error);
-    return {
-      qualityScore: 0,
-      suggestions: ["Please check your connection and try again."],
-      severityAssessment: "Medium",
-      summary: "Could not reach the AI service. Please try again.",
-      analyzedBy: analyzedBy || 'automated',
-      analyzedByUser,
-      analyzedAt: Date.now(),
-    };
+    // Re-throw so the caller can catch it
+    throw error;
   }
 };

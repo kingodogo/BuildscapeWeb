@@ -143,8 +143,8 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
         setAiResult(result);
         setHasEverAnalyzed(true);
         onNotify("AI Analysis complete!", "success");
-    } catch (error) {
-        onNotify("AI service connection refused. Please try again.", "error");
+    } catch (error: any) {
+        onNotify(error.message || "AI service connection refused. Please try again.", "error");
     } finally {
         setAnalyzing(false);
     }
