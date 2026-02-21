@@ -13,6 +13,8 @@ export interface BugReport {
   title: string;
   description: string;
   stepsToReproduce: string;
+  expectedBehavior?: string;
+  actualBehavior?: string;
   versions: string[]; // Changed to array
   mcVersions: string[]; // Changed to array
   author: string;

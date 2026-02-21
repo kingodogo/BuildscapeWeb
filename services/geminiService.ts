@@ -6,6 +6,8 @@ export const analyzeBugReport = async (
   description: string,
   steps: string,
   mcVersions: string[],
+  expected?: string,
+  actual?: string,
   analyzedBy?: 'admin' | 'automated',
   analyzedByUser?: string
 ): Promise<AIAnalysisResult> => {
@@ -20,7 +22,7 @@ export const analyzeBugReport = async (
         'Content-Type': 'application/json',
         ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ title, description, steps, mcVersions }),
+      body: JSON.stringify({ title, description, steps, mcVersions, expected, actual }),
     });
 
     const result = await response.json();

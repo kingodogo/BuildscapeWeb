@@ -25,6 +25,8 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
     title: "",
     description: "",
     steps: "",
+    expected: "",
+    actual: "",
     author: "",
     tags: ""
   });
@@ -95,13 +97,19 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
     if (!aiResult) {
         setAnalyzing(true);
         try {
-            const result = await analyzeBugReport(formData.title, formData.description, formData.steps, selectedMcVersions);
+            const result = await analyzeBugReport(
+                formData.title, 
+                formData.description, 
+                formData.steps, 
+                selectedMcVersions,
+                formData.expected,
+                formData.actual
+            );
             setAiResult(result);
             setHasEverAnalyzed(true);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Analysis failed", error);
-            // We continue even if AI fails, but notify
-            onNotify("AI analysis failed, but you can still submit.", "error");
+            onNotify(error.message || "AI analysis failed, but you can still submit.", "error");
         } finally {
             setAnalyzing(false);
         }
@@ -117,6 +125,8 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
       title: formData.title,
       description: formData.description,
       stepsToReproduce: formData.steps,
+      expectedBehavior: formData.expected,
+      actualBehavior: formData.actual,
       versions: selectedModVersions,
       mcVersions: selectedMcVersions,
       author: currentUser?.username || formData.author || 'Anonymous',
@@ -139,7 +149,14 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
     }
     setAnalyzing(true);
     try {
-        const result = await analyzeBugReport(formData.title, formData.description, formData.steps, selectedMcVersions);
+        const result = await analyzeBugReport(
+            formData.title, 
+            formData.description, 
+            formData.steps, 
+            selectedMcVersions,
+            formData.expected,
+            formData.actual
+        );
         setAiResult(result);
         setHasEverAnalyzed(true);
         onNotify("AI Analysis complete!", "success");
@@ -229,6 +246,17 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">Steps to Reproduce</label>
                         <textarea rows={4} disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 outline-none resize-none font-mono text-sm disabled:opacity-50" placeholder={`1. Open inventory\n2. Select item...\n3. Place block...`} value={formData.steps} onChange={(e) => setFormData({...formData, steps: e.target.value})} />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-1.5">Expected Behavior</label>
+                            <textarea rows={3} disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 outline-none resize-none text-sm disabled:opacity-50" placeholder="What should have happened?" value={formData.expected} onChange={(e) => setFormData({...formData, expected: e.target.value})} />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-1.5">Actual Behavior</label>
+                            <textarea rows={3} disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 outline-none resize-none text-sm disabled:opacity-50" placeholder="What actually happened?" value={formData.actual} onChange={(e) => setFormData({...formData, actual: e.target.value})} />
+                        </div>
                     </div>
 
                     <div className="flex gap-4 pt-4 border-t border-gray-800">

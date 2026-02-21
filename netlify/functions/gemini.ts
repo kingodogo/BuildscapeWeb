@@ -39,39 +39,54 @@ export const handler = async (event: any) => {
     let body: any = {};
     try { body = JSON.parse(event.body || '{}'); } catch (e) { /* ignore */ }
 
-    const { title, description, steps, mcVersions } = body;
+    const { title, description, steps, mcVersions, expected, actual } = body;
     if (!title || !description) return corsResponse(400, { error: 'Title and description are required.' });
 
     const { GoogleGenAI } = await import('@google/genai');
-    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    const genAI = new (GoogleGenAI as any)({ apiKey: API_KEY });
+    
+    // Using 1.5 Flash for best reliability and quota on Free Tier. 
+    // It supports JSON mode and is very fast.
+    const model = genAI.getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: {
+        responseMimeType: 'application/json',
+      }
+    });
 
-    const prompt = `You are a QA Engineer for the Minecraft mod "Buildscape" (Authors: DGA, kingodogo).
+    const prompt = `You are a senior QA engineer for the Minecraft mod "Buildscape" (Authors: DGA, kingodogo).
 Analyze the following bug report for Minecraft Versions: ${mcVersions?.join(', ') || 'Unknown'}.
 
 Title: ${title}
 Description: ${description}
 Steps to Reproduce: ${steps || 'Not provided'}
+Expected Behavior: ${expected || 'Not provided'}
+Actual Behavior: ${actual || 'Not provided'}
 
-Provide a JSON response with the following schema:
-{
-  "qualityScore": number (1-10),
-  "suggestions": [string],
-  "severityAssessment": "Low" | "Medium" | "High" | "Critical",
-  "summary": string
-}`;
+Please provide a structured analysis in JSON format with the following fields:
+- summary: A concise 1-sentence summary of the issue.
+- qualityScore: A number (1-10) representing the clarity and completeness of the report.
+- severityAssessment: Your recommended severity (Low, Medium, High, Critical) based on the impact described.
+- suggestions: A list of 3-4 items including potential technical causes (e.g., mod conflicts, rendering pipeline) and advice for the reporter.
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
-      contents: prompt,
-      config: { responseMimeType: 'application/json' },
-    });
+Output ONLY valid JSON.`;
 
-    // response.text is a getter (string property), not a function
-    const text = response.text;
-    if (!text) throw new Error('No response from AI');
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    
+    if (!text) throw new Error('Empty response from AI service');
 
-    const result = JSON.parse(text);
-    return corsResponse(200, result);
+    let aiData;
+    try {
+      aiData = JSON.parse(text);
+    } catch (e) {
+      // Small fallback if JSON is wrapped in code blocks
+      const cleaned = text.replace(/```json|```/g, '').trim();
+      aiData = JSON.parse(cleaned);
+    }
+
+    return corsResponse(200, aiData);
 
   } catch (error: any) {
     console.error('Gemini Error:', error);

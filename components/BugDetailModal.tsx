@@ -102,6 +102,8 @@ export default function BugDetailModal({
                 bug.description,
                 bug.stepsToReproduce || '',
                 bug.mcVersions || [],
+                bug.expectedBehavior,
+                bug.actualBehavior,
                 'admin',
                 currentUser.username
             );
@@ -282,6 +284,29 @@ export default function BugDetailModal({
                                 <div className="bg-black/40 border border-gray-800 rounded-lg p-4 md:p-5 font-mono text-sm text-gray-300 whitespace-pre-wrap shadow-inner relative group overflow-x-auto break-words word-break break-all">
                                     {bug.stepsToReproduce || "No steps provided."}
                                 </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {(bug.expectedBehavior) && (
+                                    <div className="min-w-0">
+                                        <h3 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-2">
+                                            <Box size={14} /> Expected Behavior
+                                        </h3>
+                                        <div className="bg-[#1a1a1a] border border-gray-800 rounded-lg p-4 text-gray-300 text-sm shadow-sm break-words word-break break-all whitespace-pre-wrap">
+                                            {bug.expectedBehavior}
+                                        </div>
+                                    </div>
+                                )}
+                                {(bug.actualBehavior) && (
+                                    <div className="min-w-0">
+                                        <h3 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-2">
+                                            <AlertOctagon size={14} /> Actual Behavior
+                                        </h3>
+                                        <div className="bg-[#1a1a1a] border border-gray-800 rounded-lg p-4 text-gray-300 text-sm shadow-sm break-words word-break break-all whitespace-pre-wrap">
+                                            {bug.actualBehavior}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {bug.aiAnalysis && (
