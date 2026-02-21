@@ -384,5 +384,66 @@ export const AuthService = {
 
     fetchWithAuth: async (url: string, options: RequestInit = {}) => {
         return fetchWithAuth(url, options);
-    }
+    },
+
+    // ── Legacy Migration (Supabase-native OTP) ───────────────────────────────
+    // Step 1: Backend resolves username→email and creates the auth user if needed.
+    //         Then we call Supabase's own signInWithOtp — it sends the email automatically.
+    initiateLegacyMigration: async (identifier: string): Promise<{ email: string; maskedEmail: string; username: string }> => {
+        // Ask backend to resolve the identifier and prep the auth user
+        const res = await fetch('/.netlify/functions/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'initiateLegacyMigration', identifier })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new AuthError(data.error || 'Account not found', 'SERVER_ERROR');
+
+        // Now trigger Supabase's built-in OTP email (6-digit code)
+        const { error: otpErr } = await supabase.auth.signInWithOtp({
+            email: data.email,
+            options: { shouldCreateUser: false } // user was already created by backend
+        });
+        if (otpErr) throw new AuthError(otpErr.message, 'SERVER_ERROR');
+
+        return data; // { email, maskedEmail, username }
+    },
+
+    // Step 2: Verify Supabase OTP — user is now authenticated
+    verifyLegacyOtp: async (email: string, token: string) => {
+        const { data, error } = await supabase.auth.verifyOtp({
+            email,
+            token,
+            type: 'email'
+        });
+        if (error) throw new AuthError(error.message, 'INVALID_CREDENTIALS');
+        return data.session;
+    },
+
+    // Step 3: Set a new password (user is already logged in via OTP)
+    // Step 4: Restore old profile data from legacy_users table
+    finalizeLegacyProfile: async (newPassword: string): Promise<User> => {
+        // Set the new password
+        const { error: pwErr } = await supabase.auth.updateUser({ password: newPassword });
+        if (pwErr) throw new AuthError(pwErr.message, 'SERVER_ERROR');
+
+        // Get current session token to authenticate the backend call
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new AuthError('No session found', 'SERVER_ERROR');
+
+        // Restore old profile (role, Minecraft, etc.) from legacy_users
+        const res = await fetch('/.netlify/functions/auth', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ action: 'finalizeLegacyProfile' })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new AuthError(data.error || 'Failed to restore profile', 'SERVER_ERROR');
+
+        localStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
+        return data.user as User;
+    },
 };

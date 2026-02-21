@@ -763,7 +763,91 @@ export const handler = async (event: any, context: any) => {
       return corsResponse(200, { success: true });
     }
 
+
+    // ── Legacy Account Migration (Supabase-native OTP) ────────────────────────
+    // Step 1: Look up the legacy user, ensure they exist in Supabase Auth,
+    //         then trigger Supabase's built-in OTP email.
+    if (requestAction === 'initiateLegacyMigration') {
+      const { identifier } = body; // username or email
+      if (!identifier) return corsResponse(400, { error: "Identifier required" });
+
+      // Look up by email or username
+      const isEmail = identifier.includes('@');
+      const q = supabaseAdmin.from('legacy_users').select('*');
+      const { data: legacy } = isEmail
+        ? await q.eq('email', identifier.toLowerCase()).maybeSingle()
+        : await q.ilike('username', identifier).maybeSingle();
+
+      if (!legacy) return corsResponse(404, { error: "No legacy account found" });
+
+      // Ensure the user exists in Supabase Auth (create if first-time migration)
+      const { data: { users } } = await supabaseAdmin.auth.admin.listUsers();
+      const exists = users.find((u: any) => u.email?.toLowerCase() === legacy.email.toLowerCase());
+
+      if (!exists) {
+        // Create unconfirmed Supabase auth user — OTP will confirm them
+        const { error: createErr } = await supabaseAdmin.auth.admin.createUser({
+          email: legacy.email,
+          email_confirm: false,
+          user_metadata: { username: legacy.username }
+        });
+        if (createErr && !createErr.message.includes('already')) throw createErr;
+      }
+
+      // Return the real email so the frontend can call supabase.auth.signInWithOtp()
+      const parts = legacy.email.split('@');
+      const maskedEmail = parts[0].slice(0, 2) + '***@' + parts[1];
+      return corsResponse(200, {
+        success: true,
+        email: legacy.email,   // real email — frontend needs it for signInWithOtp
+        maskedEmail,
+        username: legacy.username
+      });
+    }
+
+    // Step 2: Called AFTER Supabase OTP verified + user set password.
+    //         Restores the old profile (role, Minecraft, etc.) for this user.
+    if (requestAction === 'finalizeLegacyProfile') {
+      // This is an authenticated request — user is already logged in via Supabase OTP
+      const authHeader = event.headers['authorization'] || event.headers['Authorization'];
+      if (!authHeader) return corsResponse(401, { error: "Unauthorized" });
+
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
+      if (authErr || !user) return corsResponse(401, { error: "Invalid token" });
+
+      // Look up legacy data by email
+      const { data: legacy } = await supabaseAdmin
+        .from('legacy_users')
+        .select('*')
+        .eq('email', user.email!.toLowerCase())
+        .maybeSingle();
+
+      if (!legacy) return corsResponse(404, { error: "No legacy data found for this account" });
+
+      // Upsert profile with all restored data
+      const { data: profile, error: upsertErr } = await supabaseAdmin
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          username: legacy.username,
+          email: legacy.email,
+          role: legacy.old_role || 'user',
+          minecraft_username: legacy.old_minecraft_username || null,
+          minecraft_uuid: legacy.old_minecraft_uuid || null,
+          kofi_username: legacy.old_kofi_username || null,
+        }, { onConflict: 'id' })
+        .select()
+        .single();
+
+      if (upsertErr) throw upsertErr;
+
+      return corsResponse(200, { success: true, user: mapProfileToUser(profile) });
+    }
+
+
     return corsResponse(400, { error: "Invalid action" });
+
 
   } catch (err: any) {
     console.error("Function error:", err);
