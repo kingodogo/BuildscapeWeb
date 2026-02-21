@@ -28,95 +28,67 @@ export const handler = async (event: any) => {
     return corsResponse(403, { error: 'Only admins can run AI analysis.' });
   }
 
-  // Check both possible names for the API key
   const API_KEY = (process.env.GEMINI_API_KEY || process.env.API_KEY || '').trim();
   
   if (!API_KEY) {
-    return corsResponse(503, {
-      error: 'AI analysis is not enabled on this server. (Missing API Key)'
-    });
+    return corsResponse(503, { error: 'AI API Key not found in environment variables.' });
   }
 
   try {
-    let body: any = {};
-    try { body = JSON.parse(event.body || '{}'); } catch (e) { /* ignore */ }
-
+    const body = JSON.parse(event.body || '{}');
     const { title, description, steps, mcVersions, expected, actual } = body;
+    
     if (!title || !description) return corsResponse(400, { error: 'Title and description are required.' });
 
-    // 🚀 EXACT syntax from Google AI Studio SDK (@google/genai)
     const { GoogleGenAI } = await import('@google/genai');
+    const client = new (GoogleGenAI as any)({ apiKey: API_KEY });
     
-    // The user's snippet showed: new GoogleGenAI({ apiKey: ... })
-    const ai = new (GoogleGenAI as any)({ apiKey: API_KEY });
-    
-    const prompt = `You are a senior QA engineer for the Minecraft mod "Buildscape" (Authors: DGA, kingodogo).
-Analyze the following bug report for Minecraft Versions: ${mcVersions?.join(', ') || 'Unknown'}.
-
+    const prompt = `You are a senior QA engineer for the Minecraft mod "Buildscape".
+Analyze this bug report:
 Title: ${title}
 Description: ${description}
-Steps to Reproduce: ${steps || 'Not provided'}
-Expected Behavior: ${expected || 'Not provided'}
-Actual Behavior: ${actual || 'Not provided'}
+Steps: ${steps || 'Not provided'}
+Expected: ${expected || 'Not provided'}
+Actual: ${actual || 'Not provided'}
+Versions: ${mcVersions?.join(', ') || 'Unknown'}
 
-Please provide a structured analysis in JSON format with the following fields:
-- summary: A concise 1-sentence summary of the issue.
-- qualityScore: A number (1-10) representing the clarity and completeness of the report.
-- severityAssessment: Your recommended severity (Low, Medium, High, Critical) based on the impact described.
-- suggestions: A list of 3-4 items including potential technical causes (e.g., mod conflicts, rendering pipeline) and advice for the reporter.
+Provide a JSON response with:
+- summary: 1-sentence summary
+- qualityScore: 1-10
+- severityAssessment: Low, Medium, High, or Critical
+- suggestions: List of 3-4 items (causes, fixes, or reporter advice)
 
 Output ONLY valid JSON.`;
 
-    // ⚡ Using Gemini 2.0 Flash as it's the current state-of-the-art for fast JSON tasks
-    const response = await ai.models.generateContent({
+    // ⚡ Using Gemini 2.0 Flash - the fastest and most reliable for JSON
+    const response = await client.models.generateContent({
       model: 'gemini-2.0-flash',
       contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-      }
+      config: { responseMimeType: 'application/json' }
     });
 
-    // In the new unified SDK, 'text' is a property.
     const text = response.text;
+    if (!text) throw new Error('AI returned an empty response.');
+
+    // Direct parse and return
+    const aiData = JSON.parse(text.replace(/```json|```/g, '').trim());
     
-    if (!text) {
-        throw new Error('AI service returned a success status but empty content.');
-    }
-
-    let aiData;
-    try {
-      // Clean potential markdown blocks just in case
-      const cleaned = text.replace(/```json|```/g, '').trim();
-      aiData = JSON.parse(cleaned);
-    } catch (e) {
-      console.error('JSON Parse Error. Raw text:', text);
-      throw new Error(`The AI provided a non-JSON response: ${text.substring(0, 100)}...`);
-    }
-
-    // Gracefully map any field name variations (e.g. priority vs severity)
     return corsResponse(200, {
-      summary: aiData.summary || 'Bug report analyzed.',
+      summary: aiData.summary || 'No summary.',
       qualityScore: aiData.qualityScore || 5,
-      severityAssessment: aiData.severityAssessment || aiData.suggestedPriority || 'Medium',
-      suggestions: aiData.suggestions || aiData.potentialCauses || ['Review report for missing logs or version info.']
+      severityAssessment: aiData.severityAssessment || 'Medium',
+      suggestions: aiData.suggestions || []
     });
 
   } catch (error: any) {
     console.error('Gemini System Error:', error);
     
-    // Only return "Rate Limited" if it's actually a 429
-    if (error.status === 429 || error.message?.includes('429')) {
-      return corsResponse(429, {
-        error: 'Rate Limit reached. Please wait a moment.',
-        details: error.message
-      });
-    }
-
-    // Otherwise, return the REAL error so we know what's wrong
-    return corsResponse(500, {
-      error: 'The AI service encountered an error.',
-      message: error.message,
-      code: error.status || 'UNKNOWN'
+    // Return the RAW error from Google so the user can see exactly why it fails
+    // No more "Rate Limit" masks unless Google specifically sends a 429
+    return corsResponse(error.status || 500, {
+      error: error.message || 'An unexpected error occurred in the AI service.',
+      code: error.status || 'AI_ERROR',
+      details: error.details || error.stack
     });
   }
 };
