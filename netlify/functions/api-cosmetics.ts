@@ -47,21 +47,30 @@ export const handler = async (event: any, context: any) => {
 
         if (error || !mcUser) return corsResponse(404, { error: 'User not found' });
 
-        // 2. Check ownership (unless cosmeticId is "none" or "clear"?)
-        // Assuming "none" or empty string means unequip.
-        // If cosmeticId is specific, check ownership.
-        
-        // TODO: Is "test" a valid cosmeticId in tests?
-        // Test 8: "Cosmetics - Invalid cosmetic type".
-        
+        // 2. Check ownership (unless cosmeticId is "none" or empty which means unequip)
         let valid = false;
         if (cosmeticId === 'none' || cosmeticId === '') {
             valid = true;
         } else {
-             const unlocked = mcUser.unlocked_cosmetics || [];
-             if (unlocked.includes(cosmeticId)) {
-                 valid = true;
-             }
+            // Check if user has admin/owner role (bypass ownership check)
+            const { data: profile } = await supabaseAdmin
+                .from('profiles')
+                .select('role')
+                .eq('minecraft_uuid', normalizedUuid)
+                .single();
+
+            const isAdmin = profile && (profile.role === 'admin' || profile.role === 'owner');
+
+            if (isAdmin) {
+                // Admin/owner can equip any cosmetic
+                valid = true;
+            } else {
+                // Regular users must own the cosmetic
+                const unlocked = mcUser.unlocked_cosmetics || [];
+                if (unlocked.includes(cosmeticId)) {
+                    valid = true;
+                }
+            }
         }
 
         if (!valid) {

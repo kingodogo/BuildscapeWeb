@@ -13,19 +13,32 @@ export const handler = async (event: any, context: any) => {
   const normalizedUuid = uuid.replace(/-/g, '');
 
   try {
-      // Get unlocking cosmetics for this UUID
-      const { data: mcUser, error } = await supabaseAdmin
+      // 1. Check for Admin/Owner first
+      const { data: profile } = await supabaseAdmin
+          .from('profiles')
+          .select('role')
+          .eq('minecraft_uuid', normalizedUuid)
+          .single();
+      
+      const isAdmin = profile && (profile.role === 'admin' || profile.role === 'owner');
+
+      // 2. Get cosmetics for this UUID
+      let { data: mcUser } = await supabaseAdmin
           .from('minecraft_users')
           .select('*')
           .eq('uuid', normalizedUuid)
           .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
-
-      const unlockedIds = mcUser?.unlocked_cosmetics || [];
+      let unlockedIds = mcUser?.unlocked_cosmetics || [];
       const selected = mcUser?.selected_cosmetics || {};
 
-      // Get cosmetics details for ONLY unlocked
+      // Admin/owner override
+      if (isAdmin) {
+          const { data: allCosmetics } = await supabaseAdmin.from('cosmetics').select('id');
+          unlockedIds = (allCosmetics || []).map((c: any) => c.id);
+      }
+
+      // 3. Get cosmetics details
       let unlockedDetails: any[] = [];
       if (unlockedIds.length > 0) {
           const { data } = await supabaseAdmin.from('cosmetics').select('*').in('id', unlockedIds);

@@ -12,19 +12,40 @@ export const handler = async (event: any, context: any) => {
      if (!authorized) return response;
 
      if (event.httpMethod === 'GET') {
-         const { data, error } = await supabaseAdmin
-             .from('code_redemptions')
-             .select('*, profiles(username)')
-             .order('redeemed_at', { ascending: false });
+         const { codeId, startDate, endDate } = event.queryStringParameters || {};
          
-         if (error) throw error;
+         let query = supabaseAdmin.from('code_redemptions').select('*, profiles!author_id(username)');
+         
+         if (codeId && codeId !== 'all') query = query.eq('code_id', codeId);
+         if (startDate) query = query.gte('redeemed_at', parseInt(startDate));
+         if (endDate) query = query.lte('redeemed_at', parseInt(endDate));
+         
+         query = query.order('redeemed_at', { ascending: false });
+
+         let { data, error } = await query;
+         
+         // Fallback if join fails (e.g. SQL not run yet)
+         if (error && error.message.includes('relationship')) {
+             console.warn("Join failed, falling back to manual profile fetch");
+             let fallbackQuery = supabaseAdmin.from('code_redemptions').select('*');
+             if (codeId && codeId !== 'all') fallbackQuery = fallbackQuery.eq('code_id', codeId);
+             if (startDate) fallbackQuery = fallbackQuery.gte('redeemed_at', parseInt(startDate));
+             if (endDate) fallbackQuery = fallbackQuery.lte('redeemed_at', parseInt(endDate));
+             fallbackQuery = fallbackQuery.order('redeemed_at', { ascending: false });
+             
+             const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+             if (fallbackError) throw fallbackError;
+             data = fallbackData;
+         } else if (error) {
+             throw error;
+         }
          
          const mapped = (data || []).map((r: any) => ({
              id: r.id,
              codeId: r.code_id,
              code: r.code,
              userId: r.user_id,
-             username: r.profiles?.username || 'Unknown',
+             username: r.profiles?.username || (r.user_id?.startsWith('mc:') ? 'MC User' : 'Legacy/Unknown'),
              minecraftUuid: r.minecraft_uuid,
              rewards: r.rewards,
              redeemedAt: Number(r.redeemed_at)

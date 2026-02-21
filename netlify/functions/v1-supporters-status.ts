@@ -16,7 +16,7 @@ export const handler = async (event: any, context: any) => {
       // Check profile for subscription
       const { data: user, error } = await supabaseAdmin
           .from('profiles')
-          .select('id, username, kofi_subscription, minecraft_username')
+          .select('id, username, role, kofi_subscription, minecraft_username')
           .eq('minecraft_uuid', normalizedUuid)
           .single();
 
@@ -28,11 +28,13 @@ export const handler = async (event: any, context: any) => {
       }
 
       const sub = user.kofi_subscription;
-      const isActive = sub?.isActive === true;
+      const isAdmin = user.role === 'admin' || user.role === 'owner';
+      const isActive = (sub?.isActive === true) || isAdmin;
 
       return corsResponse(200, {
           active: isActive,
-          tier: sub?.tierName || null,
+          isAdmin,
+          tier: isAdmin ? 'Admin' : (sub?.tierName || null),
           username: user.username,
           minecraft_username: user.minecraft_username,
           subscription: sub

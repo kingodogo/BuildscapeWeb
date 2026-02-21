@@ -175,7 +175,8 @@ CREATE TABLE IF NOT EXISTS public.code_redemptions (
   id TEXT PRIMARY KEY,
   code_id TEXT NOT NULL REFERENCES redeem_codes(id) ON DELETE CASCADE,
   code TEXT NOT NULL,
-  user_id TEXT NOT NULL,
+  user_id TEXT NOT NULL, -- Keep for legacy/mc fallback
+  author_id UUID REFERENCES profiles(id) ON DELETE SET NULL, -- Proper FK for join
   minecraft_uuid TEXT,
   rewards JSONB DEFAULT '[]',
   redeemed_at BIGINT NOT NULL,
@@ -257,9 +258,19 @@ CREATE TABLE IF NOT EXISTS public.support_tiers (
 -- ==========================================
 DO $$ 
 BEGIN
-  -- Example: Add cosmetic_ids if it was missing from older schema versions
+  -- Add cosmetic_ids if it was missing from older schema versions
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='redeem_codes' AND column_name='cosmetic_ids') THEN
     ALTER TABLE public.redeem_codes ADD COLUMN cosmetic_ids TEXT[] DEFAULT '{}';
+  END IF;
+
+  -- Add author_id to code_redemptions if missing
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='code_redemptions' AND column_name='author_id') THEN
+    ALTER TABLE public.code_redemptions ADD COLUMN author_id UUID REFERENCES profiles(id) ON DELETE SET NULL;
+    
+    -- DATA MIGRATION: Try to populate author_id from existing user_id if it's a UUID
+    UPDATE public.code_redemptions 
+    SET author_id = user_id::UUID 
+    WHERE user_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
   END IF;
 
   -- Add any other columns that were added in later scripts here...

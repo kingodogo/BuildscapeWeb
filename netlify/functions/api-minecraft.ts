@@ -69,14 +69,34 @@ export const handler = async (event: any, context: any) => {
         }
 
         const userUnlockedIds = mcUser.unlocked_cosmetics || [];
-        
+
+        // Check if user has admin/owner role (grants all cosmetics)
+        const { data: profile } = await supabaseAdmin
+            .from('profiles')
+            .select('role')
+            .eq('minecraft_uuid', normalizedUuid)
+            .single();
+
+        const isAdmin = profile && (profile.role === 'admin' || profile.role === 'owner');
+
+        let finalUnlockedIds = userUnlockedIds;
+
+        // Admin/owner gets ALL cosmetics
+        if (isAdmin) {
+            const { data: allCosmetics } = await supabaseAdmin
+                .from('cosmetics')
+                .select('id');
+            finalUnlockedIds = (allCosmetics || []).map((c: any) => c.id);
+        }
+
         // Return cosmetics data in the format expected by the Java mod
         return corsResponse(200, {
-            unlockedCosmetics: userUnlockedIds, // Only user-specific ones
+            unlockedCosmetics: finalUnlockedIds, // User-specific + admin bypass
             selectedCosmetics: mcUser.selected_cosmetics || {},
-            defaultCosmetics: [], // No automatic defaults
+            defaultCosmetics: [], // Defaults handled client-side (particle trails)
             uuid: normalizedUuid,
-            username: session.username
+            username: session.username,
+            isAdmin: isAdmin || false
         });
     }
 

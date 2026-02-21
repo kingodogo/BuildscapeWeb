@@ -59,9 +59,11 @@ export const handler = async (event: any, context: any) => {
 
      // 4. Redeeming
      await supabaseAdmin.from('code_redemptions').insert({
+         id: crypto.randomUUID(),
          code_id: redeemCode.id,
          code: redeemCode.code,
          user_id: user.id,
+         author_id: user.id,
          minecraft_uuid: profile.minecraft_uuid,
          rewards: redeemCode.rewards,
          redeemed_at: Date.now()
@@ -83,6 +85,7 @@ export const handler = async (event: any, context: any) => {
      
      // Grant User Rewards (Web stuff?)
      await supabaseAdmin.from('user_rewards').insert({
+         id: crypto.randomUUID(),
          user_id: user.id,
          minecraft_uuid: profile.minecraft_uuid,
          source: 'code',

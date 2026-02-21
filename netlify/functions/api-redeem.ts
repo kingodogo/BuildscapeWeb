@@ -86,9 +86,11 @@ async function handleRedemption(redeemCode: any, normalizedUuid: string, accessT
     // 4. Redeem
     // Insert redemption
     await supabaseAdmin.from('code_redemptions').insert({
+        id: crypto.randomUUID(),
         code_id: id,
         code: code,
         user_id: userIdToUse,
+        author_id: profile ? profile.id : null,
         minecraft_uuid: normalizedUuid,
         rewards: redeemCode.rewards,
         redeemed_at: Date.now()
