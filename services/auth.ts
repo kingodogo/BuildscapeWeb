@@ -294,24 +294,6 @@ export const AuthService = {
         return user;
     },
     
-    requestMinecraftLinkingCode: async (userId: string, minecraftUsername: string): Promise<{code: string; mojangName: string}> => {
-        const data = await fetchWithAuth('/.netlify/functions/auth', {
-            method: 'POST',
-            body: JSON.stringify({ action: 'requestMinecraftCode', minecraftUsername })
-        });
-        return { code: data.code, mojangName: data.mojangName };
-    },
-
-    confirmMinecraftLink: async (userId: string, code: string): Promise<User> => {
-        const data = await fetchWithAuth('/.netlify/functions/auth', {
-            method: 'POST',
-            body: JSON.stringify({ action: 'confirmMinecraftLink', code })
-        });
-        const user = data.user;
-        localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-        return user;
-    },
-    
     linkMinecraftAccount: async (userId: string, minecraftUsername: string): Promise<User> => {
         const data = await fetchWithAuth('/.netlify/functions/auth', {
             method: 'POST',

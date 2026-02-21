@@ -463,23 +463,32 @@ export default function App() {
   }, [toast]);
 
   // Supabase auth state listener
+  const lastNotifiedUserId = React.useRef<string | null>(null);
+
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session);
         
-        if (event === 'SIGNED_IN' && session) {
+        if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
           try {
-            const user = await AuthService.getCurrentUser();
+            const user = AuthService.getCurrentUser() || await AuthService.getCurrentUser();
             if (user) {
+              const prevUserId = lastNotifiedUserId.current;
               setCurrentUser(user);
-              handleNotify(`Welcome back, ${user.username}`);
+              
+              // Only notify if we haven't welcomed this specific user ID in this browser session
+              if (user.id !== prevUserId) {
+                handleNotify(`Welcome back, ${user.username}`);
+                lastNotifiedUserId.current = user.id;
+              }
             }
           } catch (error) {
             console.error('Failed to get user profile after sign in:', error);
           }
         } else if (event === 'SIGNED_OUT') {
           setCurrentUser(null);
+          lastNotifiedUserId.current = null;
           handleNotify("Logged out");
         } else if (event === 'USER_UPDATED' && session) {
           try {

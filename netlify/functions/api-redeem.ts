@@ -34,23 +34,8 @@ export const handler = async (event: any, context: any) => {
         return corsResponse(401, { error: session.error || 'Invalid session' });
     }
 
-    // Logic similar to redeem-rewards.ts but adapting for Supabase
-    // 1. Check code
+    // 1. Check code in database
     const uCode = code.toUpperCase().trim();
-
-    // SPECIAL TEST CODES
-    if (uCode === 'BUILDER-TEST') {
-        const testReward = {
-            id: 'test-builder-hat',
-            code: 'BUILDER-TEST',
-            cosmetic_ids: ['buildscape:cosmatics/gear/builders_hat'],
-            enabled: true,
-            used_count: 0,
-            max_uses: 999999
-        };
-        return await handleRedemption(testReward, normalizedUuid, accessToken);
-    }
-
     const { data: redeemCode, error: codeError } = await supabaseAdmin
         .from('redeem_codes')
         .select('*')
@@ -109,10 +94,8 @@ async function handleRedemption(redeemCode: any, normalizedUuid: string, accessT
         redeemed_at: Date.now()
     });
 
-    // Increment count (skip for test code)
-    if (id !== 'test-builder-hat') {
-        await supabaseAdmin.from('redeem_codes').update({ used_count: redeemCode.used_count + 1 }).eq('id', id);
-    }
+    // Increment count
+    await supabaseAdmin.from('redeem_codes').update({ used_count: redeemCode.used_count + 1 }).eq('id', id);
 
     // GRANT REWARDS
     if (redeemCode.cosmetic_ids && redeemCode.cosmetic_ids.length > 0) {

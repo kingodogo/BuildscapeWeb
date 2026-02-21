@@ -74,9 +74,6 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
   const [isLinkingMinecraft, setIsLinkingMinecraft] = useState(false);
   const [minecraftError, setMinecraftError] = useState("");
   const [isUnlinkingMinecraft, setIsUnlinkingMinecraft] = useState(false);
-  const [linkingStep, setLinkingStep] = useState<'request' | 'verify'>('request');
-  const [linkingCode, setLinkingCode] = useState("");
-  const [linkingMojangName, setLinkingMojangName] = useState("");
   
   // Tab state
   const [activeTab, setActiveTab] = useState<'edit' | 'accounts' | 'rewards'>(() => {
@@ -1094,48 +1091,44 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                   </div>
 
                   <div className="pt-2">
-                    {linkingStep === 'request' ? (
-                      <div className="space-y-3">
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            value={minecraftUsername}
-                            onChange={(e) => setMinecraftUsername(e.target.value)}
-                            placeholder="Enter username"
-                            className="flex-1 bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-2 text-white text-sm"
-                            disabled={isLinkingMinecraft}
-                          />
-                          <button
-                            onClick={async () => {
-                              if (!minecraftUsername.trim()) return;
-                              setIsLinkingMinecraft(true);
-                              try {
-                                const result = await AuthService.requestMinecraftLinkingCode(currentUser.id, minecraftUsername.trim());
-                                setLinkingCode(result.code);
-                                setLinkingMojangName(result.mojangName);
-                                setLinkingStep('verify');
-                              } catch (e: any) {
-                                setMinecraftError(e.message);
-                              } finally {
-                                setIsLinkingMinecraft(false);
-                              }
-                            }}
-                            disabled={isLinkingMinecraft || !minecraftUsername.trim()}
-                            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm font-medium transition-colors"
-                          >
-                            Manual Link
-                          </button>
-                        </div>
+                  <div className="pt-2">
+                    <div className="space-y-3">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={minecraftUsername}
+                          onChange={(e) => setMinecraftUsername(e.target.value)}
+                          placeholder="Enter Minecraft username"
+                          className="flex-1 bg-[#1a1a1a] border border-gray-700 rounded-lg px-4 py-2 text-white text-sm shadow-inner"
+                          disabled={isLinkingMinecraft}
+                        />
+                        <button
+                          onClick={async () => {
+                            if (!minecraftUsername.trim()) return;
+                            setIsLinkingMinecraft(true);
+                            setMinecraftError("");
+                            try {
+                              const updatedUser = await AuthService.linkMinecraftAccount(currentUser.id, minecraftUsername.trim());
+                              onUpdate(updatedUser);
+                              onNotify("Minecraft account linked!", "success");
+                            } catch (e: any) {
+                              setMinecraftError(e.message);
+                              onNotify(e.message, "error");
+                            } finally {
+                              setIsLinkingMinecraft(false);
+                            }
+                          }}
+                          disabled={isLinkingMinecraft || !minecraftUsername.trim()}
+                          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold transition-all hover:shadow-lg disabled:opacity-50"
+                        >
+                          Link Username
+                        </button>
                       </div>
-                    ) : (
-                      <div className="space-y-3">
-                         <div className="bg-gray-800/50 p-3 rounded-lg border border-gray-700">
-                           <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">Server Command</div>
-                           <code className="text-green-400 font-mono text-xs">/bs link {linkingCode}</code>
-                         </div>
-                         <button onClick={() => setLinkingStep('request')} className="text-[10px] text-gray-500 hover:text-gray-300 underline">Cancel manual link</button>
-                      </div>
-                    )}
+                      <p className="text-[10px] text-gray-500 italic px-1">
+                        We'll verify your Minecraft ID (UUID) instantly using public records.
+                      </p>
+                    </div>
+                  </div>
                   </div>
                 </div>
               )}

@@ -61,14 +61,6 @@ export const handler = async (event: any, context: any) => {
              const unlocked = mcUser.unlocked_cosmetics || [];
              if (unlocked.includes(cosmeticId)) {
                  valid = true;
-             } else {
-                 // Check if it's a default cosmetic?
-                 const { data: cosmetic } = await supabaseAdmin
-                     .from('cosmetics')
-                     .select('is_default')
-                     .eq('id', cosmeticId)
-                     .single();
-                 if (cosmetic && cosmetic.is_default) valid = true;
              }
         }
 
@@ -96,35 +88,12 @@ export const handler = async (event: any, context: any) => {
 
     // Get Available Cosmetics
     if (action === 'getAvailable') {
-         // Return all default + unlocked
-         const { data: defaultCosmetics } = await supabaseAdmin
+         // Return ALL cosmetics so they can be shown as locked/unlocked
+         const { data: allCosmetics } = await supabaseAdmin
              .from('cosmetics')
-             .select('*')
-             .eq('is_default', true);
+             .select('*');
              
-         const { data: mcUser } = await supabaseAdmin
-            .from('minecraft_users')
-            .select('unlocked_cosmetics')
-            .eq('uuid', normalizedUuid)
-            .single();
-            
-         const unlockedIds = mcUser?.unlocked_cosmetics || [];
-         
-         // Fetch details for unlocked
-         let unlockedDetails: any[] = [];
-         if (unlockedIds.length > 0) {
-             const { data } = await supabaseAdmin
-                 .from('cosmetics')
-                 .select('*')
-                 .in('id', unlockedIds);
-             unlockedDetails = data || [];
-         }
-
-         const all = [...(defaultCosmetics || []), ...unlockedDetails];
-         // Deduplicate
-         const unique = Array.from(new Map(all.map(item => [item.id, item])).values());
-
-         return corsResponse(200, { cosmetics: unique });
+         return corsResponse(200, { cosmetics: allCosmetics || [] });
     }
 
     return corsResponse(400, { error: 'Invalid action' });
