@@ -28,7 +28,9 @@ export const handler = async (event: any) => {
     return corsResponse(403, { error: 'Only admins can run AI analysis.' });
   }
 
-  const API_KEY = process.env.GEMINI_API_KEY || '';
+  // Check both possible names for the API key
+  const API_KEY = (process.env.GEMINI_API_KEY || process.env.API_KEY || '').trim();
+  
   if (!API_KEY) {
     return corsResponse(503, {
       error: 'AI analysis is not enabled on this server. (Missing API Key)'
@@ -42,11 +44,11 @@ export const handler = async (event: any) => {
     const { title, description, steps, mcVersions, expected, actual } = body;
     if (!title || !description) return corsResponse(400, { error: 'Title and description are required.' });
 
-    // Dynamic import of the NEW unified Google GenAI SDK
+    // 🚀 EXACT syntax from Google AI Studio SDK (@google/genai)
     const { GoogleGenAI } = await import('@google/genai');
     
-    // The unified SDK expects an options object and uses client.models.generateContent
-    const client = new (GoogleGenAI as any)({ apiKey: API_KEY });
+    // The user's snippet showed: new GoogleGenAI({ apiKey: ... })
+    const ai = new (GoogleGenAI as any)({ apiKey: API_KEY });
     
     const prompt = `You are a senior QA engineer for the Minecraft mod "Buildscape" (Authors: DGA, kingodogo).
 Analyze the following bug report for Minecraft Versions: ${mcVersions?.join(', ') || 'Unknown'}.
@@ -65,8 +67,8 @@ Please provide a structured analysis in JSON format with the following fields:
 
 Output ONLY valid JSON.`;
 
-    // Modern SDK pattern: client.models.generateContent
-    const response = await client.models.generateContent({
+    // ⚡ Using Gemini 2.0 Flash as it's the current state-of-the-art for fast JSON tasks
+    const response = await ai.models.generateContent({
       model: 'gemini-2.0-flash',
       contents: prompt,
       config: {
@@ -74,52 +76,47 @@ Output ONLY valid JSON.`;
       }
     });
 
-    // In the new unified SDK, 'text' is a property, not a function
+    // In the new unified SDK, 'text' is a property.
     const text = response.text;
     
     if (!text) {
-        console.error('Empty AI response object:', response);
-        throw new Error('The AI service returned an empty response.');
+        throw new Error('AI service returned a success status but empty content.');
     }
 
     let aiData;
     try {
-      aiData = JSON.parse(text);
-    } catch (e) {
-      // Fallback: strip markdown code blocks if present
+      // Clean potential markdown blocks just in case
       const cleaned = text.replace(/```json|```/g, '').trim();
       aiData = JSON.parse(cleaned);
+    } catch (e) {
+      console.error('JSON Parse Error. Raw text:', text);
+      throw new Error(`The AI provided a non-JSON response: ${text.substring(0, 100)}...`);
     }
 
-    // Ensure we return the shape expected by the frontend
+    // Gracefully map any field name variations (e.g. priority vs severity)
     return corsResponse(200, {
-      summary: aiData.summary || aiData.summaryText || 'Analysis complete.',
+      summary: aiData.summary || 'Bug report analyzed.',
       qualityScore: aiData.qualityScore || 5,
       severityAssessment: aiData.severityAssessment || aiData.suggestedPriority || 'Medium',
-      suggestions: aiData.suggestions || aiData.potentialCauses || ['No specific suggestions provided.']
+      suggestions: aiData.suggestions || aiData.potentialCauses || ['Review report for missing logs or version info.']
     });
 
   } catch (error: any) {
-    console.error('Gemini SDK Error:', error);
+    console.error('Gemini System Error:', error);
     
-    const errorMessage = error.message?.toLowerCase() || '';
-    const isRateLimit = errorMessage.includes('429') || 
-                        errorMessage.includes('too many requests') || 
-                        errorMessage.includes('quota exceeded') ||
-                        errorMessage.includes('overloaded') ||
-                        error.status === 429;
-
-    if (isRateLimit) {
+    // Only return "Rate Limited" if it's actually a 429
+    if (error.status === 429 || error.message?.includes('429')) {
       return corsResponse(429, {
-        error: 'The AI service is currently at its limit (Rate Limited). Please wait 1-2 minutes for the quota to reset.',
-        isRateLimit: true
+        error: 'Rate Limit reached. Please wait a moment.',
+        details: error.message
       });
     }
 
+    // Otherwise, return the REAL error so we know what's wrong
     return corsResponse(500, {
-      error: 'The AI service encountered an unexpected error.',
-      details: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: 'The AI service encountered an error.',
+      message: error.message,
+      code: error.status || 'UNKNOWN'
     });
   }
 };
