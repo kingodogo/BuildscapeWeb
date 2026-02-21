@@ -42,18 +42,12 @@ export const handler = async (event: any) => {
     const { title, description, steps, mcVersions, expected, actual } = body;
     if (!title || !description) return corsResponse(400, { error: 'Title and description are required.' });
 
+    // Dynamic import of the NEW unified Google GenAI SDK
     const { GoogleGenAI } = await import('@google/genai');
-    const genAI = new (GoogleGenAI as any)({ apiKey: API_KEY });
     
-    // Using 1.5 Flash for best reliability and quota on Free Tier. 
-    // It supports JSON mode and is very fast.
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
-      generationConfig: {
-        responseMimeType: 'application/json',
-      }
-    });
-
+    // The unified SDK expects an options object and uses client.models.generateContent
+    const client = new (GoogleGenAI as any)({ apiKey: API_KEY });
+    
     const prompt = `You are a senior QA engineer for the Minecraft mod "Buildscape" (Authors: DGA, kingodogo).
 Analyze the following bug report for Minecraft Versions: ${mcVersions?.join(', ') || 'Unknown'}.
 
@@ -71,25 +65,42 @@ Please provide a structured analysis in JSON format with the following fields:
 
 Output ONLY valid JSON.`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    // Modern SDK pattern: client.models.generateContent
+    const response = await client.models.generateContent({
+      model: 'gemini-2.0-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+      }
+    });
+
+    // In the new unified SDK, 'text' is a property, not a function
+    const text = response.text;
     
-    if (!text) throw new Error('Empty response from AI service');
+    if (!text) {
+        console.error('Empty AI response object:', response);
+        throw new Error('The AI service returned an empty response.');
+    }
 
     let aiData;
     try {
       aiData = JSON.parse(text);
     } catch (e) {
-      // Small fallback if JSON is wrapped in code blocks
+      // Fallback: strip markdown code blocks if present
       const cleaned = text.replace(/```json|```/g, '').trim();
       aiData = JSON.parse(cleaned);
     }
 
-    return corsResponse(200, aiData);
+    // Ensure we return the shape expected by the frontend
+    return corsResponse(200, {
+      summary: aiData.summary || aiData.summaryText || 'Analysis complete.',
+      qualityScore: aiData.qualityScore || 5,
+      severityAssessment: aiData.severityAssessment || aiData.suggestedPriority || 'Medium',
+      suggestions: aiData.suggestions || aiData.potentialCauses || ['No specific suggestions provided.']
+    });
 
   } catch (error: any) {
-    console.error('Gemini Error:', error);
+    console.error('Gemini SDK Error:', error);
     
     const errorMessage = error.message?.toLowerCase() || '';
     const isRateLimit = errorMessage.includes('429') || 
@@ -107,7 +118,8 @@ Output ONLY valid JSON.`;
 
     return corsResponse(500, {
       error: 'The AI service encountered an unexpected error.',
-      details: error.message
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };
