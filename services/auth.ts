@@ -108,13 +108,10 @@ export const AuthService = {
                         .maybeSingle();
 
                     if (legacy) {
-                        throw new AuthError(
-                            `Welcome back, ${legacy.username}! We recently upgraded our database. Please re-register using your email (${legacy.email}) to restore your account — your data and roles will be preserved automatically.`,
-                            'LEGACY_USER'
-                        );
+                        throw new AuthError('LEGACY_USER', 'LEGACY_USER');
                     }
 
-                    throw new AuthError("Invalid username or password", "INVALID_CREDENTIALS");
+                    throw new AuthError("That username or password is incorrect.", "INVALID_CREDENTIALS");
                 }
             }
 
@@ -122,34 +119,28 @@ export const AuthService = {
             
             if (error) {
                if (error.message.includes("Invalid login")) {
-                    // Check if this email belongs to a legacy (pre-migration) user
                     const { data: legacy } = await supabase
                         .from('legacy_users')
                         .select('username')
                         .eq('email', email.toLowerCase())
                         .maybeSingle();
 
-                    if (legacy) {
-                        throw new AuthError(
-                            `Welcome back, ${legacy.username}! We recently upgraded our database. Please re-register with this email address to restore your account — your roles and linked Minecraft account will be restored automatically on first login.`,
-                            'LEGACY_USER'
-                        );
-                    }
+                    if (legacy) throw new AuthError('LEGACY_USER', 'LEGACY_USER');
 
-                    throw new AuthError("Invalid username or password", "INVALID_CREDENTIALS");
+                    throw new AuthError("That username or password is incorrect.", "INVALID_CREDENTIALS");
                }
                if (error.message.includes("Email not confirmed")) throw new AuthError(email, "EMAIL_NOT_CONFIRMED");
-               throw new AuthError(error.message, "SERVER_ERROR");
+               throw new AuthError("Something went wrong. Please try again.", "SERVER_ERROR");
             }
             
-            if (!data.user) throw new AuthError("No user returned", "SERVER_ERROR");
+            if (!data.user) throw new AuthError("Login failed. Please try again.", "SERVER_ERROR");
             
             const profile = await fetchUserProfile(data.user.id);
             localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
             return profile;
         } catch (e: any) {
              if (e instanceof AuthError) throw e;
-             throw new AuthError(e.message || "Login failed", "SERVER_ERROR");
+             throw new AuthError("Something went wrong. Please try again.", "SERVER_ERROR");
         }
     },
 
@@ -184,12 +175,9 @@ export const AuthService = {
         const { error } = await supabase.auth.resend({
             type: 'signup',
             email,
-            options: {
-                emailRedirectTo: window.location.origin
-            }
+            options: { emailRedirectTo: window.location.origin }
         });
-        
-        if (error) throw new AuthError(error.message, "SERVER_ERROR");
+        if (error) throw new AuthError("Couldn't resend the email. Please wait a moment and try again.", "SERVER_ERROR");
     },
 
     verifyOtp: async (email: string, otp: string): Promise<void> => {
