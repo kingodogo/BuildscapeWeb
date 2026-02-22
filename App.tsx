@@ -14,6 +14,7 @@ import Profile from "./components/Profile";
 import Changelog from "./components/Changelog";
 import Wiki from "./components/Wiki";
 import Redeem from "./components/Redeem";
+import ResetPassword from "./components/ResetPassword";
 import { BugReport, User, AppConfig, Suggestion, ChangelogEntry } from "./types";
 import { AuthService, AuthError } from "./services/auth";
 import { StorageService, StorageError } from "./services/storage";
@@ -157,7 +158,7 @@ const INITIAL_BUGS: BugReport[] = [
 ];
 
 // Map URL paths to view names
-type ViewType = 'home' | 'report' | 'admin' | 'login' | 'register' | 'forgot-password' | 'suggestions' | 'suggestion-form' | 'profile' | 'changelog' | 'wiki' | 'redeem';
+type ViewType = 'home' | 'report' | 'admin' | 'login' | 'register' | 'forgot-password' | 'reset-password' | 'suggestions' | 'suggestion-form' | 'profile' | 'changelog' | 'wiki' | 'redeem';
 
 const pathToView: Record<string, ViewType> = {
   '/': 'home',
@@ -167,6 +168,7 @@ const pathToView: Record<string, ViewType> = {
   '/login': 'login',
   '/register': 'register',
   '/forgot-password': 'forgot-password',
+  '/reset-password': 'reset-password',
   '/suggestions': 'suggestions',
   '/suggestion-form': 'suggestion-form',
   '/profile': 'profile',
@@ -182,6 +184,7 @@ const viewToPath: Record<ViewType, string> = {
   'login': '/login',
   'register': '/register',
   'forgot-password': '/forgot-password',
+  'reset-password': '/reset-password',
   'suggestions': '/suggestions',
   'suggestion-form': '/suggestion-form',
   'profile': '/profile',
@@ -477,6 +480,11 @@ export default function App() {
           }
         }
         
+        if (event === 'PASSWORD_RECOVERY') {
+          handleNavigate('reset-password');
+          handleNotify("Check your email to reset your password", "success");
+        }
+
         if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
           try {
             const user = AuthService.getCurrentUser() || await AuthService.getCurrentUser();
@@ -1025,7 +1033,28 @@ export default function App() {
             />
           </div>
         )}
+        {currentView === 'reset-password' && (
+          <div className="h-full overflow-y-auto custom-scrollbar fade-in flex items-center justify-center">
+            <ResetPassword 
+              onSuccess={() => handleNavigate('home')}
+              onCancel={() => handleNavigate('home')}
+            />
+          </div>
+        )}
       </main>
+
+      {/* Forced Password Reset Modal */}
+      {currentUser?.forcePasswordReset && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn">
+            <ResetPassword 
+                isForced={true}
+                onSuccess={() => {
+                   // Refresh user is handled inside ResetPassword or by onAuthStateChange
+                }}
+                onCancel={() => {}} // No cancel for forced
+            />
+        </div>
+      )}
 
       {toast && (
         <div className="fixed bottom-6 right-6 z-[100] toast-enter pointer-events-none">

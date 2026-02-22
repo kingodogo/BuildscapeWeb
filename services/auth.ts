@@ -139,8 +139,9 @@ export const AuthService = {
             if (!data.user) throw new AuthError("Login failed. Please try again.", "SERVER_ERROR");
             
             const profile = await fetchUserProfile(data.user.id);
-            localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
-            return profile;
+            const user = { ...profile, forcePasswordReset: !!data.user.user_metadata?.force_password_reset };
+            localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+            return user;
         } catch (e: any) {
              if (e instanceof AuthError) throw e;
              throw new AuthError("Something went wrong. Please try again.", "SERVER_ERROR");
@@ -231,8 +232,9 @@ export const AuthService = {
                 return null;
             }
 
-            localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
-            return profile;
+            const profileWithMeta = { ...profile, forcePasswordReset: !!user.user_metadata?.force_password_reset };
+            localStorage.setItem(SESSION_KEY, JSON.stringify(profileWithMeta));
+            return profileWithMeta;
         } catch (e) {
             console.error("Auth refresh failed:", e);
             AuthService.logout();
@@ -252,6 +254,39 @@ export const AuthService = {
     getAllUsers: async (): Promise<User[]> => {
         const data = await fetchWithAuth('/.netlify/functions/auth?action=getAllUsers');
         return data.users;
+    },
+
+    getLegacyUsers: async (): Promise<any[]> => {
+        const data = await fetchWithAuth('/.netlify/functions/auth?action=getLegacyUsers');
+        return data.users;
+    },
+
+    deleteLegacyUser: async (email: string): Promise<void> => {
+        await fetchWithAuth(`/.netlify/functions/auth`, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'deleteLegacyUser', email })
+        });
+    },
+
+    createLegacyUser: async (user: any): Promise<void> => {
+        await fetchWithAuth(`/.netlify/functions/auth`, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'createLegacyUser', user })
+        });
+    },
+
+    sendResetLink: async (userId: string): Promise<void> => {
+        await fetchWithAuth('/.netlify/functions/auth', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'sendResetLink', id: userId })
+        });
+    },
+
+    forceResetPassword: async (userId: string): Promise<void> => {
+        await fetchWithAuth('/.netlify/functions/auth', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'forceResetPassword', id: userId })
+        });
     },
 
     updateUserRole: async (id: string, role: UserRole): Promise<void> => {

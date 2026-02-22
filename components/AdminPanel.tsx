@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { createPortal } from "react-dom";
-import { BugReport, User, AppConfig, UserRole, AppConfigLinks, AppConfigHero, DatabaseConfig, Suggestion, SocialHandles, IconConfig, Role, ChangelogEntry, KofiTier, KofiRewardItem, ManualReward, RedeemCode, WikiFeature } from "../types";
+import { BugReport, User, AppConfig, UserRole, AppConfigLinks, AppConfigHero, DatabaseConfig, Suggestion, SocialHandles, IconConfig, Role, ChangelogEntry, KofiTier, KofiRewardItem, ManualReward, RedeemCode, WikiFeature, TwitchTier } from "../types";
 import { AuthService } from "../services/auth";
 import { StorageService } from "../services/storage";
-import { Users, Bug as BugIcon, Settings, Trash2, Edit, Save, Plus, X, ShieldCheck, RefreshCw, UserCheck, Lock, ChevronDown, Link as LinkIcon, Type, LogOut, CheckSquare, Square, Filter, ArrowUpDown, UserPlus, CheckCircle, AlertOctagon, Database, Upload, Download, Server, Cloud, CloudOff, RotateCcw, Lightbulb, Ban, Eye, Calendar, Maximize2, Minimize2, Crop, FileText, Bold, Italic, List, Heading1, Heading2, Heading3, Code, Image as ImageIcon, Share2, EyeOff, Globe, AlertCircle, Coffee, Crown, Gift, Gamepad2, GripVertical, ArrowUp, ArrowDown, BookOpen, Sparkles, Clock, History, Search, Info } from "lucide-react";
+import { Users, Bug as BugIcon, Settings, Trash2, Edit, Save, Plus, X, ShieldCheck, RefreshCw, UserCheck, Lock, Key, Mail, ShieldAlert, ChevronDown, Link as LinkIcon, Type, LogOut, CheckSquare, Square, Filter, ArrowUpDown, UserPlus, CheckCircle, AlertOctagon, Database, Upload, Download, Server, Cloud, CloudOff, RotateCcw, Lightbulb, Ban, Eye, Calendar, Maximize2, Minimize2, Crop, FileText, Bold, Italic, List, Heading1, Heading2, Heading3, Code, Image as ImageIcon, Share2, EyeOff, Globe, AlertCircle, Coffee, Crown, Gift, Gamepad2, GripVertical, ArrowUp, ArrowDown, BookOpen, Sparkles, Clock, History, Search, Info, Twitch } from "lucide-react";
 import { CurseForgeService, CurseForgeError } from "../services/curseforge";
 import { sanitizeHTMLPermissive } from "../utils/sanitize";
 import BugDetailModal from "./BugDetailModal";
@@ -25,7 +25,7 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ currentUser, onLogout, reports, suggestions, onUpdateReport, onDeleteReport, onUpdateSuggestion, onDeleteSuggestion, config, onUpdateConfig, onRestoreData, initialChangelogToEdit, onChangelogEditComplete }: AdminPanelProps) {
-  const [activeTab, setActiveTab] = useState<'bugs' | 'suggestions' | 'users' | 'config' | 'database' | 'changelogs' | 'kofi' | 'redeem-rewards' | 'wiki'>('bugs');
+  const [activeTab, setActiveTab] = useState<'bugs' | 'suggestions' | 'users' | 'config' | 'database' | 'changelogs' | 'kofi' | 'twitch' | 'redeem-rewards' | 'wiki'>('bugs');
 
   const [bugSubTab, setBugSubTab] = useState<'active' | 'resolved'>('active');
   const [editingBug, setEditingBug] = useState<BugReport | null>(null);
@@ -40,7 +40,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
   const [suggestionSubTab, setSuggestionSubTab] = useState<'active' | 'closed'>('active');
 
-  const [userSubTab, setUserSubTab] = useState<'staff' | 'users' | 'roles'>('staff');
+  const [userSubTab, setUserSubTab] = useState<'staff' | 'users' | 'roles' | 'legacy'>('staff');
   const [roles, setRoles] = useState<Role[]>(config.roles || []);
   const [editingRole, setEditingRole] = useState<Role | null>(null);
   const [editingSuggestion, setEditingSuggestion] = useState<Suggestion | null>(null);
@@ -54,6 +54,9 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   const [rejectionReason, setRejectionReason] = useState("");
   const [showCloudSyncModal, setShowCloudSyncModal] = useState(false);
 
+  const [legacyUsers, setLegacyUsers] = useState<any[]>([]);
+  const [loadingLegacyUsers, setLoadingLegacyUsers] = useState(false);
+
   const [configTab, setConfigTab] = useState<'home' | 'navbar' | 'links' | 'footer'>('home');
 
   const [users, setUsers] = useState<User[]>([]);
@@ -62,19 +65,19 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   const [configMcVer, setConfigMcVer] = useState("");
   const [configModVer, setConfigModVer] = useState("");
 
-  const [heroConfig, setHeroConfig] = useState<AppConfigHero>(config.hero || { 
-      headline: "", subheadline: "", description: "", latestModVersion: "", latestMcVersions: "", headlineColor: "", headlineGlowColor: "" 
+  const [heroConfig, setHeroConfig] = useState<AppConfigHero>(config.hero || {
+    headline: "", subheadline: "", description: "", latestModVersion: "", latestMcVersions: "", headlineColor: "", headlineGlowColor: ""
   });
-  const [linkConfig, setLinkConfig] = useState<AppConfigLinks>(config.links || { 
-      curseforge: "", modrinth: "", discord: "", source: "", kofi: "" 
+  const [linkConfig, setLinkConfig] = useState<AppConfigLinks>(config.links || {
+    curseforge: "", modrinth: "", discord: "", source: "", kofi: ""
   });
   const [socialHandlesConfig, setSocialHandlesConfig] = useState<SocialHandles>(config.socialHandles || {
-      author: 'DGA',
-      leadDev: 'kingodogo',
-      authorLinks: {},
-      leadDevLinks: {}
+    author: 'DGA',
+    leadDev: 'kingodogo',
+    authorLinks: {},
+    leadDevLinks: {}
   });
-  
+
   // Track order of links for drag-and-drop
   const [authorLinksOrder, setAuthorLinksOrder] = useState<string[]>(() => {
     const links = config.socialHandles?.authorLinks || {};
@@ -84,12 +87,12 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
     const links = config.socialHandles?.leadDevLinks || {};
     return Object.keys(links);
   });
-  
+
   // Drag state
-  const [draggedLink, setDraggedLink] = useState<{person: 'author' | 'leadDev', key: string} | null>(null);
-  
+  const [draggedLink, setDraggedLink] = useState<{ person: 'author' | 'leadDev', key: string } | null>(null);
+
   // Add link state
-  const [showAddLinkInput, setShowAddLinkInput] = useState<{person: 'author' | 'leadDev' | null, url: string}>({person: null, url: ''});
+  const [showAddLinkInput, setShowAddLinkInput] = useState<{ person: 'author' | 'leadDev' | null, url: string }>({ person: null, url: '' });
   const [dbConfig, setDbConfig] = useState<DatabaseConfig>(config.database || { type: 'local', endpoint: '', apiKey: '' });
 
   const [changelogs, setChangelogs] = useState<ChangelogEntry[]>(config.changelogs || []);
@@ -166,7 +169,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   }, [initialChangelogToEdit]);
 
   // State for jar file dropdown
-  const [matchingJarFiles, setMatchingJarFiles] = useState<Array<{fileName: string, displayName: string, downloadUrl: string, gameVersions: string[], fileId: number}>>([]);
+  const [matchingJarFiles, setMatchingJarFiles] = useState<Array<{ fileName: string, displayName: string, downloadUrl: string, gameVersions: string[], fileId: number }>>([]);
   const [showJarDropdown, setShowJarDropdown] = useState(false);
 
   // Auto-fetch jar files when mod version is entered manually
@@ -187,11 +190,11 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
             if (!files || files.length === 0) return;
 
             const modVersion = newChangelog.modVersion.replace(/^v/i, '');
-            
+
             // Find all files matching the mod version
             const matchingFiles = files.filter(file => {
               if (!file.isAvailable) return false;
-              
+
               const fileName = file.fileName || file.displayName || '';
               const extractedVersion = CurseForgeService.extractModVersionFromFileName(fileName);
 
@@ -203,10 +206,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
             if (matchingFiles.length === 1) {
               // Auto-fill if only one match
               const file = matchingFiles[0];
-              const projectSlugForUrl = config.curseforgeProjectSlug || 
-                                       CurseForgeService.extractProjectSlug(config.links?.curseforge || '') ||
-                                       projectSlug;
-              
+              const projectSlugForUrl = config.curseforgeProjectSlug ||
+                CurseForgeService.extractProjectSlug(config.links?.curseforge || '') ||
+                projectSlug;
+
               let finalSlug = projectSlugForUrl;
               if (/^\d+$/.test(projectSlugForUrl)) {
                 try {
@@ -218,10 +221,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   finalSlug = projectSlugForUrl;
                 }
               }
-              
+
               const downloadUrl = file.id ? CurseForgeService.buildDownloadUrl(finalSlug, file.id) : '';
-              setNewChangelog(prev => ({ 
-                ...prev, 
+              setNewChangelog(prev => ({
+                ...prev,
                 fileName: file.fileName || file.displayName,
                 downloadUrl: downloadUrl
               }));
@@ -229,10 +232,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
               setShowJarDropdown(false);
             } else if (matchingFiles.length > 1) {
               // Show dropdown if multiple matches
-              const projectSlugForUrl = config.curseforgeProjectSlug || 
-                                       CurseForgeService.extractProjectSlug(config.links?.curseforge || '') ||
-                                       projectSlug;
-              
+              const projectSlugForUrl = config.curseforgeProjectSlug ||
+                CurseForgeService.extractProjectSlug(config.links?.curseforge || '') ||
+                projectSlug;
+
               let finalSlug = projectSlugForUrl;
               if (/^\d+$/.test(projectSlugForUrl)) {
                 try {
@@ -244,7 +247,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   finalSlug = projectSlugForUrl;
                 }
               }
-              
+
               setMatchingJarFiles(matchingFiles.map(f => ({
                 fileName: f.fileName || f.displayName,
                 displayName: f.displayName || f.fileName,
@@ -306,12 +309,12 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
             // Find file matching jar name and Minecraft versions
             let matchingFile = files.find(file => {
               const fileFileName = file.fileName || file.displayName || '';
-              
+
               // Check if file name matches (exact or partial)
-              const nameMatches = fileFileName === fileName || 
-                                 fileFileName.toLowerCase().includes(fileName.toLowerCase()) ||
-                                 fileName.toLowerCase().includes(fileFileName.toLowerCase());
-              
+              const nameMatches = fileFileName === fileName ||
+                fileFileName.toLowerCase().includes(fileName.toLowerCase()) ||
+                fileName.toLowerCase().includes(fileFileName.toLowerCase());
+
               if (!nameMatches) return false;
 
               // Check if any Minecraft version matches
@@ -330,23 +333,23 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
             if (!matchingFile) {
               matchingFile = files.find(file => {
                 const fileFileName = file.fileName || file.displayName || '';
-                return (fileFileName === fileName || 
-                       fileFileName.toLowerCase().includes(fileName.toLowerCase()) ||
-                       fileName.toLowerCase().includes(fileFileName.toLowerCase())) && 
-                       file.isAvailable;
+                return (fileFileName === fileName ||
+                  fileFileName.toLowerCase().includes(fileName.toLowerCase()) ||
+                  fileName.toLowerCase().includes(fileFileName.toLowerCase())) &&
+                  file.isAvailable;
               });
             }
 
             if (matchingFile && matchingFile.id) {
               // Build CurseForge download URL using file ID
-              let projectSlugForUrl = config.curseforgeProjectSlug || 
-                                     CurseForgeService.extractProjectSlug(config.links?.curseforge || '');
-              
+              let projectSlugForUrl = config.curseforgeProjectSlug ||
+                CurseForgeService.extractProjectSlug(config.links?.curseforge || '');
+
               // If we don't have a slug, try to extract from projectSlug
               if (!projectSlugForUrl) {
                 projectSlugForUrl = CurseForgeService.extractProjectSlug(projectSlug) || projectSlug;
               }
-              
+
               // If projectSlug is numeric, try to get the actual slug
               let finalSlug = projectSlugForUrl;
               if (projectSlugForUrl && /^\d+$/.test(projectSlugForUrl)) {
@@ -364,7 +367,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   finalSlug = projectSlugForUrl;
                 }
               }
-              
+
               if (finalSlug) {
                 const downloadUrl = CurseForgeService.buildDownloadUrl(finalSlug, matchingFile.id);
                 setNewChangelog(prev => ({ ...prev, downloadUrl: downloadUrl }));
@@ -430,6 +433,21 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   const [manualRewardReason, setManualRewardReason] = useState('');
   const [manualRewardItems, setManualRewardItems] = useState<KofiRewardItem[]>([]);
 
+  // Twitch Management State
+  const [twitchSubTab, setTwitchSubTab] = useState<'tiers' | 'subscribers'>('tiers');
+  const [twitchTiers, setTwitchTiers] = useState<TwitchTier[]>(config.twitchTiers || []);
+  const [editingTwitchTier, setEditingTwitchTier] = useState<TwitchTier | null>(null);
+  const [editingTwitchTierForm, setEditingTwitchTierForm] = useState<Partial<TwitchTier>>({
+    name: '',
+    twitchTierLevel: '1000',
+    description: '',
+    rewards: [],
+    enabled: true
+  });
+  const [showTwitchTierModal, setShowTwitchTierModal] = useState(false);
+  const [loadingTwitchUsers, setLoadingTwitchUsers] = useState(false);
+  const [twitchSubscribedUsers, setTwitchSubscribedUsers] = useState<User[]>([]);
+
   // Redeem codes state
   const [redeemCodes, setRedeemCodes] = useState<RedeemCode[]>([]);
   const [loadingRedeemCodes, setLoadingRedeemCodes] = useState(false);
@@ -475,7 +493,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   const mediaFileInputRef = useRef<HTMLInputElement>(null);
   const [showDescriptionPreview, setShowDescriptionPreview] = useState(false);
   const [aiReviewing, setAiReviewing] = useState(false);
-  const [aiReviewBackup, setAiReviewBackup] = useState<{title?: string; description?: string; details?: string[]} | null>(null);
+  const [aiReviewBackup, setAiReviewBackup] = useState<{ title?: string; description?: string; details?: string[] } | null>(null);
   // Wiki filtering state
   const [wikiSearchTerm, setWikiSearchTerm] = useState('');
   const [wikiCategoryFilter, setWikiCategoryFilter] = useState<string>('all');
@@ -505,10 +523,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   const [footerCropPosition, setFooterCropPosition] = useState({ x: 0, y: 0 });
   const footerCanvasRef = useRef<HTMLCanvasElement>(null);
   const footerImageRef = useRef<HTMLImageElement>(null);
-  
+
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [toast, setToast] = useState<{msg: string, type: 'success' | 'error' | 'info'} | null>(null);
+  const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' | 'info' } | null>(null);
 
   // Memoize config values to prevent unnecessary re-renders
   const configHero = useMemo(() => config.hero, [config.hero]);
@@ -517,58 +535,138 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   const configDatabase = useMemo(() => config.database, [config.database]);
   const configChangelogs = useMemo(() => config.changelogs, [config.changelogs]);
   const configKofiTiers = useMemo(() => config.kofiTiers, [config.kofiTiers]);
+  const configTwitchTiers = useMemo(() => config.twitchTiers, [config.twitchTiers]);
 
   // Use React.startTransition for non-urgent updates to prevent blocking
   useEffect(() => {
-      // Use requestIdleCallback or setTimeout to batch updates
-      const updateTimer = setTimeout(() => {
-          if (configHero) setHeroConfig(configHero);
-          if (configLinks) setLinkConfig({ curseforge: "", modrinth: "", discord: "", source: "", kofi: "", ...configLinks });
-          if (configSocialHandles) {
-              setSocialHandlesConfig(configSocialHandles);
-              // Update order arrays
-              if (configSocialHandles.authorLinks) {
-                  setAuthorLinksOrder(Object.keys(configSocialHandles.authorLinks));
-              }
-              if (configSocialHandles.leadDevLinks) {
-                  setLeadDevLinksOrder(Object.keys(configSocialHandles.leadDevLinks));
-              }
-          }
-          setDbConfig(configDatabase || { type: 'local', endpoint: '', apiKey: '' });
-          if (configChangelogs) setChangelogs(configChangelogs);
-          if (configKofiTiers) setKofiTiers(configKofiTiers);
-      }, 0);
-      
-      return () => clearTimeout(updateTimer);
-  }, [configHero, configLinks, configSocialHandles, configDatabase, configChangelogs, configKofiTiers]);
-  
+    // Use requestIdleCallback or setTimeout to batch updates
+    const updateTimer = setTimeout(() => {
+      if (configHero) setHeroConfig(configHero);
+      if (configLinks) setLinkConfig({ curseforge: "", modrinth: "", discord: "", source: "", kofi: "", ...configLinks });
+      if (configSocialHandles) {
+        setSocialHandlesConfig(configSocialHandles);
+        // Update order arrays
+        if (configSocialHandles.authorLinks) {
+          setAuthorLinksOrder(Object.keys(configSocialHandles.authorLinks));
+        }
+        if (configSocialHandles.leadDevLinks) {
+          setLeadDevLinksOrder(Object.keys(configSocialHandles.leadDevLinks));
+        }
+      }
+      setDbConfig(configDatabase || { type: 'local', endpoint: '', apiKey: '' });
+      if (configChangelogs) setChangelogs(configChangelogs);
+      if (configKofiTiers) setKofiTiers(configKofiTiers);
+      if (configTwitchTiers) setTwitchTiers(configTwitchTiers);
+    }, 0);
+
+    return () => clearTimeout(updateTimer);
+  }, [configHero, configLinks, configSocialHandles, configDatabase, configChangelogs, configKofiTiers, configTwitchTiers]);
+
   // Check DB status separately and debounced
   useEffect(() => {
-      const timer = setTimeout(() => {
-          checkDbStatus();
-      }, 300);
-      return () => clearTimeout(timer);
+    const timer = setTimeout(() => {
+      checkDbStatus();
+    }, 300);
+    return () => clearTimeout(timer);
   }, [config]);
 
   const checkDbStatus = async () => {
-      const isConnected = await StorageService.isCloudAvailable();
-      setDbStatus(isConnected ? 'connected' : 'disconnected');
+    const isConnected = await StorageService.isCloudAvailable();
+    setDbStatus(isConnected ? 'connected' : 'disconnected');
   };
 
   const loadUsers = async () => {
     setRefreshingUsers(true);
     try {
-        const fetchedUsers = await AuthService.getAllUsers();
-        setUsers(fetchedUsers);
+      const fetchedUsers = await AuthService.getAllUsers();
+      setUsers(fetchedUsers);
     } catch (e: any) {
-        console.error("Failed to load users", e);
-        alert(`Failed to load users: ${e.message || 'Unknown error'}`);
+      console.error("Failed to load users", e);
+      alert(`Failed to load users: ${e.message || 'Unknown error'}`);
 
-        if (currentUser) {
-          setUsers([currentUser]);
-        }
+      if (currentUser) {
+        setUsers([currentUser]);
+      }
     }
     setRefreshingUsers(false);
+  };
+
+  const loadLegacyUsers = async () => {
+    setLoadingLegacyUsers(true);
+    try {
+      const users = await AuthService.getLegacyUsers();
+      setLegacyUsers(users);
+    } catch (e: any) {
+      console.error("Failed to load legacy users", e);
+      setToast({ msg: `Failed to load legacy users: ${e.message}`, type: 'error' });
+    } finally {
+      setLoadingLegacyUsers(false);
+    }
+  };
+
+  const handleDeleteLegacyUser = async (email: string) => {
+    if (!confirm(`Are you sure you want to delete legacy entry for ${email}?`)) return;
+    try {
+      await AuthService.deleteLegacyUser(email);
+      setLegacyUsers(prev => prev.filter(u => u.email !== email));
+      setToast({ msg: 'Legacy user deleted', type: 'info' });
+    } catch (e: any) {
+      console.error("Failed to delete legacy user", e);
+      setToast({ msg: `Failed to delete: ${e.message}`, type: 'error' });
+    }
+  };
+
+  const [showAddLegacyModal, setShowAddLegacyModal] = useState(false);
+  const [newLegacyUser, setNewLegacyUser] = useState({
+    email: '',
+    username: '',
+    role: 'user',
+    minecraftUsername: '',
+    minecraftUuid: '',
+    kofiUsername: ''
+  });
+
+  const handleAddLegacyUser = async () => {
+    if (!newLegacyUser.email || !newLegacyUser.username) {
+      alert("Email and Username are required");
+      return;
+    }
+    try {
+      await AuthService.createLegacyUser(newLegacyUser);
+      setToast({ msg: 'Legacy user created', type: 'success' });
+      setShowAddLegacyModal(false);
+      setNewLegacyUser({
+        email: '',
+        username: '',
+        role: 'user',
+        minecraftUsername: '',
+        minecraftUuid: '',
+        kofiUsername: ''
+      });
+      loadLegacyUsers();
+    } catch (e: any) {
+      setToast({ msg: `Failed to create legacy user: ${e.message}`, type: 'error' });
+    }
+  };
+
+  const handleSendResetLink = async (userId: string) => {
+    if (!confirm('Send password reset link to user?')) return;
+    try {
+      await AuthService.sendResetLink(userId);
+      setToast({ msg: 'Reset link sent!', type: 'success' });
+    } catch (e: any) {
+      setToast({ msg: `Failed to send reset link: ${e.message}`, type: 'error' });
+    }
+  };
+
+  const handleForceResetPassword = async (userId: string) => {
+    if (!confirm('Force reset password and assign temporary dummy? User will be forced to change it on next login.')) return;
+    try {
+      await AuthService.forceResetPassword(userId);
+      setToast({ msg: 'Temporary password sent to user!', type: 'success' });
+    } catch (e: any) {
+      setToast({ msg: `Failed to force reset: ${e.message}`, type: 'error' });
+    }
   };
 
   useEffect(() => { loadUsers(); }, [currentUser]);
@@ -603,36 +701,36 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
 
   const handleRoleChange = async (userId: string, newRole: UserRole) => {
-      if (newRole === 'owner' && !confirm("Warning: You are granting FULL SYSTEM ACCESS (Owner) to this user. Continue?")) return;
-      try { 
-          await AuthService.updateUserRole(userId, newRole); 
-          loadUsers(); 
-      } catch (e: any) { alert(e.message); }
+    if (newRole === 'owner' && !confirm("Warning: You are granting FULL SYSTEM ACCESS (Owner) to this user. Continue?")) return;
+    try {
+      await AuthService.updateUserRole(userId, newRole);
+      loadUsers();
+    } catch (e: any) { alert(e.message); }
   };
 
   const handleDeleteUser = async (id: string) => {
-      if (confirm("Are you sure you want to delete this user? This action cannot be undone.")) {
-          try { await AuthService.deleteUser(id); loadUsers(); } catch (e: any) { alert(e.message); }
-      }
+    if (confirm("Are you sure you want to delete this user? This action cannot be undone.")) {
+      try { await AuthService.deleteUser(id); loadUsers(); } catch (e: any) { alert(e.message); }
+    }
   };
 
   const insertTextAtCursor = (before: string, after: string, newLine: boolean = false) => {
     const textarea = changelogTextareaRef.current;
     if (!textarea) return;
-    
+
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const text = textarea.value;
     const selectedText = text.substring(start, end);
-    
+
     const prefix = newLine && start > 0 && text[start - 1] !== '\n' ? '\n' : '';
     const suffix = newLine && end < text.length && text[end] !== '\n' ? '\n' : '';
-    
+
     const newText = text.substring(0, start) + prefix + before + selectedText + after + suffix + text.substring(end);
     const newCursorPos = start + prefix.length + before.length + selectedText.length + after.length + suffix.length;
-    
+
     setNewChangelog({ ...newChangelog, changelog: newText });
-    
+
     setTimeout(() => {
       textarea.focus();
       textarea.setSelectionRange(newCursorPos, newCursorPos);
@@ -645,7 +743,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
       if (!report) {
         return `<span class="text-gray-500 font-mono text-sm">@${patchId}</span>`;
       }
-      
+
       const formatDate = (timestamp: number): string => {
         const date = new Date(timestamp);
         const month = date.getMonth() + 1;
@@ -653,34 +751,34 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
         const year = date.getFullYear();
         return `${month}/${day}/${year}`;
       };
-      
+
       // Format MC versions (comma-separated if multiple)
-      const mcVersionsStr = report.mcVersions && report.mcVersions.length > 0 
-        ? `MC ${report.mcVersions.join(', ')}` 
+      const mcVersionsStr = report.mcVersions && report.mcVersions.length > 0
+        ? `MC ${report.mcVersions.join(', ')}`
         : 'MC N/A';
       const modVersion = report.versions && report.versions.length > 0 ? `v${report.versions[0]}` : 'vN/A';
       const dateStr = formatDate(report.timestamp);
-      
+
       const statusColors = {
         'Open': 'bg-gray-700/50 text-gray-300',
         'In Progress': 'bg-blue-700/50 text-blue-300',
         'Resolved': 'bg-green-700/50 text-green-300'
       };
-      
+
       const severityColors = {
         'Critical': 'bg-red-700/50 text-red-300',
         'High': 'bg-orange-700/50 text-orange-300',
         'Medium': 'bg-yellow-700/50 text-yellow-300',
         'Low': 'bg-green-700/50 text-green-300'
       };
-      
+
       const severityTagColors = {
         'Critical': 'bg-red-900/30 text-red-600 border-red-700',
         'High': 'bg-orange-900/30 text-orange-600 border-orange-700',
         'Medium': 'bg-yellow-900/30 text-yellow-600 border-yellow-700',
         'Low': 'bg-green-900/30 text-green-600 border-green-700'
       };
-      
+
       const escapeHtml = (str: string) => {
         if (!str) return '';
         return String(str)
@@ -690,7 +788,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#039;');
       };
-      
+
       const escapedTitle = escapeHtml(report.title);
       const escapedDescription = escapeHtml(report.description || '');
       const escapedStatus = escapeHtml(report.status);
@@ -699,11 +797,11 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
       const escapedMcVersion = escapeHtml(mcVersionsStr);
       const escapedModVersion = escapeHtml(modVersion);
       const escapedDate = escapeHtml(dateStr);
-      
+
       const severityTagClass = severityTagColors[report.severity as keyof typeof severityTagColors] || severityTagColors['Low'];
       const statusTagClass = statusColors[report.status as keyof typeof statusColors] || statusColors['Open'];
       const severityTagClass2 = severityColors[report.severity as keyof typeof severityColors] || severityColors['Low'];
-      
+
       return `
         <div 
           class="inline-block px-3 py-2 rounded-lg border cursor-pointer hover:opacity-90 transition-all bg-gray-800/50 border-gray-700 hover:border-blue-500 my-1 bug-report-clickable"
@@ -742,11 +840,11 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
       const sanitized = sanitizeHTMLPermissive(truncated);
       return <div className="text-sm text-gray-300" dangerouslySetInnerHTML={{ __html: sanitized }} />;
     }
-    
+
     const lines = changelog.split('\n');
     const previewLines = lines.slice(0, maxLines);
     const hasMore = lines.length > maxLines;
-    
+
     return (
       <div className="text-sm text-gray-300 space-y-1">
         {previewLines.map((line, idx) => {
@@ -810,7 +908,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
       const sanitized = sanitizeHTMLPermissive(processed);
       return <div dangerouslySetInnerHTML={{ __html: sanitized }} />;
     }
-    
+
     const lines = markdown.split('\n');
     return (
       <div className="space-y-2">
@@ -868,345 +966,360 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   };
 
   const handleNavbarCropAndSave = () => {
-      if (!navbarCanvasRef.current || !navbarImageRef.current || !navbarOriginalImage) return;
-      
-      const canvas = navbarCanvasRef.current;
-      const img = navbarImageRef.current;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+    if (!navbarCanvasRef.current || !navbarImageRef.current || !navbarOriginalImage) return;
 
-      canvas.width = 128;
-      canvas.height = 128;
+    const canvas = navbarCanvasRef.current;
+    const img = navbarImageRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-      const container = img.parentElement;
-      if (!container) return;
-      const containerWidth = container.clientWidth;
-      const containerHeight = container.clientHeight;
+    canvas.width = 128;
+    canvas.height = 128;
 
-      const cropSize = Math.min(containerWidth, containerHeight) / navbarCropScale;
-      const cropX = (containerWidth - cropSize) / 2 - navbarCropPosition.x;
-      const cropY = (containerHeight - cropSize) / 2 - navbarCropPosition.y;
+    const container = img.parentElement;
+    if (!container) return;
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
 
-      const imgAspect = img.naturalWidth / img.naturalHeight;
-      const containerAspect = containerWidth / containerHeight;
-      
-      let displayedWidth, displayedHeight, offsetX, offsetY;
-      
-      if (imgAspect > containerAspect) {
+    const cropSize = Math.min(containerWidth, containerHeight) / navbarCropScale;
+    const cropX = (containerWidth - cropSize) / 2 - navbarCropPosition.x;
+    const cropY = (containerHeight - cropSize) / 2 - navbarCropPosition.y;
 
-          displayedHeight = containerHeight;
-          displayedWidth = displayedHeight * imgAspect;
-          offsetX = (containerWidth - displayedWidth) / 2;
-          offsetY = 0;
-      } else {
+    const imgAspect = img.naturalWidth / img.naturalHeight;
+    const containerAspect = containerWidth / containerHeight;
 
-          displayedWidth = containerWidth;
-          displayedHeight = displayedWidth / imgAspect;
-          offsetX = 0;
-          offsetY = (containerHeight - displayedHeight) / 2;
-      }
+    let displayedWidth, displayedHeight, offsetX, offsetY;
 
-      const sourceX = ((cropX - offsetX) / displayedWidth) * img.naturalWidth;
-      const sourceY = ((cropY - offsetY) / displayedHeight) * img.naturalHeight;
-      const sourceSize = (cropSize / displayedWidth) * img.naturalWidth;
+    if (imgAspect > containerAspect) {
 
-      ctx.drawImage(
-          img,
-          Math.max(0, sourceX), Math.max(0, sourceY), 
-          Math.min(sourceSize, img.naturalWidth - Math.max(0, sourceX)), 
-          Math.min(sourceSize, img.naturalHeight - Math.max(0, sourceY)),
-          0, 0, 128, 128
-      );
+      displayedHeight = containerHeight;
+      displayedWidth = displayedHeight * imgAspect;
+      offsetX = (containerWidth - displayedWidth) / 2;
+      offsetY = 0;
+    } else {
 
-      const croppedBase64 = canvas.toDataURL('image/jpeg', 0.75);
-      setNavbarIconConfig({...navbarIconConfig, icon: croppedBase64});
+      displayedWidth = containerWidth;
+      displayedHeight = displayedWidth / imgAspect;
+      offsetX = 0;
+      offsetY = (containerHeight - displayedHeight) / 2;
+    }
 
-      setShowNavbarCropEditor(false);
-      setNavbarCropScale(1);
-      setNavbarCropPosition({ x: 0, y: 0 });
+    const sourceX = ((cropX - offsetX) / displayedWidth) * img.naturalWidth;
+    const sourceY = ((cropY - offsetY) / displayedHeight) * img.naturalHeight;
+    const sourceSize = (cropSize / displayedWidth) * img.naturalWidth;
+
+    ctx.drawImage(
+      img,
+      Math.max(0, sourceX), Math.max(0, sourceY),
+      Math.min(sourceSize, img.naturalWidth - Math.max(0, sourceX)),
+      Math.min(sourceSize, img.naturalHeight - Math.max(0, sourceY)),
+      0, 0, 128, 128
+    );
+
+    const croppedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+    setNavbarIconConfig({ ...navbarIconConfig, icon: croppedBase64 });
+
+    setShowNavbarCropEditor(false);
+    setNavbarCropScale(1);
+    setNavbarCropPosition({ x: 0, y: 0 });
   };
 
   const handleFooterCropAndSave = () => {
-      if (!footerCanvasRef.current || !footerImageRef.current || !footerOriginalImage) return;
-      
-      const canvas = footerCanvasRef.current;
-      const img = footerImageRef.current;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+    if (!footerCanvasRef.current || !footerImageRef.current || !footerOriginalImage) return;
 
-      canvas.width = 128;
-      canvas.height = 128;
+    const canvas = footerCanvasRef.current;
+    const img = footerImageRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-      const container = img.parentElement;
-      if (!container) return;
-      const containerWidth = container.clientWidth;
-      const containerHeight = container.clientHeight;
+    canvas.width = 128;
+    canvas.height = 128;
 
-      const cropSize = Math.min(containerWidth, containerHeight) / footerCropScale;
-      const cropX = (containerWidth - cropSize) / 2 - footerCropPosition.x;
-      const cropY = (containerHeight - cropSize) / 2 - footerCropPosition.y;
+    const container = img.parentElement;
+    if (!container) return;
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
 
-      const imgAspect = img.naturalWidth / img.naturalHeight;
-      const containerAspect = containerWidth / containerHeight;
-      
-      let displayedWidth, displayedHeight, offsetX, offsetY;
-      
-      if (imgAspect > containerAspect) {
+    const cropSize = Math.min(containerWidth, containerHeight) / footerCropScale;
+    const cropX = (containerWidth - cropSize) / 2 - footerCropPosition.x;
+    const cropY = (containerHeight - cropSize) / 2 - footerCropPosition.y;
 
-          displayedHeight = containerHeight;
-          displayedWidth = displayedHeight * imgAspect;
-          offsetX = (containerWidth - displayedWidth) / 2;
-          offsetY = 0;
-      } else {
+    const imgAspect = img.naturalWidth / img.naturalHeight;
+    const containerAspect = containerWidth / containerHeight;
 
-          displayedWidth = containerWidth;
-          displayedHeight = displayedWidth / imgAspect;
-          offsetX = 0;
-          offsetY = (containerHeight - displayedHeight) / 2;
-      }
+    let displayedWidth, displayedHeight, offsetX, offsetY;
 
-      const sourceX = ((cropX - offsetX) / displayedWidth) * img.naturalWidth;
-      const sourceY = ((cropY - offsetY) / displayedHeight) * img.naturalHeight;
-      const sourceSize = (cropSize / displayedWidth) * img.naturalWidth;
+    if (imgAspect > containerAspect) {
 
-      ctx.drawImage(
-          img,
-          Math.max(0, sourceX), Math.max(0, sourceY), 
-          Math.min(sourceSize, img.naturalWidth - Math.max(0, sourceX)), 
-          Math.min(sourceSize, img.naturalHeight - Math.max(0, sourceY)),
-          0, 0, 128, 128
-      );
+      displayedHeight = containerHeight;
+      displayedWidth = displayedHeight * imgAspect;
+      offsetX = (containerWidth - displayedWidth) / 2;
+      offsetY = 0;
+    } else {
 
-      const croppedBase64 = canvas.toDataURL('image/jpeg', 0.75);
-      setFooterIconConfig({...footerIconConfig, icon: croppedBase64});
+      displayedWidth = containerWidth;
+      displayedHeight = displayedWidth / imgAspect;
+      offsetX = 0;
+      offsetY = (containerHeight - displayedHeight) / 2;
+    }
 
-      setShowFooterCropEditor(false);
-      setFooterCropScale(1);
-      setFooterCropPosition({ x: 0, y: 0 });
+    const sourceX = ((cropX - offsetX) / displayedWidth) * img.naturalWidth;
+    const sourceY = ((cropY - offsetY) / displayedHeight) * img.naturalHeight;
+    const sourceSize = (cropSize / displayedWidth) * img.naturalWidth;
+
+    ctx.drawImage(
+      img,
+      Math.max(0, sourceX), Math.max(0, sourceY),
+      Math.min(sourceSize, img.naturalWidth - Math.max(0, sourceX)),
+      Math.min(sourceSize, img.naturalHeight - Math.max(0, sourceY)),
+      0, 0, 128, 128
+    );
+
+    const croppedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+    setFooterIconConfig({ ...footerIconConfig, icon: croppedBase64 });
+
+    setShowFooterCropEditor(false);
+    setFooterCropScale(1);
+    setFooterCropPosition({ x: 0, y: 0 });
   };
 
   // Ko-fi Management Functions
   const saveKofiTiers = async (tiers: KofiTier[]) => {
-      const updatedConfig = {
-          ...config,
-          kofiTiers: tiers
-      };
-      onUpdateConfig(updatedConfig);
+    const updatedConfig = {
+      ...config,
+      kofiTiers: tiers
+    };
+    onUpdateConfig(updatedConfig);
+    try {
+      await StorageService.saveAll(reports, suggestions, updatedConfig);
+    } catch (error) {
+      console.error('Failed to save kofi tiers:', error);
+      setToast({ msg: 'Failed to save kofi tiers to database', type: 'error' });
+    }
   };
 
   const saveManualReward = async (reward: ManualReward) => {
-      try {
-          await AuthService.fetchWithAuth('/api/kofi-rewards', {
-              method: 'POST',
-              body: JSON.stringify({ reward })
-          });
-      } catch (error: any) {
-          console.error('Failed to save manual reward:', error);
-          setToast({ msg: 'Failed to save manual reward', type: 'error' });
-      }
+    try {
+      await AuthService.fetchWithAuth('/api/kofi-rewards', {
+        method: 'POST',
+        body: JSON.stringify({ reward })
+      });
+    } catch (error: any) {
+      console.error('Failed to save manual reward:', error);
+      setToast({ msg: 'Failed to save manual reward', type: 'error' });
+    }
   };
 
   const deleteManualReward = async (id: string) => {
     try {
-        await AuthService.fetchWithAuth(`/api/kofi-rewards?id=${id}`, {
-            method: 'DELETE'
-        });
-        setToast({ msg: 'Manual reward deleted', type: 'info' });
+      await AuthService.fetchWithAuth(`/api/kofi-rewards?id=${id}`, {
+        method: 'DELETE'
+      });
+      setToast({ msg: 'Manual reward deleted', type: 'info' });
     } catch (error: any) {
-        console.error('Failed to delete manual reward:', error);
-        setToast({ msg: 'Failed to delete manual reward', type: 'error' });
+      console.error('Failed to delete manual reward:', error);
+      setToast({ msg: 'Failed to delete manual reward', type: 'error' });
     }
   };
 
   const updateManualReward = async (id: string, updates: any) => {
     try {
-        await AuthService.fetchWithAuth('/api/kofi-rewards', {
-            method: 'PATCH',
-            body: JSON.stringify({ id, updates })
-        });
-        setToast({ msg: 'Manual reward updated', type: 'success' });
+      await AuthService.fetchWithAuth('/api/kofi-rewards', {
+        method: 'PATCH',
+        body: JSON.stringify({ id, updates })
+      });
+      setToast({ msg: 'Manual reward updated', type: 'success' });
     } catch (error: any) {
-        console.error('Failed to update manual reward:', error);
-        setToast({ msg: 'Failed to update manual reward', type: 'error' });
+      console.error('Failed to update manual reward:', error);
+      setToast({ msg: 'Failed to update manual reward', type: 'error' });
     }
   };
 
   const loadManualRewards = async () => {
-      try {
-          const data = await AuthService.fetchWithAuth('/api/kofi-rewards');
-          setManualRewards(data.rewards || []);
-      } catch (error: any) {
-          console.error('Failed to load manual rewards:', error);
-      }
+    try {
+      const data = await AuthService.fetchWithAuth('/api/kofi-rewards');
+      setManualRewards(data.rewards || []);
+    } catch (error: any) {
+      console.error('Failed to load manual rewards:', error);
+    }
   };
 
   // Load ALL admin data when component first mounts
   useEffect(() => {
-      console.log('AdminPanel mounted - loading all initial data');
-      // Always load redeem codes on mount (needed for all redeem-rewards tabs)
-      loadRedeemCodes();
+    console.log('AdminPanel mounted - loading all initial data');
+    // Always load redeem codes on mount (needed for all redeem-rewards tabs)
+    loadRedeemCodes();
   }, []); // Empty dependency array = run only on mount
 
   // Load data when switching tabs or sub-tabs
   useEffect(() => {
-      if (activeTab === 'kofi') {
-          if (kofiSubTab === 'subscribers') {
-              loadSubscribedUsers();
-          } else if (kofiSubTab === 'manual-rewards') {
-              loadManualRewards();
-          }
+    if (activeTab === 'kofi') {
+      if (kofiSubTab === 'subscribers') {
+        loadSubscribedUsers();
+      } else if (kofiSubTab === 'manual-rewards') {
+        loadManualRewards();
       }
-      
-      if (activeTab === 'redeem-rewards') {
-          // Reload redeem codes when switching to this tab
-          loadRedeemCodes();
-          if (redeemCodeSubTab === 'claims') {
-              loadCodeRedemptions();
-          }
+    }
+    if (activeTab === 'twitch') {
+      if (twitchSubTab === 'subscribers') {
+        loadTwitchSubscribedUsers();
       }
-      
-      if (activeTab === 'wiki') {
-          loadWikiFeatures();
+    }
+
+    if (activeTab === 'redeem-rewards') {
+      // Reload redeem codes when switching to this tab
+      loadRedeemCodes();
+      if (redeemCodeSubTab === 'claims') {
+        loadCodeRedemptions();
       }
-  }, [activeTab, kofiSubTab, redeemCodeSubTab]);
+    }
+
+    if (activeTab === 'wiki') {
+      loadWikiFeatures();
+    }
+
+    if (activeTab === 'users' && userSubTab === 'legacy') {
+      loadLegacyUsers();
+    }
+  }, [activeTab, kofiSubTab, twitchSubTab, redeemCodeSubTab, userSubTab]);
 
   const loadRedeemCodes = async () => {
-      setLoadingRedeemCodes(true);
-      try {
-          const data = await AuthService.fetchWithAuth('/api/admin/redeem-codes');
-          setRedeemCodes(data.codes || []);
-          console.log('Set redeem codes:', data.codes?.length || 0);
-      } catch (error: any) {
-          console.error('Failed to load redeem codes - exception:', error);
-          setToast({ msg: `Failed to load redeem codes: ${error.message || 'Network error'}`, type: 'error' });
-      } finally {
-          setLoadingRedeemCodes(false);
-      }
+    setLoadingRedeemCodes(true);
+    try {
+      const data = await AuthService.fetchWithAuth('/api/admin/redeem-codes');
+      setRedeemCodes(data.codes || []);
+      console.log('Set redeem codes:', data.codes?.length || 0);
+    } catch (error: any) {
+      console.error('Failed to load redeem codes - exception:', error);
+      setToast({ msg: `Failed to load redeem codes: ${error.message || 'Network error'}`, type: 'error' });
+    } finally {
+      setLoadingRedeemCodes(false);
+    }
   };
 
   const loadCodeRedemptions = async () => {
-      setLoadingRedemptions(true);
-      try {
-          const params = new URLSearchParams();
-          if (selectedCodeFilter !== 'all') {
-              params.append('codeId', selectedCodeFilter);
-          }
-          if (redemptionDateFilter.start) {
-              params.append('startDate', new Date(redemptionDateFilter.start).getTime().toString());
-          }
-          if (redemptionDateFilter.end) {
-              params.append('endDate', new Date(redemptionDateFilter.end + 'T23:59:59').getTime().toString());
-          }
-
-          const data = await AuthService.fetchWithAuth(`/api/admin/code-redemptions?${params.toString()}`);
-          setCodeRedemptions(data.redemptions || []);
-      } catch (error: any) {
-          console.error('Failed to load code redemptions:', error);
-          setToast({ msg: 'Failed to load code redemptions', type: 'error' });
-      } finally {
-          setLoadingRedemptions(false);
+    setLoadingRedemptions(true);
+    try {
+      const params = new URLSearchParams();
+      if (selectedCodeFilter !== 'all') {
+        params.append('codeId', selectedCodeFilter);
       }
+      if (redemptionDateFilter.start) {
+        params.append('startDate', new Date(redemptionDateFilter.start).getTime().toString());
+      }
+      if (redemptionDateFilter.end) {
+        params.append('endDate', new Date(redemptionDateFilter.end + 'T23:59:59').getTime().toString());
+      }
+
+      const data = await AuthService.fetchWithAuth(`/api/admin/code-redemptions?${params.toString()}`);
+      setCodeRedemptions(data.redemptions || []);
+    } catch (error: any) {
+      console.error('Failed to load code redemptions:', error);
+      setToast({ msg: 'Failed to load code redemptions', type: 'error' });
+    } finally {
+      setLoadingRedemptions(false);
+    }
   };
 
   const saveRedeemCode = async () => {
-      if (!newRedeemCode.code || !newRedeemCode.rewards || newRedeemCode.rewards.length === 0) {
-          setToast({ msg: 'Code and at least one reward are required', type: 'error' });
-          return;
+    if (!newRedeemCode.code || !newRedeemCode.rewards || newRedeemCode.rewards.length === 0) {
+      setToast({ msg: 'Code and at least one reward are required', type: 'error' });
+      return;
+    }
+
+    try {
+      const url = editingRedeemCode
+        ? '/api/admin/redeem-codes'
+        : '/api/admin/redeem-codes';
+      const method = editingRedeemCode ? 'PUT' : 'POST';
+
+      const body: any = {
+        code: newRedeemCode.code,
+        description: newRedeemCode.description || '',
+        rewards: newRedeemCode.rewards,
+        enabled: newRedeemCode.enabled !== undefined ? newRedeemCode.enabled : true,
+        createdBy: currentUser.username
+      };
+
+      if (newRedeemCode.maxUses !== undefined && newRedeemCode.maxUses > 0) {
+        body.maxUses = newRedeemCode.maxUses;
       }
 
-      try {
-          const url = editingRedeemCode 
-              ? '/api/admin/redeem-codes'
-              : '/api/admin/redeem-codes';
-          const method = editingRedeemCode ? 'PUT' : 'POST';
-
-          const body: any = {
-              code: newRedeemCode.code,
-              description: newRedeemCode.description || '',
-              rewards: newRedeemCode.rewards,
-              enabled: newRedeemCode.enabled !== undefined ? newRedeemCode.enabled : true,
-              createdBy: currentUser.username
-          };
-
-          if (newRedeemCode.maxUses !== undefined && newRedeemCode.maxUses > 0) {
-              body.maxUses = newRedeemCode.maxUses;
-          }
-
-          if (newRedeemCode.expiresAt) {
-              body.expiresAt = newRedeemCode.expiresAt;
-          }
-
-          if (newRedeemCode.requiresMembership) {
-              body.requiresMembership = newRedeemCode.requiresMembership;
-          }
-
-          if (editingRedeemCode) {
-              body.id = editingRedeemCode.id;
-          }
-
-          const data = await AuthService.fetchWithAuth(url, {
-              method: method,
-              body: JSON.stringify(body)
-          });
-
-          setToast({ msg: editingRedeemCode ? 'Code updated successfully' : 'Code created successfully', type: 'success' });
-          setShowRedeemCodeModal(false);
-          setEditingRedeemCode(null);
-          setNewRedeemCode({
-              code: '',
-              description: '',
-              rewards: [],
-              maxUses: undefined,
-              expiresAt: undefined,
-              requiresMembership: undefined,
-              enabled: true
-          });
-          loadRedeemCodes();
-      } catch (error: any) {
-          console.error('Failed to save redeem code:', error);
-          setToast({ msg: 'Failed to save redeem code', type: 'error' });
+      if (newRedeemCode.expiresAt) {
+        body.expiresAt = newRedeemCode.expiresAt;
       }
+
+      if (newRedeemCode.requiresMembership) {
+        body.requiresMembership = newRedeemCode.requiresMembership;
+      }
+
+      if (editingRedeemCode) {
+        body.id = editingRedeemCode.id;
+      }
+
+      const data = await AuthService.fetchWithAuth(url, {
+        method: method,
+        body: JSON.stringify(body)
+      });
+
+      setToast({ msg: editingRedeemCode ? 'Code updated successfully' : 'Code created successfully', type: 'success' });
+      setShowRedeemCodeModal(false);
+      setEditingRedeemCode(null);
+      setNewRedeemCode({
+        code: '',
+        description: '',
+        rewards: [],
+        maxUses: undefined,
+        expiresAt: undefined,
+        requiresMembership: undefined,
+        enabled: true
+      });
+      loadRedeemCodes();
+    } catch (error: any) {
+      console.error('Failed to save redeem code:', error);
+      setToast({ msg: 'Failed to save redeem code', type: 'error' });
+    }
   };
 
   const deleteRedeemCode = async (id: string) => {
-      if (!confirm('Are you sure you want to delete this code? This action cannot be undone.')) {
-          return;
-      }
+    if (!confirm('Are you sure you want to delete this code? This action cannot be undone.')) {
+      return;
+    }
 
-      try {
-          await AuthService.fetchWithAuth(`/api/admin/redeem-codes?id=${id}`, {
-              method: 'DELETE'
-          });
+    try {
+      await AuthService.fetchWithAuth(`/api/admin/redeem-codes?id=${id}`, {
+        method: 'DELETE'
+      });
 
-          setToast({ msg: 'Code deleted successfully', type: 'success' });
-          loadRedeemCodes();
-      } catch (error: any) {
-          console.error('Failed to delete redeem code:', error);
-          setToast({ msg: 'Failed to delete redeem code', type: 'error' });
-      }
+      setToast({ msg: 'Code deleted successfully', type: 'success' });
+      loadRedeemCodes();
+    } catch (error: any) {
+      console.error('Failed to delete redeem code:', error);
+      setToast({ msg: 'Failed to delete redeem code', type: 'error' });
+    }
   };
 
   const loadWikiFeatures = async () => {
-      setLoadingWikiFeatures(true);
-      try {
-          const data = await AuthService.fetchWithAuth('/api/wiki');
-          setWikiFeatures(data.features || []);
-      } catch (error: any) {
-          console.error('Failed to load wiki features:', error);
-          setToast({ msg: 'Failed to load wiki features', type: 'error' });
-      } finally {
-          setLoadingWikiFeatures(false);
-      }
+    setLoadingWikiFeatures(true);
+    try {
+      const data = await AuthService.fetchWithAuth('/api/wiki');
+      setWikiFeatures(data.features || []);
+    } catch (error: any) {
+      console.error('Failed to load wiki features:', error);
+      setToast({ msg: 'Failed to load wiki features', type: 'error' });
+    } finally {
+      setLoadingWikiFeatures(false);
+    }
   };
 
   const enhanceDescriptionLocally = (description: string, currentType: string): string => {
     if (!description) return description;
     if (currentType === 'html') return description;
-    
+
     // Convert plain text to markdown with better formatting
     const lines = description.split('\n');
     const enhanced: string[] = [];
-    
+
     lines.forEach((line, idx) => {
       const trimmed = line.trim();
       if (!trimmed) {
@@ -1215,7 +1328,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
         }
         return;
       }
-      
+
       // Detect bullet points
       if (trimmed.match(/^[-•*]\s+/)) {
         enhanced.push(trimmed);
@@ -1226,7 +1339,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
         enhanced.push(trimmed);
       }
     });
-    
+
     return enhanced.join('\n');
   };
 
@@ -1234,7 +1347,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
     // Validate file type
     const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
     const validVideoTypes = ['video/mp4', 'video/webm', 'video/ogg', 'video/quicktime'];
-    
+
     if (!validImageTypes.includes(file.type) && !validVideoTypes.includes(file.type)) {
       setToast({ msg: 'Please upload an image (JPEG, PNG, GIF, WebP, SVG) or video (MP4, WebM, OGG) file', type: 'error' });
       return;
@@ -1262,7 +1375,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
       reader.onloadend = async () => {
         if (reader.result) {
           setUploadProgress(50);
-          
+
           try {
             // Upload to cloud storage
             const data = await AuthService.fetchWithAuth('/api/upload', {
@@ -1310,168 +1423,205 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   };
 
   const saveWikiFeature = async () => {
-      if (!newWikiFeature.title || !newWikiFeature.categories || newWikiFeature.categories.length === 0) {
-          setToast({ msg: 'Title and at least one category are required', type: 'error' });
-          return;
-      }
+    if (!newWikiFeature.title || !newWikiFeature.categories || newWikiFeature.categories.length === 0) {
+      setToast({ msg: 'Title and at least one category are required', type: 'error' });
+      return;
+    }
 
-      try {
-          const url = '/api/wiki';
-          const method = editingWikiFeature ? 'PUT' : 'POST';
+    try {
+      const url = '/api/wiki';
+      const method = editingWikiFeature ? 'PUT' : 'POST';
 
-          const featureData: WikiFeature = {
-              id: editingWikiFeature?.id || generateUUID(),
-              title: newWikiFeature.title,
-              mcVersions: newWikiFeature.mcVersions || [],
-              modVersions: newWikiFeature.modVersions || [],
-              categories: newWikiFeature.categories || [],
-              subcategories: newWikiFeature.subcategories || [],
-              description: newWikiFeature.description || '',
-              descriptionType: newWikiFeature.descriptionType || 'text',
-              media: newWikiFeature.media || mediaPreview,
-              details: newWikiFeature.details || [],
-              createdBy: currentUser.username,
-              createdAt: editingWikiFeature?.createdAt || Date.now(),
-              updatedAt: Date.now()
-          };
+      const featureData: WikiFeature = {
+        id: editingWikiFeature?.id || generateUUID(),
+        title: newWikiFeature.title,
+        mcVersions: newWikiFeature.mcVersions || [],
+        modVersions: newWikiFeature.modVersions || [],
+        categories: newWikiFeature.categories || [],
+        subcategories: newWikiFeature.subcategories || [],
+        description: newWikiFeature.description || '',
+        descriptionType: newWikiFeature.descriptionType || 'text',
+        media: newWikiFeature.media || mediaPreview,
+        details: newWikiFeature.details || [],
+        createdBy: currentUser.username,
+        createdAt: editingWikiFeature?.createdAt || Date.now(),
+        updatedAt: Date.now()
+      };
 
-          const data = await AuthService.fetchWithAuth(url, {
-              method: method,
-              body: JSON.stringify({ feature: featureData })
-          });
+      const data = await AuthService.fetchWithAuth(url, {
+        method: method,
+        body: JSON.stringify({ feature: featureData })
+      });
 
-          setToast({ msg: editingWikiFeature ? 'Feature updated successfully' : 'Feature created successfully', type: 'success' });
-          setShowWikiModal(false);
-          setEditingWikiFeature(null);
-          setNewWikiFeature({
-              title: '',
-              mcVersions: [],
-              modVersions: [],
-              categories: [],
-              subcategories: [],
-              description: '',
-              descriptionType: 'markdown',
-              media: '',
-              details: []
-          });
-          setNewDetail('');
-          setMediaPreview('');
-          loadWikiFeatures();
-      } catch (error: any) {
-          console.error('Failed to save wiki feature:', error);
-          setToast({ msg: 'Failed to save wiki feature', type: 'error' });
-      }
+      setToast({ msg: editingWikiFeature ? 'Feature updated successfully' : 'Feature created successfully', type: 'success' });
+      setShowWikiModal(false);
+      setEditingWikiFeature(null);
+      setNewWikiFeature({
+        title: '',
+        mcVersions: [],
+        modVersions: [],
+        categories: [],
+        subcategories: [],
+        description: '',
+        descriptionType: 'markdown',
+        media: '',
+        details: []
+      });
+      setNewDetail('');
+      setMediaPreview('');
+      loadWikiFeatures();
+    } catch (error: any) {
+      console.error('Failed to save wiki feature:', error);
+      setToast({ msg: 'Failed to save wiki feature', type: 'error' });
+    }
   };
 
   const deleteWikiFeature = async (id: string) => {
-      if (!confirm('Are you sure you want to delete this feature? This action cannot be undone.')) {
-          return;
-      }
+    if (!confirm('Are you sure you want to delete this feature? This action cannot be undone.')) {
+      return;
+    }
 
-      try {
-          await AuthService.fetchWithAuth(`/api/wiki?id=${id}`, {
-              method: 'DELETE'
-          });
+    try {
+      await AuthService.fetchWithAuth(`/api/wiki?id=${id}`, {
+        method: 'DELETE'
+      });
 
-          setToast({ msg: 'Feature deleted successfully', type: 'success' });
-          loadWikiFeatures();
-      } catch (error: any) {
-          console.error('Failed to delete wiki feature:', error);
-          setToast({ msg: 'Failed to delete wiki feature', type: 'error' });
-      }
+      setToast({ msg: 'Feature deleted successfully', type: 'success' });
+      loadWikiFeatures();
+    } catch (error: any) {
+      console.error('Failed to delete wiki feature:', error);
+      setToast({ msg: 'Failed to delete wiki feature', type: 'error' });
+    }
   };
 
   function generateUUID(): string {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-          const r = Math.random() * 16 | 0;
-          const v = c === 'x' ? r : (r & 0x3 | 0x8);
-          return v.toString(16);
-      });
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
   }
 
   const loadSubscribedUsers = async () => {
-      setLoadingKofiUsers(true);
-      try {
-          const allUsers = await AuthService.getAllUsers();
-          const subscribed = allUsers.filter(user => user.kofiSubscription?.isActive === true);
-          setSubscribedUsers(subscribed);
-      } catch (error: any) {
-          console.error('Failed to load subscribed users:', error);
-          setToast({ msg: 'Failed to load subscribed users', type: 'error' });
-      } finally {
-          setLoadingKofiUsers(false);
-      }
+    setLoadingKofiUsers(true);
+    try {
+      const allUsers = await AuthService.getAllUsers();
+      const subscribed = allUsers.filter(user => user.kofiSubscription?.isActive === true);
+      setSubscribedUsers(subscribed);
+    } catch (error: any) {
+      console.error('Failed to load subscribed users:', error);
+      setToast({ msg: 'Failed to load subscribed users', type: 'error' });
+    } finally {
+      setLoadingKofiUsers(false);
+    }
+  };
+
+  const loadTwitchSubscribedUsers = async () => {
+    setLoadingTwitchUsers(true);
+    try {
+      const allUsers = await AuthService.getAllUsers();
+      const subscribed = allUsers.filter(user => user.twitchSubscriptionData?.isSub === true);
+      setTwitchSubscribedUsers(subscribed);
+    } catch (error: any) {
+      console.error('Failed to load twitch subscribed users:', error);
+      setToast({ msg: 'Failed to load twitch subscribed users', type: 'error' });
+    } finally {
+      setLoadingTwitchUsers(false);
+    }
+  };
+
+  const saveTwitchTiers = async (tiers: TwitchTier[]) => {
+    const updatedConfig = {
+      ...config,
+      twitchTiers: tiers
+    };
+    onUpdateConfig(updatedConfig);
+    try {
+      await StorageService.saveAll(reports, suggestions, updatedConfig);
+    } catch (error) {
+      console.error('Failed to save twitch tiers:', error);
+      setToast({ msg: 'Failed to save twitch tiers to database', type: 'error' });
+    }
   };
 
 
-  const saveGeneralConfig = () => {
-      onUpdateConfig({ 
-          ...config, 
-          hero: heroConfig, 
-          links: linkConfig, 
-          database: dbConfig,
-          socialHandles: {
-              ...socialHandlesConfig,
-              // Rebuild links objects in the correct order
-              authorLinks: authorLinksOrder.reduce((acc, key) => {
-                  const value = socialHandlesConfig.authorLinks?.[key];
-                  if (value) acc[key] = value;
-                  return acc;
-              }, {} as Record<string, string>),
-              leadDevLinks: leadDevLinksOrder.reduce((acc, key) => {
-                  const value = socialHandlesConfig.leadDevLinks?.[key];
-                  if (value) acc[key] = value;
-                  return acc;
-              }, {} as Record<string, string>)
-          },
-          navbarIcon: navbarIconConfig,
-          footerIcon: footerIconConfig,
-          roles: roles,
-          curseforgeProjectSlug: curseforgeProjectSlug || undefined,
-          autoSyncCurseForge: autoSyncCurseForge, // Keep for backward compatibility
-          curseforgeSyncInterval: curseforgeSyncInterval,
+  const saveGeneralConfig = async () => {
+    const updatedConfig: AppConfig = {
+      ...config,
+      hero: heroConfig,
+      links: linkConfig,
+      database: dbConfig,
+      socialHandles: {
+        ...socialHandlesConfig,
+        // Rebuild links objects in the correct order
+        authorLinks: authorLinksOrder.reduce((acc, key) => {
+          const value = socialHandlesConfig.authorLinks?.[key];
+          if (value) acc[key] = value;
+          return acc;
+        }, {} as Record<string, string>),
+        leadDevLinks: leadDevLinksOrder.reduce((acc, key) => {
+          const value = socialHandlesConfig.leadDevLinks?.[key];
+          if (value) acc[key] = value;
+          return acc;
+        }, {} as Record<string, string>)
+      },
+      navbarIcon: navbarIconConfig,
+      footerIcon: footerIconConfig,
+      roles: roles,
+      curseforgeProjectSlug: curseforgeProjectSlug || undefined,
+      autoSyncCurseForge: autoSyncCurseForge, // Keep for backward compatibility
+      curseforgeSyncInterval: curseforgeSyncInterval,
+      kofiTiers: kofiTiers,
+      twitchTiers: twitchTiers,
 
-          mcVersions: config.mcVersions, 
-          modVersions: config.modVersions
-      });
+      mcVersions: config.mcVersions,
+      modVersions: config.modVersions
+    };
+    onUpdateConfig(updatedConfig);
+    try {
+      await StorageService.saveAll(reports, suggestions, updatedConfig);
       alert("Configuration Saved!");
+    } catch (error) {
+      console.error('Failed to save configuration:', error);
+      alert('Failed to save configuration to database');
+    }
   };
 
   const handleSyncFromCurseForge = async () => {
-      setIsSyncingCurseForge(true);
-      try {
-          const currentConfig = {
-              ...config,
-              curseforgeProjectSlug: curseforgeProjectSlug || CurseForgeService.extractProjectId(linkConfig.curseforge) || '',
-          };
+    setIsSyncingCurseForge(true);
+    try {
+      const currentConfig = {
+        ...config,
+        curseforgeProjectSlug: curseforgeProjectSlug || CurseForgeService.extractProjectId(linkConfig.curseforge) || '',
+      };
 
-          const syncedData = await CurseForgeService.syncVersionsFromCurseForge(currentConfig);
+      const syncedData = await CurseForgeService.syncVersionsFromCurseForge(currentConfig);
 
-          const updatedConfig = {
-              ...config,
-              mcVersions: syncedData.mcVersions,
-              modVersions: syncedData.modVersions,
-              hero: {
-                  ...heroConfig,
-                  latestModVersion: syncedData.latestModVersion,
-                  latestMcVersions: syncedData.latestMcVersions
-              },
-              curseforgeProjectSlug: curseforgeProjectSlug || CurseForgeService.extractProjectId(linkConfig.curseforge) || '',
-          };
+      const updatedConfig = {
+        ...config,
+        mcVersions: syncedData.mcVersions,
+        modVersions: syncedData.modVersions,
+        hero: {
+          ...heroConfig,
+          latestModVersion: syncedData.latestModVersion,
+          latestMcVersions: syncedData.latestMcVersions
+        },
+        curseforgeProjectSlug: curseforgeProjectSlug || CurseForgeService.extractProjectId(linkConfig.curseforge) || '',
+      };
 
-          setHeroConfig(updatedConfig.hero);
-          onUpdateConfig(updatedConfig);
-          alert(`Successfully synced from CurseForge!\n\nLatest Mod Version: ${syncedData.latestModVersion}\nLatest MC Versions: ${syncedData.latestMcVersions}\nMinecraft Versions: ${syncedData.mcVersions.length} versions loaded\nMod Versions: ${syncedData.modVersions.length} versions loaded`);
-      } catch (error: any) {
-          console.error('Failed to sync from CurseForge:', error);
-          if (error instanceof CurseForgeError) {
-              alert(`Failed to sync from CurseForge: ${error.message}`);
-          } else {
-              alert(`Failed to sync from CurseForge: ${error.message || 'Unknown error'}`);
-          }
-      } finally {
-          setIsSyncingCurseForge(false);
+      setHeroConfig(updatedConfig.hero);
+      onUpdateConfig(updatedConfig);
+      alert(`Successfully synced from CurseForge!\n\nLatest Mod Version: ${syncedData.latestModVersion}\nLatest MC Versions: ${syncedData.latestMcVersions}\nMinecraft Versions: ${syncedData.mcVersions.length} versions loaded\nMod Versions: ${syncedData.modVersions.length} versions loaded`);
+    } catch (error: any) {
+      console.error('Failed to sync from CurseForge:', error);
+      if (error instanceof CurseForgeError) {
+        alert(`Failed to sync from CurseForge: ${error.message}`);
+      } else {
+        alert(`Failed to sync from CurseForge: ${error.message || 'Unknown error'}`);
       }
+    } finally {
+      setIsSyncingCurseForge(false);
+    }
   };
 
   const tabFilteredReports = useMemo(() => {
@@ -1483,23 +1633,23 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   }, [reports, bugSubTab]);
 
   const filteredReports = useMemo(() => {
-      return tabFilteredReports.filter(bug => {
-          const matchesSearch = (bug.title + bug.description + bug.author).toLowerCase().includes(searchTerm.toLowerCase());
-          const matchesMcVersion = filters.mcVersion === 'All' || bug.mcVersions.includes(filters.mcVersion);
-          const matchesModVersion = filters.modVersion === 'All' || bug.versions.includes(filters.modVersion);
-          const matchesSeverity = filters.severity === 'All' || bug.severity === filters.severity;
-          const matchesAssigned = filters.assigned === 'All' || 
-                                  (filters.assigned === 'Unassigned' ? !bug.assignedTo : bug.assignedTo === filters.assigned);
-          return matchesSearch && matchesMcVersion && matchesModVersion && matchesSeverity && matchesAssigned;
-      }).sort((a, b) => {
-          if (sortBy === 'newest') return b.timestamp - a.timestamp;
-          if (sortBy === 'oldest') return a.timestamp - b.timestamp;
-          if (sortBy === 'severity') {
-              const order = { 'Critical': 3, 'High': 2, 'Medium': 1, 'Low': 0 };
-              return order[b.severity] - order[a.severity];
-          }
-          return 0;
-      });
+    return tabFilteredReports.filter(bug => {
+      const matchesSearch = (bug.title + bug.description + bug.author).toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesMcVersion = filters.mcVersion === 'All' || bug.mcVersions.includes(filters.mcVersion);
+      const matchesModVersion = filters.modVersion === 'All' || bug.versions.includes(filters.modVersion);
+      const matchesSeverity = filters.severity === 'All' || bug.severity === filters.severity;
+      const matchesAssigned = filters.assigned === 'All' ||
+        (filters.assigned === 'Unassigned' ? !bug.assignedTo : bug.assignedTo === filters.assigned);
+      return matchesSearch && matchesMcVersion && matchesModVersion && matchesSeverity && matchesAssigned;
+    }).sort((a, b) => {
+      if (sortBy === 'newest') return b.timestamp - a.timestamp;
+      if (sortBy === 'oldest') return a.timestamp - b.timestamp;
+      if (sortBy === 'severity') {
+        const order = { 'Critical': 3, 'High': 2, 'Medium': 1, 'Low': 0 };
+        return order[b.severity] - order[a.severity];
+      }
+      return 0;
+    });
   }, [tabFilteredReports, searchTerm, filters, sortBy]);
 
   const toggleSelectAll = () => { if (selectedIds.size === filteredReports.length) setSelectedIds(new Set()); else setSelectedIds(new Set(filteredReports.map(r => r.id))); };
@@ -1507,13 +1657,13 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   const handleBulkResolve = () => { if (!confirm(`Mark ${selectedIds.size} reports as Resolved?`)) return; reports.forEach(bug => { if (selectedIds.has(bug.id)) onUpdateReport({ ...bug, status: 'Resolved', resolvedBy: currentUser.username }); }); setSelectedIds(new Set()); };
   const handleBulkDelete = () => { if (!confirm(`Permanently delete ${selectedIds.size} reports?`)) return; reports.forEach(bug => { if (selectedIds.has(bug.id)) onDeleteReport(bug.id); }); setSelectedIds(new Set()); };
   const handleBulkAssign = () => { if (!bulkAssignUser) return alert("Select user."); if (!confirm(`Assign ${selectedIds.size} reports?`)) return; reports.forEach(bug => { if (selectedIds.has(bug.id)) onUpdateReport({ ...bug, assignedTo: bulkAssignUser }); }); setSelectedIds(new Set()); setBulkAssignUser(""); };
-  
+
   const handleEditBug = (bug: BugReport) => {
     setEditingBug(bug);
     setEditStatus(bug.status);
     setEditAssignedTo(bug.assignedTo || '');
   };
-  
+
   const handleSaveBugEdit = () => {
     if (!editingBug) return;
     const updatedBug = {
@@ -1526,13 +1676,13 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
     setEditStatus('Open');
     setEditAssignedTo('');
   };
-  
+
   const handleQuickAction = (bug: BugReport, action: 'resolve' | 'reopen' | 'open') => {
     let newStatus: BugReport['status'];
     if (action === 'resolve') newStatus = 'Resolved';
     else if (action === 'reopen') newStatus = 'Open';
     else newStatus = 'Open';
-    
+
     const updatedBug = { ...bug, status: newStatus };
     // Set resolvedBy when marking as Resolved, clear it when reopening
     if (newStatus === 'Resolved') {
@@ -1540,7 +1690,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
     } else if (newStatus === 'Open') {
       updatedBug.resolvedBy = undefined;
     }
-    
+
     onUpdateReport(updatedBug);
   };
 
@@ -1575,14 +1725,14 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
     if (selectedSuggestionIds.size === filteredSuggestions.length) setSelectedSuggestionIds(new Set());
     else setSelectedSuggestionIds(new Set(filteredSuggestions.map(s => s.id)));
   };
-  
+
   const toggleSelectSuggestion = (id: string) => {
     const newSet = new Set(selectedSuggestionIds);
     if (newSet.has(id)) newSet.delete(id);
     else newSet.add(id);
     setSelectedSuggestionIds(newSet);
   };
-  
+
   const handleBulkImplement = () => {
     if (!onUpdateSuggestion) return;
     if (!confirm(`Mark ${selectedSuggestionIds.size} suggestions as Implemented?`)) return;
@@ -1593,7 +1743,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
     });
     setSelectedSuggestionIds(new Set());
   };
-  
+
   const handleBulkDeleteSuggestions = () => {
     if (!onDeleteSuggestion) return;
     if (!confirm(`Permanently delete ${selectedSuggestionIds.size} suggestions?`)) return;
@@ -1604,12 +1754,12 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
     });
     setSelectedSuggestionIds(new Set());
   };
-  
+
   const handleEditSuggestion = (suggestion: Suggestion) => {
     setEditingSuggestion(suggestion);
     setEditSuggestionStatus(suggestion.status);
   };
-  
+
   const handleSaveSuggestionEdit = () => {
     if (!editingSuggestion || !onUpdateSuggestion) return;
     const updatedSuggestion = {
@@ -1620,29 +1770,29 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
     setEditingSuggestion(null);
     setEditSuggestionStatus('Open');
   };
-  
+
   const handleQuickSuggestionAction = (suggestion: Suggestion, action: 'implement' | 'reopen' | 'reject') => {
     if (!onUpdateSuggestion) return;
-    
+
     if (action === 'reject') {
       setRejectingSuggestion(suggestion);
       setRejectionReason("");
       setShowRejectModal(true);
       return;
     }
-    
+
     let newStatus: Suggestion['status'];
     if (action === 'implement') newStatus = 'Implemented';
     else if (action === 'reopen') newStatus = 'Open';
     else newStatus = 'Open';
-    
+
     onUpdateSuggestion({ ...suggestion, status: newStatus });
   };
 
   const handleConfirmReject = () => {
     if (rejectingSuggestion && onUpdateSuggestion) {
-      onUpdateSuggestion({ 
-        ...rejectingSuggestion, 
+      onUpdateSuggestion({
+        ...rejectingSuggestion,
         status: 'Rejected',
         rejectionReason: rejectionReason.trim() || undefined
       });
@@ -1651,7 +1801,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
       setRejectionReason("");
     }
   };
-  
+
   const prepareBackupData = async () => {
 
     if (users.length === 0) {
@@ -1673,16 +1823,16 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
         exportDate: new Date().toISOString()
       }
     };
-    
+
     return backupData;
   };
 
-  const handleSyncToCloud = async (cloudService: string) => { 
-    if (dbStatus !== 'connected') { 
-      alert("Database not connected. Please check your MongoDB configuration."); 
-      return; 
-    } 
-    
+  const handleSyncToCloud = async (cloudService: string) => {
+    if (dbStatus !== 'connected') {
+      alert("Database not connected. Please check your MongoDB configuration.");
+      return;
+    }
+
     try {
 
       const backupData = await prepareBackupData();
@@ -1713,7 +1863,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
           downloadBackupFile(blob, fileName);
           alert(`Backup file "${fileName}" has been downloaded. Please upload it manually to ${cloudService}.`);
       }
-      
+
       setShowCloudSyncModal(false);
     } catch (err: any) {
       alert(`Failed to upload backup: ${err.message || 'Unknown error'}`);
@@ -1779,7 +1929,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
       'AWS S3': 'https://s3.console.aws.amazon.com/s3/buckets',
       'Microsoft Azure': 'https://portal.azure.com/#blade/HubsExtension/BrowseResourceBlade/resourceType/Microsoft.Storage%2FStorageAccounts'
     };
-    
+
     const url = urls[cloudService];
     if (url) {
       window.open(url, '_blank');
@@ -1788,29 +1938,29 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
       alert(`Backup file "${fileName}" has been downloaded.\n\nPlease upload it manually to ${cloudService}.`);
     }
   };
-  
-  const handleExportData = () => { 
-    loadUsers().then(() => { 
-      const data = { timestamp: Date.now(), reports, config, users }; 
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }); 
-      const url = URL.createObjectURL(blob); 
-      const a = document.createElement('a'); 
-      a.href = url; 
-      a.download = `buildscape_backup_${new Date().toISOString().split('T')[0]}.json`; 
-      document.body.appendChild(a); 
-      a.click(); 
-      document.body.removeChild(a); 
-      URL.revokeObjectURL(url); 
-    }); 
+
+  const handleExportData = () => {
+    loadUsers().then(() => {
+      const data = { timestamp: Date.now(), reports, config, users };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `buildscape_backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
   };
-  
-  const handleImportData = async (e: React.ChangeEvent<HTMLInputElement>) => { 
-    const file = e.target.files?.[0]; 
-    if (!file) return; 
-    const reader = new FileReader(); 
-    reader.onload = async (ev) => { 
-      try { 
-        const data = JSON.parse(ev.target?.result as string); 
+
+  const handleImportData = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const data = JSON.parse(ev.target?.result as string);
         if (!confirm(`Restore data from backup? This will overwrite current data.`)) {
           if (fileInputRef.current) fileInputRef.current.value = "";
           return;
@@ -1825,794 +1975,982 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
         await loadUsers();
         alert("Data restored successfully!");
-      } catch (err: any) { 
-        alert("Failed to restore: " + err.message); 
+      } catch (err: any) {
+        alert("Failed to restore: " + err.message);
       } finally {
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
-    }; 
-    reader.readAsText(file); 
+    };
+    reader.readAsText(file);
   };
 
   if (currentUser.role === 'user' || currentUser.role === 'pending') return <div className="text-white text-center mt-20">Access Restricted</div>;
 
   return (
     <div className="h-full flex flex-col py-4 md:py-8">
-        <div className="w-full flex flex-col md:flex-row gap-4 md:gap-8 fade-in flex-1 min-h-0 px-2 sm:px-4">
-        
+      <div className="w-full flex flex-col md:flex-row gap-4 md:gap-8 fade-in flex-1 min-h-0 px-2 sm:px-4">
+
         <div className="w-full md:w-64 flex-shrink-0">
-            <div className="bg-[#1e1e1e] rounded-xl border border-gray-800 p-3 md:p-5 sticky top-24 shadow-lg md:h-[calc(100vh-8rem)] md:overflow-y-auto md:max-h-[calc(100vh-8rem)] w-full md:w-64">
-                
-                <div className="hidden md:flex items-center gap-3 mb-8 px-2">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-inner overflow-hidden ${currentUser.role === 'owner' ? 'bg-amber-600' : 'bg-blue-600'}`}>
-                        {currentUser.profileIcon && currentUser.profileIcon.trim() && currentUser.profileIcon !== 'null' ? (
-                            <img 
-                                src={currentUser.profileIcon} 
-                                alt={currentUser.username}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                    e.currentTarget.style.display = 'none';
-                                    const parent = e.currentTarget.parentElement;
-                                    if (parent) {
-                                        const initial = parent.querySelector('.sidebar-initial') as HTMLElement;
-                                        if (initial) initial.style.display = 'flex';
-                                    }
-                                }}
-                            />
-                        ) : null}
-                        <span className={`${currentUser.profileIcon && currentUser.profileIcon.trim() && currentUser.profileIcon !== 'null' ? 'hidden sidebar-initial' : ''}`}>
-                        {currentUser.username[0].toUpperCase()}
-                        </span>
-                    </div>
-                    <div className="overflow-hidden"><div className="text-white font-bold truncate text-sm">{currentUser.username}</div><div className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">{currentUser.role}</div></div>
-                </div>
-                
-                <div className="flex md:flex-col flex-row gap-1 md:gap-1 md:space-y-0">
-                    <button onClick={() => setActiveTab('bugs')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'bugs' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Issues"><BugIcon size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Issues</span></button>
-                    <button onClick={() => setActiveTab('suggestions')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'suggestions' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Suggestions"><Lightbulb size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Suggestions</span></button>
-                    <button onClick={() => setActiveTab('changelogs')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'changelogs' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Changelogs"><FileText size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Changelogs</span></button>
-                    <button onClick={() => setActiveTab('kofi')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'kofi' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Ko-fi Management"><Coffee size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Ko-fi</span></button>
-                    <button onClick={() => setActiveTab('redeem-rewards')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'redeem-rewards' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Redeem Rewards"><Gift size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Redeem Rewards</span></button>
-                    <button onClick={() => setActiveTab('wiki')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'wiki' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Wiki Management"><BookOpen size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Wiki</span></button>
-                    <button onClick={() => setActiveTab('config')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'config' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Configuration"><Settings size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Configuration</span></button>
-                    {(currentUser.role === 'admin' || currentUser.role === 'owner') && (
-                        <>
-                            <button onClick={() => setActiveTab('users')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'users' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Users"><Users size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Users</span></button>
-                            <button onClick={() => setActiveTab('database')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'database' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Database"><Database size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Database</span></button>
-                        </>
-                    )}
-                </div>
-                
-                <div className="hidden md:block mt-8 pt-6 border-t border-gray-700">
-                    <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium text-red-400 hover:bg-red-900/20">
-                        <LogOut size={16} /> Sign Out
-                    </button>
-                </div>
+          <div className="bg-[#1e1e1e] rounded-xl border border-gray-800 p-3 md:p-5 sticky top-24 shadow-lg md:h-[calc(100vh-8rem)] md:overflow-y-auto md:max-h-[calc(100vh-8rem)] w-full md:w-64">
+
+            <div className="hidden md:flex items-center gap-3 mb-8 px-2">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-inner overflow-hidden ${currentUser.role === 'owner' ? 'bg-amber-600' : 'bg-blue-600'}`}>
+                {currentUser.profileIcon && currentUser.profileIcon.trim() && currentUser.profileIcon !== 'null' ? (
+                  <img
+                    src={currentUser.profileIcon}
+                    alt={currentUser.username}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      const parent = e.currentTarget.parentElement;
+                      if (parent) {
+                        const initial = parent.querySelector('.sidebar-initial') as HTMLElement;
+                        if (initial) initial.style.display = 'flex';
+                      }
+                    }}
+                  />
+                ) : null}
+                <span className={`${currentUser.profileIcon && currentUser.profileIcon.trim() && currentUser.profileIcon !== 'null' ? 'hidden sidebar-initial' : ''}`}>
+                  {currentUser.username[0].toUpperCase()}
+                </span>
+              </div>
+              <div className="overflow-hidden"><div className="text-white font-bold truncate text-sm">{currentUser.username}</div><div className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">{currentUser.role}</div></div>
             </div>
+
+            <div className="flex md:flex-col flex-row gap-1 md:gap-1 md:space-y-0">
+              <button onClick={() => setActiveTab('bugs')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'bugs' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Issues"><BugIcon size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Issues</span></button>
+              <button onClick={() => setActiveTab('suggestions')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'suggestions' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Suggestions"><Lightbulb size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Suggestions</span></button>
+              <button onClick={() => setActiveTab('changelogs')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'changelogs' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Changelogs"><FileText size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Changelogs</span></button>
+              <button onClick={() => setActiveTab('kofi')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'kofi' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Ko-fi Management"><Coffee size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Ko-fi</span></button>
+              <button onClick={() => setActiveTab('twitch')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'twitch' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Twitch Management"><Twitch size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Twitch</span></button>
+              <button onClick={() => setActiveTab('redeem-rewards')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'redeem-rewards' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Redeem Rewards"><Gift size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Redeem Rewards</span></button>
+              <button onClick={() => setActiveTab('wiki')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'wiki' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Wiki Management"><BookOpen size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Wiki</span></button>
+              <button onClick={() => setActiveTab('config')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'config' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Configuration"><Settings size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Configuration</span></button>
+              {(currentUser.role === 'admin' || currentUser.role === 'owner') && (
+                <>
+                  <button onClick={() => setActiveTab('users')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'users' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Users"><Users size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Users</span></button>
+                  <button onClick={() => setActiveTab('database')} className={`flex items-center justify-center md:justify-start gap-3 px-3 py-2.5 md:py-2.5 rounded-lg text-sm font-medium transition-all flex-1 md:flex-none md:w-full ${activeTab === 'database' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:bg-gray-800/50'}`} title="Database"><Database size={20} className="md:w-4 md:h-4" /> <span className="hidden md:inline">Database</span></button>
+                </>
+              )}
+            </div>
+
+            <div className="hidden md:block mt-8 pt-6 border-t border-gray-700">
+              <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium text-red-400 hover:bg-red-900/20">
+                <LogOut size={16} /> Sign Out
+              </button>
+            </div>
+          </div>
         </div>
 
-        
+
         <div className="flex-1 min-w-0 flex flex-col min-h-0 w-full md:w-[calc(100%-18rem)] max-w-full overflow-hidden">
-            <div className="w-full min-w-0 flex flex-col h-full min-h-0">
-            
+          <div className="w-full min-w-0 flex flex-col h-full min-h-0">
+
             {activeTab === 'bugs' && (
-                <div className="flex flex-col h-full min-h-0 w-full min-w-0">
-                    
-                    <div className="flex gap-2 border-b border-gray-800 flex-shrink-0 pb-2 mb-4 w-full">
-                        <button
-                            onClick={() => setBugSubTab('active')}
-                            className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${
-                                bugSubTab === 'active'
-                                    ? 'text-white border-green-500'
-                                    : 'text-gray-400 border-transparent hover:text-gray-300'
-                            }`}
-                            title="Active Issues"
-                        >
-                            <div className="flex items-center gap-2 whitespace-nowrap">
-                                <BugIcon className="w-4 h-4 flex-shrink-0" />
-                                <span className="hidden md:inline">Active Issues</span>
-                            </div>
-                        </button>
-                        <button
-                            onClick={() => setBugSubTab('resolved')}
-                            className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${
-                                bugSubTab === 'resolved'
-                                    ? 'text-white border-green-500'
-                                    : 'text-gray-400 border-transparent hover:text-gray-300'
-                            }`}
-                            title="Resolved Issues"
-                        >
-                            <div className="flex items-center gap-2 whitespace-nowrap">
-                                <CheckCircle className="w-4 h-4 flex-shrink-0" />
-                                <span className="hidden md:inline">Resolved Issues</span>
-                            </div>
-                        </button>
-                    </div>
+              <div className="flex flex-col h-full min-h-0 w-full min-w-0">
 
-                    
-                    <div className="bg-[#1e1e1e] border border-gray-800 rounded-xl p-4 shadow-sm space-y-4 flex-shrink-0 mb-2">
-                        <div className="flex flex-col md:flex-row gap-4 justify-between">
-                            <input className="w-full md:w-auto flex-1 bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors hover:border-gray-600" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                            <div className="flex gap-2 flex-wrap">
-                                <select className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8" value={filters.mcVersion} onChange={e => setFilters({...filters, mcVersion: e.target.value})}>
-                                    <option value="All">All MC Ver</option>
-                                    {config.mcVersions.map(v => <option key={v} value={v}>MC {v}</option>)}
-                                </select>
-                                <select className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8" value={filters.modVersion} onChange={e => setFilters({...filters, modVersion: e.target.value})}>
-                                    <option value="All">All Mod Ver</option>
-                                    {config.modVersions.map(v => <option key={v} value={v}>v{v}</option>)}
-                                </select>
-                                <select className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8" value={filters.severity} onChange={e => setFilters({...filters, severity: e.target.value})}><option value="All">Severity</option><option value="Critical">Critical</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select>
-                                <button onClick={() => setSortBy(sortBy === 'newest' ? 'oldest' : 'newest')} className="bg-gray-800 hover:bg-gray-700 px-3 py-2.5 h-10 rounded-lg text-sm text-gray-300 transition-colors flex items-center justify-center"><ArrowUpDown size={14}/></button>
-                            </div>
-                        </div>
-                        {selectedIds.size > 0 && <div className="flex items-center justify-between bg-blue-900/20 p-2 rounded"><span className="text-sm text-blue-200">{selectedIds.size} selected</span><div className="flex gap-2"><button onClick={handleBulkResolve} className="bg-green-700 text-white px-3 py-1 text-xs rounded">Resolve</button><button onClick={handleBulkDelete} className="bg-red-700 text-white px-3 py-1 text-xs rounded">Delete</button></div></div>}
+                <div className="flex gap-2 border-b border-gray-800 flex-shrink-0 pb-2 mb-4 w-full">
+                  <button
+                    onClick={() => setBugSubTab('active')}
+                    className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${bugSubTab === 'active'
+                      ? 'text-white border-green-500'
+                      : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
+                    title="Active Issues"
+                  >
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <BugIcon className="w-4 h-4 flex-shrink-0" />
+                      <span className="hidden md:inline">Active Issues</span>
                     </div>
-
-                    
-                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                    <div className="space-y-2 w-full max-w-full">
-                      {filteredReports.map(bug => (
-                        <div key={bug.id} className="flex items-center gap-4 bg-[#1e1e1e] border border-gray-800 p-4 rounded-lg">
-                          <button onClick={() => toggleSelect(bug.id)}>
-                            {selectedIds.has(bug.id) ? <CheckSquare className="text-blue-500" size={18}/> : <Square size={18} className="text-gray-600"/>}
-                          </button>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-white text-sm font-medium truncate">{bug.title}</div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              <div className="flex flex-wrap items-center gap-y-1">
-                                <span className="mr-2">•</span>
-                                <span className={`px-2 py-0.5 rounded ${bug.status === 'Resolved' ? 'bg-green-900/20 text-green-400' : bug.status === 'In Progress' ? 'bg-blue-900/20 text-blue-400' : 'bg-gray-800 text-gray-300'}`}>{bug.status}</span>
-                                <span className="mx-2">•</span>
-                                <span className={`px-2 py-0.5 rounded ${
-                                  bug.severity === 'Critical' ? 'bg-red-900/20 text-red-400' :
-                                  bug.severity === 'High' ? 'bg-orange-900/20 text-orange-400' :
-                                  bug.severity === 'Medium' ? 'bg-yellow-900/20 text-yellow-400' :
-                                  'bg-green-900/20 text-green-400'
-                                }`}>{bug.severity}</span>
-                                {bug.assignedTo && (
-                                  <>
-                                    <span className="mx-2">•</span>
-                                    <span className="text-blue-400">Assigned: {bug.assignedTo}</span>
-                                  </>
-                                )}
-                                {bug.status === 'Resolved' && bug.resolvedBy && (
-                                  <>
-                                    <span className="mx-2">•</span>
-                                    <span className="text-green-400">Resolved by: {bug.resolvedBy}</span>
-                                  </>
-                                )}
-                              </div>
-                              <div className="flex flex-wrap items-center gap-y-1 mt-1">
-                                <span className="mr-2">•</span>
-                                <span>MC {bug.mcVersions.join(', ')}</span>
-                                <span className="mx-2">•</span>
-                                <span>v{bug.versions.join(', ')}</span>
-                                <span className="mx-2">•</span>
-                                <span>{new Date(bug.timestamp).toLocaleDateString()}</span>
-                                {bug.comments && bug.comments.length > 0 && (
-                                  <>
-                                    <span className="mx-2">•</span>
-                                    <span className="text-gray-400">{bug.comments.length} comments</span>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            
-                            {bug.status !== 'Resolved' && (
-                              <button 
-                                onClick={() => handleQuickAction(bug, 'resolve')}
-                                className="p-1.5 text-green-400 hover:text-green-300 hover:bg-green-900/20 rounded transition-colors"
-                                title="Mark as Resolved"
-                              >
-                                <CheckCircle size={16} />
-                              </button>
-                            )}
-                            {bug.status === 'Resolved' && (
-                              <button 
-                                onClick={() => handleQuickAction(bug, 'reopen')}
-                                className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 rounded transition-colors"
-                                title="Reopen"
-                              >
-                                <RotateCcw size={16} />
-                              </button>
-                            )}
-                            <button 
-                              onClick={() => handleEditBug(bug)}
-                              className="p-1.5 text-gray-400 hover:text-blue-400 hover:bg-blue-900/20 rounded transition-colors"
-                              title="Edit Status & Assignment"
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button 
-                              onClick={() => onDeleteReport(bug.id)} 
-                              className="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-900/20 rounded transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 size={16}/>
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                      {filteredReports.length === 0 && (
-                        <div className="text-center py-12 text-gray-500">
-                          <BugIcon size={48} className="mx-auto mb-4 opacity-50" />
-                          <p>No issues found matching criteria.</p>
-                        </div>
-                      )}
+                  </button>
+                  <button
+                    onClick={() => setBugSubTab('resolved')}
+                    className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${bugSubTab === 'resolved'
+                      ? 'text-white border-green-500'
+                      : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
+                    title="Resolved Issues"
+                  >
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                      <span className="hidden md:inline">Resolved Issues</span>
                     </div>
-                    </div>
+                  </button>
                 </div>
+
+
+                <div className="bg-[#1e1e1e] border border-gray-800 rounded-xl p-4 shadow-sm space-y-4 flex-shrink-0 mb-2">
+                  <div className="flex flex-col md:flex-row gap-4 justify-between">
+                    <input className="w-full md:w-auto flex-1 bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors hover:border-gray-600" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                    <div className="flex gap-2 flex-wrap">
+                      <select className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8" value={filters.mcVersion} onChange={e => setFilters({ ...filters, mcVersion: e.target.value })}>
+                        <option value="All">All MC Ver</option>
+                        {config.mcVersions.map(v => <option key={v} value={v}>MC {v}</option>)}
+                      </select>
+                      <select className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8" value={filters.modVersion} onChange={e => setFilters({ ...filters, modVersion: e.target.value })}>
+                        <option value="All">All Mod Ver</option>
+                        {config.modVersions.map(v => <option key={v} value={v}>v{v}</option>)}
+                      </select>
+                      <select className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8" value={filters.severity} onChange={e => setFilters({ ...filters, severity: e.target.value })}><option value="All">Severity</option><option value="Critical">Critical</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select>
+                      <button onClick={() => setSortBy(sortBy === 'newest' ? 'oldest' : 'newest')} className="bg-gray-800 hover:bg-gray-700 px-3 py-2.5 h-10 rounded-lg text-sm text-gray-300 transition-colors flex items-center justify-center"><ArrowUpDown size={14} /></button>
+                    </div>
+                  </div>
+                  {selectedIds.size > 0 && <div className="flex items-center justify-between bg-blue-900/20 p-2 rounded"><span className="text-sm text-blue-200">{selectedIds.size} selected</span><div className="flex gap-2"><button onClick={handleBulkResolve} className="bg-green-700 text-white px-3 py-1 text-xs rounded">Resolve</button><button onClick={handleBulkDelete} className="bg-red-700 text-white px-3 py-1 text-xs rounded">Delete</button></div></div>}
+                </div>
+
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                  <div className="space-y-2 w-full max-w-full">
+                    {filteredReports.map(bug => (
+                      <div key={bug.id} className="flex items-center gap-4 bg-[#1e1e1e] border border-gray-800 p-4 rounded-lg">
+                        <button onClick={() => toggleSelect(bug.id)}>
+                          {selectedIds.has(bug.id) ? <CheckSquare className="text-blue-500" size={18} /> : <Square size={18} className="text-gray-600" />}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-white text-sm font-medium truncate">{bug.title}</div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            <div className="flex flex-wrap items-center gap-y-1">
+                              <span className="mr-2">•</span>
+                              <span className={`px-2 py-0.5 rounded ${bug.status === 'Resolved' ? 'bg-green-900/20 text-green-400' : bug.status === 'In Progress' ? 'bg-blue-900/20 text-blue-400' : 'bg-gray-800 text-gray-300'}`}>{bug.status}</span>
+                              <span className="mx-2">•</span>
+                              <span className={`px-2 py-0.5 rounded ${bug.severity === 'Critical' ? 'bg-red-900/20 text-red-400' :
+                                bug.severity === 'High' ? 'bg-orange-900/20 text-orange-400' :
+                                  bug.severity === 'Medium' ? 'bg-yellow-900/20 text-yellow-400' :
+                                    'bg-green-900/20 text-green-400'
+                                }`}>{bug.severity}</span>
+                              {bug.assignedTo && (
+                                <>
+                                  <span className="mx-2">•</span>
+                                  <span className="text-blue-400">Assigned: {bug.assignedTo}</span>
+                                </>
+                              )}
+                              {bug.status === 'Resolved' && bug.resolvedBy && (
+                                <>
+                                  <span className="mx-2">•</span>
+                                  <span className="text-green-400">Resolved by: {bug.resolvedBy}</span>
+                                </>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-y-1 mt-1">
+                              <span className="mr-2">•</span>
+                              <span>MC {bug.mcVersions.join(', ')}</span>
+                              <span className="mx-2">•</span>
+                              <span>v{bug.versions.join(', ')}</span>
+                              <span className="mx-2">•</span>
+                              <span>{new Date(bug.timestamp).toLocaleDateString()}</span>
+                              {bug.comments && bug.comments.length > 0 && (
+                                <>
+                                  <span className="mx-2">•</span>
+                                  <span className="text-gray-400">{bug.comments.length} comments</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+
+                          {bug.status !== 'Resolved' && (
+                            <button
+                              onClick={() => handleQuickAction(bug, 'resolve')}
+                              className="p-1.5 text-green-400 hover:text-green-300 hover:bg-green-900/20 rounded transition-colors"
+                              title="Mark as Resolved"
+                            >
+                              <CheckCircle size={16} />
+                            </button>
+                          )}
+                          {bug.status === 'Resolved' && (
+                            <button
+                              onClick={() => handleQuickAction(bug, 'reopen')}
+                              className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 rounded transition-colors"
+                              title="Reopen"
+                            >
+                              <RotateCcw size={16} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleEditBug(bug)}
+                            className="p-1.5 text-gray-400 hover:text-blue-400 hover:bg-blue-900/20 rounded transition-colors"
+                            title="Edit Status & Assignment"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button
+                            onClick={() => onDeleteReport(bug.id)}
+                            className="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-900/20 rounded transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {filteredReports.length === 0 && (
+                      <div className="text-center py-12 text-gray-500">
+                        <BugIcon size={48} className="mx-auto mb-4 opacity-50" />
+                        <p>No issues found matching criteria.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
 
-            
+
             {activeTab === 'suggestions' && (
-                <div className="flex flex-col h-full min-h-0 w-full min-w-0">
-                    
-                    <div className="flex gap-2 border-b border-gray-800 flex-shrink-0 pb-2 mb-4 w-full">
-                        <button
-                            onClick={() => setSuggestionSubTab('active')}
-                            className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${
-                                suggestionSubTab === 'active'
-                                    ? 'text-white border-blue-500'
-                                    : 'text-gray-400 border-transparent hover:text-gray-300'
-                            }`}
-                            title="Active Suggestions"
-                        >
-                            <div className="flex items-center gap-2 whitespace-nowrap">
-                                <Lightbulb className="w-4 h-4 flex-shrink-0" />
-                                <span className="hidden md:inline">Active Suggestions</span>
-                            </div>
-                        </button>
-                        <button
-                            onClick={() => setSuggestionSubTab('closed')}
-                            className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${
-                                suggestionSubTab === 'closed'
-                                    ? 'text-white border-green-500'
-                                    : 'text-gray-400 border-transparent hover:text-gray-300'
-                            }`}
-                            title="Approved/Closed"
-                        >
-                            <div className="flex items-center gap-2 whitespace-nowrap">
-                                <CheckCircle className="w-4 h-4 flex-shrink-0" />
-                                <span className="hidden md:inline">Approved/Closed</span>
-                            </div>
-                        </button>
-                    </div>
+              <div className="flex flex-col h-full min-h-0 w-full min-w-0">
 
-                    
-                    <div className="bg-[#1e1e1e] border border-gray-800 rounded-xl p-4 shadow-sm space-y-4 flex-shrink-0 mb-2">
-                        <div className="flex flex-col md:flex-row gap-4 justify-between">
-                            <input 
-                                className="w-full md:w-auto flex-1 bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600" 
-                                placeholder="Search suggestions..." 
-                                value={suggestionSearchTerm} 
-                                onChange={e => setSuggestionSearchTerm(e.target.value)} 
-                            />
-                            <div className="flex gap-2 flex-wrap">
-                                <select value={suggestionFilters.mcVersion} onChange={e => setSuggestionFilters({...suggestionFilters, mcVersion: e.target.value})} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
-                                    <option value="All">All MC Ver</option>
-                                    {config.mcVersions.map(v => <option key={v} value={v}>MC {v}</option>)}
-                                </select>
-                                <select value={suggestionFilters.modVersion} onChange={e => setSuggestionFilters({...suggestionFilters, modVersion: e.target.value})} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
-                                    <option value="All">All Mod Ver</option>
-                                    {config.modVersions.map(v => <option key={v} value={v}>v{v}</option>)}
-                                </select>
-                                <select value={suggestionFilters.category} onChange={e => setSuggestionFilters({...suggestionFilters, category: e.target.value})} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
-                                    <option value="All">All Categories</option>
-                                    <option value="Feature">Feature</option>
-                                    <option value="Enhancement">Enhancement</option>
-                                    <option value="Block">Block</option>
-                                    <option value="Item">Item</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                                <select value={suggestionFilters.priority} onChange={e => setSuggestionFilters({...suggestionFilters, priority: e.target.value})} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
-                                    <option value="All">All Priority</option>
-                                    <option value="High">High</option>
-                                    <option value="Medium">Medium</option>
-                                    <option value="Low">Low</option>
-                                </select>
-                                <select value={suggestionSortBy} onChange={e => setSuggestionSortBy(e.target.value as 'newest' | 'oldest' | 'priority')} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
-                                    <option value="newest">Newest</option>
-                                    <option value="oldest">Oldest</option>
-                                    <option value="priority">Priority</option>
-                                </select>
-                            </div>
-                        </div>
-                        {selectedSuggestionIds.size > 0 && (
-                            <div className="flex items-center justify-between bg-blue-900/20 p-2 rounded">
-                                <span className="text-sm text-blue-200">{selectedSuggestionIds.size} selected</span>
-                                <div className="flex gap-2">
-                                    <button onClick={handleBulkImplement} className="bg-green-700 text-white px-3 py-1 text-xs rounded">Mark Implemented</button>
-                                    <button onClick={handleBulkDeleteSuggestions} className="bg-red-700 text-white px-3 py-1 text-xs rounded">Delete</button>
-                                </div>
-                            </div>
-                        )}
+                <div className="flex gap-2 border-b border-gray-800 flex-shrink-0 pb-2 mb-4 w-full">
+                  <button
+                    onClick={() => setSuggestionSubTab('active')}
+                    className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${suggestionSubTab === 'active'
+                      ? 'text-white border-blue-500'
+                      : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
+                    title="Active Suggestions"
+                  >
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <Lightbulb className="w-4 h-4 flex-shrink-0" />
+                      <span className="hidden md:inline">Active Suggestions</span>
                     </div>
+                  </button>
+                  <button
+                    onClick={() => setSuggestionSubTab('closed')}
+                    className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${suggestionSubTab === 'closed'
+                      ? 'text-white border-green-500'
+                      : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
+                    title="Approved/Closed"
+                  >
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <CheckCircle className="w-4 h-4 flex-shrink-0" />
+                      <span className="hidden md:inline">Approved/Closed</span>
+                    </div>
+                  </button>
+                </div>
 
-                    
-                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                    <div className="space-y-2 w-full max-w-full">
-                      {filteredSuggestions.map(suggestion => (
-                        <div key={suggestion.id} className="flex items-center gap-4 bg-[#1e1e1e] border border-gray-800 p-4 rounded-lg">
-                          <button onClick={() => toggleSelectSuggestion(suggestion.id)}>
-                            {selectedSuggestionIds.has(suggestion.id) ? <CheckSquare className="text-blue-500" size={18}/> : <Square size={18} className="text-gray-600"/>}
-                          </button>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-white text-sm font-medium truncate">{suggestion.title}</div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              <span className={`px-2 py-0.5 rounded ${
-                                suggestion.status === 'Implemented' ? 'bg-green-900/20 text-green-400' :
-                                suggestion.status === 'Rejected' ? 'bg-red-900/20 text-red-400' :
+
+                <div className="bg-[#1e1e1e] border border-gray-800 rounded-xl p-4 shadow-sm space-y-4 flex-shrink-0 mb-2">
+                  <div className="flex flex-col md:flex-row gap-4 justify-between">
+                    <input
+                      className="w-full md:w-auto flex-1 bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600"
+                      placeholder="Search suggestions..."
+                      value={suggestionSearchTerm}
+                      onChange={e => setSuggestionSearchTerm(e.target.value)}
+                    />
+                    <div className="flex gap-2 flex-wrap">
+                      <select value={suggestionFilters.mcVersion} onChange={e => setSuggestionFilters({ ...suggestionFilters, mcVersion: e.target.value })} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
+                        <option value="All">All MC Ver</option>
+                        {config.mcVersions.map(v => <option key={v} value={v}>MC {v}</option>)}
+                      </select>
+                      <select value={suggestionFilters.modVersion} onChange={e => setSuggestionFilters({ ...suggestionFilters, modVersion: e.target.value })} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
+                        <option value="All">All Mod Ver</option>
+                        {config.modVersions.map(v => <option key={v} value={v}>v{v}</option>)}
+                      </select>
+                      <select value={suggestionFilters.category} onChange={e => setSuggestionFilters({ ...suggestionFilters, category: e.target.value })} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
+                        <option value="All">All Categories</option>
+                        <option value="Feature">Feature</option>
+                        <option value="Enhancement">Enhancement</option>
+                        <option value="Block">Block</option>
+                        <option value="Item">Item</option>
+                        <option value="Other">Other</option>
+                      </select>
+                      <select value={suggestionFilters.priority} onChange={e => setSuggestionFilters({ ...suggestionFilters, priority: e.target.value })} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
+                        <option value="All">All Priority</option>
+                        <option value="High">High</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Low">Low</option>
+                      </select>
+                      <select value={suggestionSortBy} onChange={e => setSuggestionSortBy(e.target.value as 'newest' | 'oldest' | 'priority')} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
+                        <option value="newest">Newest</option>
+                        <option value="oldest">Oldest</option>
+                        <option value="priority">Priority</option>
+                      </select>
+                    </div>
+                  </div>
+                  {selectedSuggestionIds.size > 0 && (
+                    <div className="flex items-center justify-between bg-blue-900/20 p-2 rounded">
+                      <span className="text-sm text-blue-200">{selectedSuggestionIds.size} selected</span>
+                      <div className="flex gap-2">
+                        <button onClick={handleBulkImplement} className="bg-green-700 text-white px-3 py-1 text-xs rounded">Mark Implemented</button>
+                        <button onClick={handleBulkDeleteSuggestions} className="bg-red-700 text-white px-3 py-1 text-xs rounded">Delete</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                  <div className="space-y-2 w-full max-w-full">
+                    {filteredSuggestions.map(suggestion => (
+                      <div key={suggestion.id} className="flex items-center gap-4 bg-[#1e1e1e] border border-gray-800 p-4 rounded-lg">
+                        <button onClick={() => toggleSelectSuggestion(suggestion.id)}>
+                          {selectedSuggestionIds.has(suggestion.id) ? <CheckSquare className="text-blue-500" size={18} /> : <Square size={18} className="text-gray-600" />}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-white text-sm font-medium truncate">{suggestion.title}</div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            <span className={`px-2 py-0.5 rounded ${suggestion.status === 'Implemented' ? 'bg-green-900/20 text-green-400' :
+                              suggestion.status === 'Rejected' ? 'bg-red-900/20 text-red-400' :
                                 suggestion.status === 'Planned' ? 'bg-blue-900/20 text-blue-400' :
-                                suggestion.status === 'Under Review' ? 'bg-yellow-900/20 text-yellow-400' :
-                                'bg-gray-800 text-gray-300'
+                                  suggestion.status === 'Under Review' ? 'bg-yellow-900/20 text-yellow-400' :
+                                    'bg-gray-800 text-gray-300'
                               }`}>{suggestion.status}</span>
-                              <span className="mx-2">•</span>
-                              <span className={`px-2 py-0.5 rounded ${
-                                suggestion.category === 'Feature' ? 'bg-purple-900/20 text-purple-300' :
-                                suggestion.category === 'Enhancement' ? 'bg-blue-900/20 text-blue-300' :
+                            <span className="mx-2">•</span>
+                            <span className={`px-2 py-0.5 rounded ${suggestion.category === 'Feature' ? 'bg-purple-900/20 text-purple-300' :
+                              suggestion.category === 'Enhancement' ? 'bg-blue-900/20 text-blue-300' :
                                 suggestion.category === 'Block' ? 'bg-green-900/20 text-green-300' :
-                                suggestion.category === 'Item' ? 'bg-yellow-900/20 text-yellow-300' :
-                                'bg-gray-800 text-gray-300'
+                                  suggestion.category === 'Item' ? 'bg-yellow-900/20 text-yellow-300' :
+                                    'bg-gray-800 text-gray-300'
                               }`}>{suggestion.category}</span>
-                              <span className="mx-2">•</span>
-                              <span className={`px-2 py-0.5 rounded ${
-                                suggestion.priority === 'High' ? 'bg-red-900/20 text-red-400' :
-                                suggestion.priority === 'Medium' ? 'bg-yellow-900/20 text-yellow-400' :
+                            <span className="mx-2">•</span>
+                            <span className={`px-2 py-0.5 rounded ${suggestion.priority === 'High' ? 'bg-red-900/20 text-red-400' :
+                              suggestion.priority === 'Medium' ? 'bg-yellow-900/20 text-yellow-400' :
                                 'bg-green-900/20 text-green-400'
                               }`}>{suggestion.priority}</span>
-                              {suggestion.mcVersions && suggestion.mcVersions.length > 0 && <><span className="mx-2">•</span><span>MC {suggestion.mcVersions.join(', ')}</span></>}
-                              {suggestion.modVersions && suggestion.modVersions.length > 0 && <><span className="mx-2">•</span><span>v{suggestion.modVersions.join(', ')}</span></>}
-                              <span className="mx-2">•</span>
-                              <span>{new Date(suggestion.timestamp).toLocaleDateString()}</span>
-                              <span className="mx-2">•</span>
-                              <span>by {suggestion.author}</span>
-                              {suggestion.upvotes !== undefined && suggestion.upvotes > 0 && <><span className="mx-2">•</span><span className="text-blue-400">{suggestion.upvotes} upvotes</span></>}
-                              {suggestion.comments && suggestion.comments.length > 0 && <><span className="mx-2">•</span><span className="text-gray-400">{suggestion.comments.length} comments</span></>}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            
-                            {suggestion.status !== 'Implemented' && suggestion.status !== 'Rejected' && (
-                              <button 
-                                onClick={() => handleQuickSuggestionAction(suggestion, 'implement')}
-                                className="p-1.5 text-green-400 hover:text-green-300 hover:bg-green-900/20 rounded transition-colors"
-                                title="Mark as Implemented"
-                              >
-                                <CheckCircle size={16} />
-                              </button>
-                            )}
-                            {suggestion.status === 'Implemented' && (
-                              <button 
-                                onClick={() => handleQuickSuggestionAction(suggestion, 'reopen')}
-                                className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 rounded transition-colors"
-                                title="Reopen"
-                              >
-                                <RotateCcw size={16} />
-                              </button>
-                            )}
-                            {suggestion.status !== 'Rejected' && (
-                              <button 
-                                onClick={() => handleQuickSuggestionAction(suggestion, 'reject')}
-                                className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors"
-                                title="Reject"
-                              >
-                                <Ban size={16} />
-                              </button>
-                            )}
-                            <button 
-                              onClick={() => handleEditSuggestion(suggestion)}
-                              className="p-1.5 text-gray-400 hover:text-blue-400 hover:bg-blue-900/20 rounded transition-colors"
-                              title="Edit Status"
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button 
-                              onClick={() => onDeleteSuggestion(suggestion.id)} 
-                              className="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-900/20 rounded transition-colors"
-                              title="Delete"
-                            >
-                              <Trash2 size={16}/>
-                            </button>
+                            {suggestion.mcVersions && suggestion.mcVersions.length > 0 && <><span className="mx-2">•</span><span>MC {suggestion.mcVersions.join(', ')}</span></>}
+                            {suggestion.modVersions && suggestion.modVersions.length > 0 && <><span className="mx-2">•</span><span>v{suggestion.modVersions.join(', ')}</span></>}
+                            <span className="mx-2">•</span>
+                            <span>{new Date(suggestion.timestamp).toLocaleDateString()}</span>
+                            <span className="mx-2">•</span>
+                            <span>by {suggestion.author}</span>
+                            {suggestion.upvotes !== undefined && suggestion.upvotes > 0 && <><span className="mx-2">•</span><span className="text-blue-400">{suggestion.upvotes} upvotes</span></>}
+                            {suggestion.comments && suggestion.comments.length > 0 && <><span className="mx-2">•</span><span className="text-gray-400">{suggestion.comments.length} comments</span></>}
                           </div>
                         </div>
-                      ))}
-                      {filteredSuggestions.length === 0 && (
-                        <div className="text-center py-12 text-gray-500">
-                          <Lightbulb size={48} className="mx-auto mb-4 opacity-50" />
-                          <p>No suggestions found matching criteria.</p>
+                        <div className="flex items-center gap-2">
+
+                          {suggestion.status !== 'Implemented' && suggestion.status !== 'Rejected' && (
+                            <button
+                              onClick={() => handleQuickSuggestionAction(suggestion, 'implement')}
+                              className="p-1.5 text-green-400 hover:text-green-300 hover:bg-green-900/20 rounded transition-colors"
+                              title="Mark as Implemented"
+                            >
+                              <CheckCircle size={16} />
+                            </button>
+                          )}
+                          {suggestion.status === 'Implemented' && (
+                            <button
+                              onClick={() => handleQuickSuggestionAction(suggestion, 'reopen')}
+                              className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 rounded transition-colors"
+                              title="Reopen"
+                            >
+                              <RotateCcw size={16} />
+                            </button>
+                          )}
+                          {suggestion.status !== 'Rejected' && (
+                            <button
+                              onClick={() => handleQuickSuggestionAction(suggestion, 'reject')}
+                              className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors"
+                              title="Reject"
+                            >
+                              <Ban size={16} />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleEditSuggestion(suggestion)}
+                            className="p-1.5 text-gray-400 hover:text-blue-400 hover:bg-blue-900/20 rounded transition-colors"
+                            title="Edit Status"
+                          >
+                            <Edit size={16} />
+                          </button>
+                          <button
+                            onClick={() => onDeleteSuggestion(suggestion.id)}
+                            className="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-900/20 rounded transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {filteredSuggestions.length === 0 && (
+                      <div className="text-center py-12 text-gray-500">
+                        <Lightbulb size={48} className="mx-auto mb-4 opacity-50" />
+                        <p>No suggestions found matching criteria.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+
+            {activeTab === 'users' && (currentUser.role === 'admin' || currentUser.role === 'owner') && (
+              <div className="flex flex-col h-full min-h-0 w-full min-w-0">
+
+                <div className="flex gap-2 border-b border-gray-800 flex-shrink-0 pb-2 mb-4 w-full">
+                  <button
+                    onClick={() => setUserSubTab('staff')}
+                    className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${userSubTab === 'staff'
+                      ? 'text-white border-blue-500'
+                      : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
+                    title="Staff"
+                  >
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <i className="fa fa-user-secret" aria-hidden="true"></i>
+                      <span className="hidden md:inline">Staff</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setUserSubTab('users')}
+                    className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${userSubTab === 'users'
+                      ? 'text-white border-blue-500'
+                      : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
+                    title="Users"
+                  >
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <i className="fa fa-users" aria-hidden="true"></i>
+                      <span className="hidden md:inline">Users</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setUserSubTab('roles')}
+                    className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${userSubTab === 'roles'
+                      ? 'text-white border-blue-500'
+                      : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
+                    title="Roles"
+                  >
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <ShieldCheck className="w-4 h-4 flex-shrink-0" />
+                      <span className="hidden md:inline">Roles</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setUserSubTab('legacy')}
+                    className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${userSubTab === 'legacy'
+                      ? 'text-white border-blue-500'
+                      : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
+                    title="Legacy Accounts"
+                  >
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <History size={16} className="flex-shrink-0" />
+                      <span className="hidden md:inline">Legacy</span>
+                    </div>
+                  </button>
+                </div>
+
+
+                <div className="flex-shrink-0 mb-2"></div>
+
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+
+                  {userSubTab === 'staff' && (
+                    <div className="animate-fadeIn w-full min-w-0">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+                        <h2 className="text-xl sm:text-2xl font-bold text-white">Staff Management</h2>
+                        <button onClick={loadUsers} className="flex items-center gap-2 text-xs sm:text-sm text-gray-400 hover:text-white"><RefreshCw size={14} className={refreshingUsers ? 'animate-spin' : ''} /> <span className="hidden sm:inline">Refresh</span></button>
+                      </div>
+                      <div className="bg-[#1e1e1e] border border-gray-800 rounded-lg overflow-hidden shadow-inner w-full overflow-x-auto">
+                        <table className="w-full text-left text-sm min-w-[600px]">
+                          <thead className="bg-[#1a1a1a] text-gray-400 font-bold uppercase text-xs">
+                            <tr><th className="px-2 sm:px-4 md:px-6 py-3 md:py-4">User</th><th className="px-2 sm:px-4 md:px-6 py-3 md:py-4">Role</th><th className="px-2 sm:px-4 md:px-6 py-3 md:py-4 text-right">Actions</th></tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-800">
+                            {users.filter(u => u.role === 'admin' || u.role === 'owner').map(u => (
+                              <tr key={u.id} className="hover:bg-gray-800/30">
+                                <td className="px-2 sm:px-4 md:px-6 py-3 md:py-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="relative w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                                      {u.profileIcon && u.profileIcon.trim() && u.profileIcon !== 'null' ? (
+                                        <img
+                                          src={u.profileIcon}
+                                          alt={u.username}
+                                          className="w-full h-full object-cover"
+                                          onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                            const parent = e.currentTarget.parentElement;
+                                            if (parent) {
+                                              const initial = parent.querySelector('.user-initial') as HTMLElement;
+                                              if (initial) initial.style.display = 'flex';
+                                            }
+                                          }}
+                                        />
+                                      ) : null}
+                                      <div className={`w-full h-full rounded-full bg-gray-700 flex items-center justify-center text-white font-bold text-xs ${u.profileIcon && u.profileIcon.trim() && u.profileIcon !== 'null' ? 'hidden user-initial' : ''}`}>
+                                        {u.username[0].toUpperCase()}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-200">{u.username}</div>
+                                      <div className="text-xs text-gray-500">{u.email}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-2 sm:px-4 md:px-6 py-3 md:py-4">
+
+                                  <select
+                                    value={u.role}
+                                    onChange={(e) => handleRoleChange(u.id, e.target.value as UserRole)}
+                                    disabled={u.id === currentUser.id} // Cannot demote self easily
+                                    className="bg-[#1a1a1a] border border-gray-700 rounded-lg text-xs px-3 py-2 text-gray-300 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 hover:border-gray-600 transition-colors cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.5rem_center] bg-no-repeat pr-8"
+                                  >
+                                    <option value="user">User</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="owner">Owner</option>
+                                    <option value="pending">Pending</option>
+                                    {roles.map(role => (
+                                      <option key={role.id} value={role.name}>{role.name}</option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td className="px-2 sm:px-4 md:px-6 py-3 md:py-4 text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <button
+                                      onClick={() => handleSendResetLink(u.id)}
+                                      className="p-1.5 text-gray-500 hover:text-blue-400 hover:bg-blue-900/10 rounded transition-all"
+                                      title="Send Reset Link"
+                                    >
+                                      <Mail size={16} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleForceResetPassword(u.id)}
+                                      className="p-1.5 text-gray-500 hover:text-orange-400 hover:bg-orange-900/10 rounded transition-all"
+                                      title="Force Reset (Dummy Pwd)"
+                                    >
+                                      <ShieldAlert size={16} />
+                                    </button>
+                                    {u.id !== currentUser.id && (
+                                      <button onClick={() => handleDeleteUser(u.id)} className="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-900/10 rounded transition-all"><Trash2 size={16} /></button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+
+                  {userSubTab === 'users' && (
+                    <div className="animate-fadeIn w-full min-w-0">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+                        <h2 className="text-xl sm:text-2xl font-bold text-white">All Users</h2>
+                        <button onClick={loadUsers} className="flex items-center gap-2 text-xs sm:text-sm text-gray-400 hover:text-white"><RefreshCw size={14} className={refreshingUsers ? 'animate-spin' : ''} /> <span className="hidden sm:inline">Refresh</span></button>
+                      </div>
+                      <div className="bg-[#1e1e1e] border border-gray-800 rounded-lg overflow-hidden shadow-inner w-full overflow-x-auto">
+                        <table className="w-full text-left text-sm min-w-[600px]">
+                          <thead className="bg-[#1a1a1a] text-gray-400 font-bold uppercase text-xs">
+                            <tr><th className="px-2 sm:px-4 md:px-6 py-3 md:py-4">User</th><th className="px-2 sm:px-4 md:px-6 py-3 md:py-4">Role</th><th className="px-2 sm:px-4 md:px-6 py-3 md:py-4 text-right">Actions</th></tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-800">
+                            {users.filter(u => u.role !== 'admin' && u.role !== 'owner').map(u => (
+                              <tr key={u.id} className="hover:bg-gray-800/30">
+                                <td className="px-2 sm:px-4 md:px-6 py-3 md:py-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="relative w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
+                                      {u.profileIcon && u.profileIcon.trim() && u.profileIcon !== 'null' ? (
+                                        <img
+                                          src={u.profileIcon}
+                                          alt={u.username}
+                                          className="w-full h-full object-cover"
+                                          onError={(e) => {
+                                            e.currentTarget.style.display = 'none';
+                                            const parent = e.currentTarget.parentElement;
+                                            if (parent) {
+                                              const initial = parent.querySelector('.user-initial') as HTMLElement;
+                                              if (initial) initial.style.display = 'flex';
+                                            }
+                                          }}
+                                        />
+                                      ) : null}
+                                      <div className={`w-full h-full rounded-full bg-gray-700 flex items-center justify-center text-white font-bold text-xs ${u.profileIcon && u.profileIcon.trim() && u.profileIcon !== 'null' ? 'hidden user-initial' : ''}`}>
+                                        {u.username[0].toUpperCase()}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div className="text-gray-200">{u.username}</div>
+                                      <div className="text-xs text-gray-500">{u.email}</div>
+                                    </div>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <select
+                                    value={u.role}
+                                    onChange={(e) => handleRoleChange(u.id, e.target.value as UserRole)}
+                                    className="bg-[#1a1a1a] border border-gray-700 rounded-lg text-xs px-3 py-2 text-gray-300 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 hover:border-gray-600 transition-colors cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.5rem_center] bg-no-repeat pr-8"
+                                  >
+                                    <option value="user">User</option>
+                                    <option value="admin">Admin</option>
+                                    <option value="pending">Pending</option>
+                                    {roles.map(role => (
+                                      <option key={role.id} value={role.name}>{role.name}</option>
+                                    ))}
+                                  </select>
+                                </td>
+                                <td className="px-2 sm:px-4 md:px-6 py-3 md:py-4 text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <button
+                                      onClick={() => handleSendResetLink(u.id)}
+                                      className="p-1.5 text-gray-500 hover:text-blue-400 hover:bg-blue-900/10 rounded transition-all"
+                                      title="Send Reset Link"
+                                    >
+                                      <Mail size={16} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleForceResetPassword(u.id)}
+                                      className="p-1.5 text-gray-500 hover:text-orange-400 hover:bg-orange-900/10 rounded transition-all"
+                                      title="Force Reset (Dummy Pwd)"
+                                    >
+                                      <ShieldAlert size={16} />
+                                    </button>
+                                    <button onClick={() => handleDeleteUser(u.id)} className="p-1.5 text-gray-500 hover:text-red-500 hover:bg-red-900/10 rounded transition-all"><Trash2 size={16} /></button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+
+                  {userSubTab === 'roles' && (
+                    <div className="animate-fadeIn w-full min-w-0">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+                        <h2 className="text-xl sm:text-2xl font-bold text-white">Role Management</h2>
+                        <button
+                          onClick={() => {
+                            const newRole: Role = {
+                              id: crypto.randomUUID(),
+                              name: '',
+                              permissions: {},
+                              color: '#6366f1'
+                            };
+                            setEditingRole(newRole);
+                          }}
+                          className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-xs sm:text-sm w-full sm:w-auto justify-center"
+                        >
+                          <Plus size={14} className="sm:w-4 sm:h-4" />
+                          <span className="hidden sm:inline">Create Role</span>
+                          <span className="sm:hidden">Create</span>
+                        </button>
+                      </div>
+
+                      <div className="space-y-4">
+                        {roles.map(role => (
+                          <div key={role.id} className="bg-[#1e1e1e] border border-gray-800 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white"
+                                  style={{ backgroundColor: role.color || '#6366f1' }}
+                                >
+                                  {role.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                  <h3 className="text-white font-bold">{role.name}</h3>
+                                  <p className="text-xs text-gray-500">{Object.values(role.permissions).filter(Boolean).length} permissions</p>
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => setEditingRole(role)}
+                                  className="p-2 text-gray-400 hover:text-blue-400 hover:bg-blue-900/20 rounded transition-colors"
+                                  title="Edit Role"
+                                >
+                                  <Edit size={16} />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const updatedRoles = roles.filter(r => r.id !== role.id);
+                                    setRoles(updatedRoles);
+                                    onUpdateConfig({ ...config, roles: updatedRoles });
+                                  }}
+                                  className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors"
+                                  title="Delete Role"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                        {roles.length === 0 && (
+                          <div className="text-center py-12 text-gray-500 bg-[#1e1e1e] border border-gray-800 rounded-lg">
+                            <ShieldCheck size={48} className="mx-auto mb-4 opacity-50" />
+                            <p>No custom roles created yet.</p>
+                            <p className="text-sm mt-2">Click "Create Role" to add a new role with custom permissions.</p>
+                          </div>
+                        )}
+                      </div>
+
+
+                      {userSubTab === 'legacy' && (
+                        <div className="animate-fadeIn w-full min-w-0">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+                            <h2 className="text-xl sm:text-2xl font-bold text-white">Legacy Accounts</h2>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setShowAddLegacyModal(true)}
+                                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-xs sm:text-sm"
+                              >
+                                <UserPlus size={14} />
+                                <span>Create Legacy Account</span>
+                              </button>
+                              <button onClick={loadLegacyUsers} className="flex items-center gap-2 text-xs sm:text-sm text-gray-400 hover:text-white"><RefreshCw size={14} className={loadingLegacyUsers ? 'animate-spin' : ''} /> <span className="hidden sm:inline">Refresh</span></button>
+                            </div>
+                          </div>
+                          <div className="bg-[#1e1e1e] border border-gray-800 rounded-lg overflow-hidden shadow-inner w-full overflow-x-auto">
+                            <table className="w-full text-left text-sm min-w-[700px]">
+                              <thead className="bg-[#1a1a1a] text-gray-400 font-bold uppercase text-xs">
+                                <tr>
+                                  <th className="px-6 py-4">User Details</th>
+                                  <th className="px-6 py-4">Minecraft</th>
+                                  <th className="px-6 py-4">Created</th>
+                                  <th className="px-6 py-4 text-right">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-800">
+                                {legacyUsers.map(u => (
+                                  <tr key={u.email} className="hover:bg-gray-800/30">
+                                    <td className="px-6 py-4">
+                                      <div className="text-gray-200 font-medium">{u.username}</div>
+                                      <div className="text-xs text-gray-500">{u.email}</div>
+                                      <div className="mt-1">
+                                        <span className="px-1.5 py-0.5 bg-gray-700 text-gray-400 text-[10px] rounded">Role: {u.role}</span>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                      {u.minecraftUsername ? (
+                                        <div>
+                                          <div className="text-xs text-gray-300">{u.minecraftUsername}</div>
+                                          <div className="text-[10px] text-gray-600 font-mono">{u.minecraftUuid}</div>
+                                        </div>
+                                      ) : (
+                                        <span className="text-gray-600 italic text-xs">Not linked</span>
+                                      )}
+                                    </td>
+                                    <td className="px-6 py-4 text-xs text-gray-500">
+                                      {new Date(u.createdAt).toLocaleDateString()}
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                      <button
+                                        onClick={() => handleDeleteLegacyUser(u.email)}
+                                        className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-900/10 rounded transition-all"
+                                        title="Delete Legacy Entry"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                                {legacyUsers.length === 0 && !loadingLegacyUsers && (
+                                  <tr>
+                                    <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
+                                      No legacy accounts pending migration.
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Add Legacy User Modal */}
+                          {showAddLegacyModal && (
+                            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+                              <div className="bg-[#1e1e1e] border border-gray-700 rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+                                <div className="p-6">
+                                  <div className="flex items-center justify-between mb-6">
+                                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                      <UserPlus size={20} />
+                                      Add Legacy Account
+                                    </h3>
+                                    <button onClick={() => setShowAddLegacyModal(false)} className="text-gray-400 hover:text-white transition-colors">
+                                      <X size={24} />
+                                    </button>
+                                  </div>
+
+                                  <div className="space-y-4">
+                                    <div>
+                                      <label className="block text-xs text-gray-400 mb-1">Email (Primary Key)</label>
+                                      <input
+                                        type="email"
+                                        value={newLegacyUser.email}
+                                        onChange={(e) => setNewLegacyUser({ ...newLegacyUser, email: e.target.value })}
+                                        className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-blue-500 focus:outline-none"
+                                        placeholder="user@example.com"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs text-gray-400 mb-1">Username</label>
+                                      <input
+                                        type="text"
+                                        value={newLegacyUser.username}
+                                        onChange={(e) => setNewLegacyUser({ ...newLegacyUser, username: e.target.value })}
+                                        className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-blue-500 focus:outline-none"
+                                        placeholder="Legacy Username"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs text-gray-400 mb-1">Role (Old)</label>
+                                      <select
+                                        value={newLegacyUser.role}
+                                        onChange={(e) => setNewLegacyUser({ ...newLegacyUser, role: e.target.value })}
+                                        className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-blue-500 focus:outline-none"
+                                      >
+                                        <option value="user">User</option>
+                                        <option value="admin">Admin</option>
+                                        <option value="owner">Owner</option>
+                                      </select>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div>
+                                        <label className="block text-xs text-gray-400 mb-1">Minecraft Name</label>
+                                        <input
+                                          type="text"
+                                          value={newLegacyUser.minecraftUsername}
+                                          onChange={(e) => setNewLegacyUser({ ...newLegacyUser, minecraftUsername: e.target.value })}
+                                          className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-blue-500 focus:outline-none"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs text-gray-400 mb-1">Minecraft UUID</label>
+                                        <input
+                                          type="text"
+                                          value={newLegacyUser.minecraftUuid}
+                                          onChange={(e) => setNewLegacyUser({ ...newLegacyUser, minecraftUuid: e.target.value })}
+                                          className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-blue-500 focus:outline-none"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex gap-3 justify-end mt-8">
+                                    <button onClick={() => setShowAddLegacyModal(false)} className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm">Cancel</button>
+                                    <button onClick={handleAddLegacyUser} className="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm">Create Entry</button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {editingRole && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                          <div className="bg-[#1e1e1e] border border-gray-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-auto">
+                            <div className="p-6">
+                              <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                  <ShieldCheck size={20} />
+                                  {editingRole.name ? `Edit Role: ${editingRole.name}` : 'Create New Role'}
+                                </h3>
+                                <button
+                                  onClick={() => {
+                                    setEditingRole(null);
+                                  }}
+                                  className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
+                                >
+                                  <X size={20} />
+                                </button>
+                              </div>
+
+                              <div className="space-y-6">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-300 mb-2">Role Name</label>
+                                  <input
+                                    type="text"
+                                    value={editingRole.name}
+                                    onChange={(e) => setEditingRole({ ...editingRole, name: e.target.value })}
+                                    placeholder="e.g., Moderator, Developer"
+                                    className="w-full bg-black/30 border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-300 mb-2">Role Color</label>
+                                  <input
+                                    type="color"
+                                    value={editingRole.color || '#6366f1'}
+                                    onChange={(e) => setEditingRole({ ...editingRole, color: e.target.value })}
+                                    className="w-full h-12 rounded-lg cursor-pointer"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-300 mb-4">Permissions</label>
+                                  <div className="space-y-3">
+                                    {[
+                                      { key: 'canViewAdminPanel', label: 'View Admin Panel' },
+                                      { key: 'canManageBugs', label: 'Manage Bug Reports' },
+                                      { key: 'canManageSuggestions', label: 'Manage Suggestions' },
+                                      { key: 'canAssignStaff', label: 'Assign Staff to Reports' },
+                                      { key: 'canDeleteReports', label: 'Delete Reports' },
+                                      { key: 'canDeleteSuggestions', label: 'Delete Suggestions' },
+                                      { key: 'canManageUsers', label: 'Manage Users' },
+                                      { key: 'canManageRoles', label: 'Manage Roles' },
+                                      { key: 'canManageConfig', label: 'Manage Configuration' },
+                                    ].map(perm => (
+                                      <label key={perm.key} className="flex items-center gap-3 p-3 bg-[#1a1a1a] border border-gray-800 rounded-lg hover:bg-[#252525] transition-colors cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={editingRole.permissions[perm.key as keyof typeof editingRole.permissions] || false}
+                                          onChange={(e) => setEditingRole({
+                                            ...editingRole,
+                                            permissions: {
+                                              ...editingRole.permissions,
+                                              [perm.key]: e.target.checked
+                                            }
+                                          })}
+                                          className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                                        />
+                                        <span className="text-sm text-gray-300">{perm.label}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div className="flex gap-3 pt-4 border-t border-gray-800">
+                                  <button
+                                    onClick={() => {
+                                      setEditingRole(null);
+                                    }}
+                                    className="flex-1 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (!editingRole.name.trim()) {
+                                        alert('Please enter a role name');
+                                        return;
+                                      }
+                                      const existingIndex = roles.findIndex(r => r.id === editingRole.id);
+                                      let updatedRoles;
+                                      if (existingIndex >= 0) {
+                                        updatedRoles = [...roles];
+                                        updatedRoles[existingIndex] = editingRole;
+                                      } else {
+                                        updatedRoles = [...roles, editingRole];
+                                      }
+                                      setRoles(updatedRoles);
+                                      onUpdateConfig({ ...config, roles: updatedRoles });
+                                      setEditingRole(null);
+                                    }}
+                                    className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                                  >
+                                    <Save size={16} />
+                                    Save Role
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
-                    </div>
+                  )}
                 </div>
-            )}
-
-            
-            {activeTab === 'users' && (currentUser.role === 'admin' || currentUser.role === 'owner') && (
-                 <div className="flex flex-col h-full min-h-0 w-full min-w-0">
-                    
-                    <div className="flex gap-2 border-b border-gray-800 flex-shrink-0 pb-2 mb-4 w-full">
-                        <button
-                            onClick={() => setUserSubTab('staff')}
-                            className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${
-                                userSubTab === 'staff'
-                                    ? 'text-white border-blue-500'
-                                    : 'text-gray-400 border-transparent hover:text-gray-300'
-                            }`}
-                            title="Staff"
-                        >
-                            <div className="flex items-center gap-2 whitespace-nowrap">
-                                <i className="fa fa-user-secret" aria-hidden="true"></i>
-                                <span className="hidden md:inline">Staff</span>
-                            </div>
-                        </button>
-                        <button
-                            onClick={() => setUserSubTab('users')}
-                            className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${
-                                userSubTab === 'users'
-                                    ? 'text-white border-blue-500'
-                                    : 'text-gray-400 border-transparent hover:text-gray-300'
-                            }`}
-                            title="Users"
-                        >
-                            <div className="flex items-center gap-2 whitespace-nowrap">
-                                <i className="fa fa-users" aria-hidden="true"></i>
-                                <span className="hidden md:inline">Users</span>
-                            </div>
-                        </button>
-                        <button
-                            onClick={() => setUserSubTab('roles')}
-                            className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${
-                                userSubTab === 'roles'
-                                    ? 'text-white border-blue-500'
-                                    : 'text-gray-400 border-transparent hover:text-gray-300'
-                            }`}
-                            title="Roles"
-                        >
-                            <div className="flex items-center gap-2 whitespace-nowrap">
-                                <ShieldCheck className="w-4 h-4 flex-shrink-0" />
-                                <span className="hidden md:inline">Roles</span>
-                            </div>
-                        </button>
-                    </div>
-
-                    
-                    <div className="flex-shrink-0 mb-2"></div>
-
-                    
-                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                        
-                        {userSubTab === 'staff' && (
-                            <div className="animate-fadeIn w-full min-w-0">
-                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
-                                    <h2 className="text-xl sm:text-2xl font-bold text-white">Staff Management</h2>
-                                    <button onClick={loadUsers} className="flex items-center gap-2 text-xs sm:text-sm text-gray-400 hover:text-white"><RefreshCw size={14} className={refreshingUsers ? 'animate-spin' : ''} /> <span className="hidden sm:inline">Refresh</span></button>
-                    </div>
-                                <div className="bg-[#1e1e1e] border border-gray-800 rounded-lg overflow-hidden shadow-inner w-full overflow-x-auto">
-                                    <table className="w-full text-left text-sm min-w-[600px]">
-                            <thead className="bg-[#1a1a1a] text-gray-400 font-bold uppercase text-xs">
-                                            <tr><th className="px-2 sm:px-4 md:px-6 py-3 md:py-4">User</th><th className="px-2 sm:px-4 md:px-6 py-3 md:py-4">Role</th><th className="px-2 sm:px-4 md:px-6 py-3 md:py-4 text-right">Actions</th></tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-800">
-                                            {users.filter(u => u.role === 'admin' || u.role === 'owner').map(u => (
-                                    <tr key={u.id} className="hover:bg-gray-800/30">
-                                                    <td className="px-2 sm:px-4 md:px-6 py-3 md:py-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="relative w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                                                                {u.profileIcon && u.profileIcon.trim() && u.profileIcon !== 'null' ? (
-                                                                    <img 
-                                                                        src={u.profileIcon} 
-                                                                        alt={u.username}
-                                                                        className="w-full h-full object-cover"
-                                                                        onError={(e) => {
-                                                                            e.currentTarget.style.display = 'none';
-                                                                            const parent = e.currentTarget.parentElement;
-                                                                            if (parent) {
-                                                                                const initial = parent.querySelector('.user-initial') as HTMLElement;
-                                                                                if (initial) initial.style.display = 'flex';
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                ) : null}
-                                                                <div className={`w-full h-full rounded-full bg-gray-700 flex items-center justify-center text-white font-bold text-xs ${u.profileIcon && u.profileIcon.trim() && u.profileIcon !== 'null' ? 'hidden user-initial' : ''}`}>
-                                                                    {u.username[0].toUpperCase()}
-                                                                </div>
-                                                            </div>
-                                                            <div>
-                                                                <div className="text-gray-200">{u.username}</div>
-                                                                <div className="text-xs text-gray-500">{u.email}</div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-2 sm:px-4 md:px-6 py-3 md:py-4">
-                                            
-                                            <select 
-                                                value={u.role} 
-                                                onChange={(e) => handleRoleChange(u.id, e.target.value as UserRole)}
-                                                disabled={u.id === currentUser.id} // Cannot demote self easily
-                                                            className="bg-[#1a1a1a] border border-gray-700 rounded-lg text-xs px-3 py-2 text-gray-300 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 hover:border-gray-600 transition-colors cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.5rem_center] bg-no-repeat pr-8"
-                                            >
-                                                <option value="user">User</option>
-                                                <option value="admin">Admin</option>
-                                                <option value="owner">Owner</option>
-                                                <option value="pending">Pending</option>
-                                                            {roles.map(role => (
-                                                                <option key={role.id} value={role.name}>{role.name}</option>
-                                                            ))}
-                                            </select>
-                                        </td>
-                                                    <td className="px-2 sm:px-4 md:px-6 py-3 md:py-4 text-right">
-                                            {u.id !== currentUser.id && <button onClick={() => handleDeleteUser(u.id)} className="text-gray-500 hover:text-red-500"><Trash2 size={16}/></button>}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    </div>
-                        )}
-
-                        
-                        {userSubTab === 'users' && (
-                            <div className="animate-fadeIn w-full min-w-0">
-                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
-                                    <h2 className="text-xl sm:text-2xl font-bold text-white">All Users</h2>
-                                    <button onClick={loadUsers} className="flex items-center gap-2 text-xs sm:text-sm text-gray-400 hover:text-white"><RefreshCw size={14} className={refreshingUsers ? 'animate-spin' : ''} /> <span className="hidden sm:inline">Refresh</span></button>
-                                </div>
-                                <div className="bg-[#1e1e1e] border border-gray-800 rounded-lg overflow-hidden shadow-inner w-full overflow-x-auto">
-                                    <table className="w-full text-left text-sm min-w-[600px]">
-                                        <thead className="bg-[#1a1a1a] text-gray-400 font-bold uppercase text-xs">
-                                            <tr><th className="px-2 sm:px-4 md:px-6 py-3 md:py-4">User</th><th className="px-2 sm:px-4 md:px-6 py-3 md:py-4">Role</th><th className="px-2 sm:px-4 md:px-6 py-3 md:py-4 text-right">Actions</th></tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-800">
-                                            {users.filter(u => u.role !== 'admin' && u.role !== 'owner').map(u => (
-                                                <tr key={u.id} className="hover:bg-gray-800/30">
-                                                    <td className="px-2 sm:px-4 md:px-6 py-3 md:py-4">
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="relative w-8 h-8 rounded-full flex items-center justify-center overflow-hidden">
-                                                                {u.profileIcon && u.profileIcon.trim() && u.profileIcon !== 'null' ? (
-                                                                    <img 
-                                                                        src={u.profileIcon} 
-                                                                        alt={u.username}
-                                                                        className="w-full h-full object-cover"
-                                                                        onError={(e) => {
-                                                                            e.currentTarget.style.display = 'none';
-                                                                            const parent = e.currentTarget.parentElement;
-                                                                            if (parent) {
-                                                                                const initial = parent.querySelector('.user-initial') as HTMLElement;
-                                                                                if (initial) initial.style.display = 'flex';
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                ) : null}
-                                                                <div className={`w-full h-full rounded-full bg-gray-700 flex items-center justify-center text-white font-bold text-xs ${u.profileIcon && u.profileIcon.trim() && u.profileIcon !== 'null' ? 'hidden user-initial' : ''}`}>
-                                                                    {u.username[0].toUpperCase()}
-                                                                </div>
-                                                            </div>
-                                                            <div>
-                                                                <div className="text-gray-200">{u.username}</div>
-                                                                <div className="text-xs text-gray-500">{u.email}</div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <select 
-                                                            value={u.role} 
-                                                            onChange={(e) => handleRoleChange(u.id, e.target.value as UserRole)}
-                                                            className="bg-[#1a1a1a] border border-gray-700 rounded-lg text-xs px-3 py-2 text-gray-300 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 hover:border-gray-600 transition-colors cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.5rem_center] bg-no-repeat pr-8"
-                                                        >
-                                                            <option value="user">User</option>
-                                                            <option value="admin">Admin</option>
-                                                            <option value="pending">Pending</option>
-                                                            {roles.map(role => (
-                                                                <option key={role.id} value={role.name}>{role.name}</option>
-                                                            ))}
-                                                        </select>
-                                                    </td>
-                                                    <td className="px-2 sm:px-4 md:px-6 py-3 md:py-4 text-right">
-                                                        <button onClick={() => handleDeleteUser(u.id)} className="text-gray-500 hover:text-red-500"><Trash2 size={16}/></button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        )}
-
-                        
-                        {userSubTab === 'roles' && (
-                            <div className="animate-fadeIn w-full min-w-0">
-                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
-                                    <h2 className="text-xl sm:text-2xl font-bold text-white">Role Management</h2>
-                                    <button 
-                                        onClick={() => {
-                                            const newRole: Role = {
-                                                id: crypto.randomUUID(),
-                                                name: '',
-                                                permissions: {},
-                                                color: '#6366f1'
-                                            };
-                                            setEditingRole(newRole);
-                                        }}
-                                        className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-xs sm:text-sm w-full sm:w-auto justify-center"
-                                    >
-                                        <Plus size={14} className="sm:w-4 sm:h-4" />
-                                        <span className="hidden sm:inline">Create Role</span>
-                                        <span className="sm:hidden">Create</span>
-                                    </button>
-                                </div>
-                                
-                                <div className="space-y-4">
-                                    {roles.map(role => (
-                                        <div key={role.id} className="bg-[#1e1e1e] border border-gray-800 rounded-lg p-4">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div 
-                                                        className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white"
-                                                        style={{ backgroundColor: role.color || '#6366f1' }}
-                                                    >
-                                                        {role.name.charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <div>
-                                                        <h3 className="text-white font-bold">{role.name}</h3>
-                                                        <p className="text-xs text-gray-500">{Object.values(role.permissions).filter(Boolean).length} permissions</p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={() => setEditingRole(role)}
-                                                        className="p-2 text-gray-400 hover:text-blue-400 hover:bg-blue-900/20 rounded transition-colors"
-                                                        title="Edit Role"
-                                                    >
-                                                        <Edit size={16} />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => {
-                                                            const updatedRoles = roles.filter(r => r.id !== role.id);
-                                                            setRoles(updatedRoles);
-                                                            onUpdateConfig({...config, roles: updatedRoles});
-                                                        }}
-                                                        className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors"
-                                                        title="Delete Role"
-                                                    >
-                                                        <Trash2 size={16} />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    
-                                    {roles.length === 0 && (
-                                        <div className="text-center py-12 text-gray-500 bg-[#1e1e1e] border border-gray-800 rounded-lg">
-                                            <ShieldCheck size={48} className="mx-auto mb-4 opacity-50" />
-                                            <p>No custom roles created yet.</p>
-                                            <p className="text-sm mt-2">Click "Create Role" to add a new role with custom permissions.</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                
-                                {editingRole && (
-                                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                                        <div className="bg-[#1e1e1e] border border-gray-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-auto">
-                                            <div className="p-6">
-                                                <div className="flex items-center justify-between mb-6">
-                                                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                                                        <ShieldCheck size={20} />
-                                                        {editingRole.name ? `Edit Role: ${editingRole.name}` : 'Create New Role'}
-                                                    </h3>
-                                                    <button
-                                                        onClick={() => {
-                                                            setEditingRole(null);
-                                                        }}
-                                                        className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
-                                                    >
-                                                        <X size={20} />
-                                                    </button>
-                                                </div>
-
-                                                <div className="space-y-6">
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-300 mb-2">Role Name</label>
-                                                        <input
-                                                            type="text"
-                                                            value={editingRole.name}
-                                                            onChange={(e) => setEditingRole({...editingRole, name: e.target.value})}
-                                                            placeholder="e.g., Moderator, Developer"
-                                                            className="w-full bg-black/30 border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                                                        />
-                                                    </div>
-
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-300 mb-2">Role Color</label>
-                                                        <input
-                                                            type="color"
-                                                            value={editingRole.color || '#6366f1'}
-                                                            onChange={(e) => setEditingRole({...editingRole, color: e.target.value})}
-                                                            className="w-full h-12 rounded-lg cursor-pointer"
-                                                        />
-                                                    </div>
-
-                                                    <div>
-                                                        <label className="block text-sm font-medium text-gray-300 mb-4">Permissions</label>
-                                                        <div className="space-y-3">
-                                                            {[
-                                                                { key: 'canViewAdminPanel', label: 'View Admin Panel' },
-                                                                { key: 'canManageBugs', label: 'Manage Bug Reports' },
-                                                                { key: 'canManageSuggestions', label: 'Manage Suggestions' },
-                                                                { key: 'canAssignStaff', label: 'Assign Staff to Reports' },
-                                                                { key: 'canDeleteReports', label: 'Delete Reports' },
-                                                                { key: 'canDeleteSuggestions', label: 'Delete Suggestions' },
-                                                                { key: 'canManageUsers', label: 'Manage Users' },
-                                                                { key: 'canManageRoles', label: 'Manage Roles' },
-                                                                { key: 'canManageConfig', label: 'Manage Configuration' },
-                                                            ].map(perm => (
-                                                                <label key={perm.key} className="flex items-center gap-3 p-3 bg-[#1a1a1a] border border-gray-800 rounded-lg hover:bg-[#252525] transition-colors cursor-pointer">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={editingRole.permissions[perm.key as keyof typeof editingRole.permissions] || false}
-                                                                        onChange={(e) => setEditingRole({
-                                                                            ...editingRole,
-                                                                            permissions: {
-                                                                                ...editingRole.permissions,
-                                                                                [perm.key]: e.target.checked
-                                                                            }
-                                                                        })}
-                                                                        className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
-                                                                    />
-                                                                    <span className="text-sm text-gray-300">{perm.label}</span>
-                                                                </label>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="flex gap-3 pt-4 border-t border-gray-800">
-                                                        <button
-                                                            onClick={() => {
-                                                                setEditingRole(null);
-                                                            }}
-                                                            className="flex-1 px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors"
-                                                        >
-                                                            Cancel
-                                                        </button>
-                                                        <button
-                                                            onClick={() => {
-                                                                if (!editingRole.name.trim()) {
-                                                                    alert('Please enter a role name');
-                                                                    return;
-                                                                }
-                                                                const existingIndex = roles.findIndex(r => r.id === editingRole.id);
-                                                                let updatedRoles;
-                                                                if (existingIndex >= 0) {
-                                                                    updatedRoles = [...roles];
-                                                                    updatedRoles[existingIndex] = editingRole;
-                                                                } else {
-                                                                    updatedRoles = [...roles, editingRole];
-                                                                }
-                                                                setRoles(updatedRoles);
-                                                                onUpdateConfig({...config, roles: updatedRoles});
-                                                                setEditingRole(null);
-                                                            }}
-                                                            className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-                                                        >
-                                                            <Save size={16} />
-                                                            Save Role
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                 </div>
+              </div>
             )}
 
             {activeTab === 'changelogs' && (
@@ -2797,41 +3135,41 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
               </div>
             )}
 
-            
+
             {activeTab === 'database' && (currentUser.role === 'admin' || currentUser.role === 'owner') && (
-                <div className="flex flex-col h-full min-h-0 w-full min-w-0">
-                    
-                    <div className="flex gap-2 border-b border-gray-800 flex-shrink-0 pb-2 mb-4 w-full">
-                        <button
-                            className="px-4 py-2 font-semibold text-sm transition-all border-b-2 text-white border-blue-500 flex-shrink-0"
-                            title="Database & Backups"
-                        >
-                            <div className="flex items-center gap-2 whitespace-nowrap">
-                                <Database className="w-4 h-4 flex-shrink-0" />
-                                <span className="hidden md:inline">Database & Backups</span>
-                            </div>
-                        </button>
-                    </div>
+              <div className="flex flex-col h-full min-h-0 w-full min-w-0">
 
-                    
-                    <div className="flex-shrink-0 mb-2"></div>
-
-                    
-                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-                    <div className="animate-fadeIn space-y-8 w-full min-w-0">
-                    <div className="bg-[#1e1e1e] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full">
-                        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                            <button onClick={() => setShowCloudSyncModal(true)} disabled={dbStatus !== 'connected'} className="bg-blue-600 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:bg-blue-700 w-full sm:w-auto"><Upload size={16}/> Sync Data</button>
-                            <button onClick={handleExportData} className="bg-gray-800 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-sm sm:text-base transition-colors hover:bg-gray-700 w-full sm:w-auto"><Download size={16}/> Download backup</button>
-                            <div className="relative w-full sm:w-auto">
-                                <input type="file" ref={fileInputRef} onChange={handleImportData} className="hidden" accept=".json" />
-                                <button onClick={() => fileInputRef.current?.click()} className="bg-gray-800 text-gray-300 border border-gray-700 px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-sm sm:text-base transition-colors hover:text-white hover:bg-gray-700 w-full sm:w-auto"><Upload size={16} /> restore</button>
-                            </div>
-                        </div>
-                            </div>
-                        </div>
+                <div className="flex gap-2 border-b border-gray-800 flex-shrink-0 pb-2 mb-4 w-full">
+                  <button
+                    className="px-4 py-2 font-semibold text-sm transition-all border-b-2 text-white border-blue-500 flex-shrink-0"
+                    title="Database & Backups"
+                  >
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <Database className="w-4 h-4 flex-shrink-0" />
+                      <span className="hidden md:inline">Database & Backups</span>
                     </div>
+                  </button>
                 </div>
+
+
+                <div className="flex-shrink-0 mb-2"></div>
+
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                  <div className="animate-fadeIn space-y-8 w-full min-w-0">
+                    <div className="bg-[#1e1e1e] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full">
+                      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                        <button onClick={() => setShowCloudSyncModal(true)} disabled={dbStatus !== 'connected'} className="bg-blue-600 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:bg-blue-700 w-full sm:w-auto"><Upload size={16} /> Sync Data</button>
+                        <button onClick={handleExportData} className="bg-gray-800 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-sm sm:text-base transition-colors hover:bg-gray-700 w-full sm:w-auto"><Download size={16} /> Download backup</button>
+                        <div className="relative w-full sm:w-auto">
+                          <input type="file" ref={fileInputRef} onChange={handleImportData} className="hidden" accept=".json" />
+                          <button onClick={() => fileInputRef.current?.click()} className="bg-gray-800 text-gray-300 border border-gray-700 px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-sm sm:text-base transition-colors hover:text-white hover:bg-gray-700 w-full sm:w-auto"><Upload size={16} /> restore</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
 
             {activeTab === 'kofi' && (
@@ -2847,11 +3185,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                 <div className="flex gap-2 border-b border-gray-800 flex-shrink-0 pb-2 mb-4">
                   <button
                     onClick={() => setKofiSubTab('tiers')}
-                    className={`px-3 sm:px-4 py-2 font-semibold text-sm transition-all border-b-2 ${
-                      kofiSubTab === 'tiers'
-                        ? 'text-white border-blue-500'
-                        : 'text-gray-400 border-transparent hover:text-gray-300'
-                    }`}
+                    className={`px-3 sm:px-4 py-2 font-semibold text-sm transition-all border-b-2 ${kofiSubTab === 'tiers'
+                      ? 'text-white border-blue-500'
+                      : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
                     title="Tiers"
                   >
                     <div className="flex items-center gap-2">
@@ -2861,11 +3198,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   </button>
                   <button
                     onClick={() => setKofiSubTab('subscribers')}
-                    className={`px-3 sm:px-4 py-2 font-semibold text-sm transition-all border-b-2 ${
-                      kofiSubTab === 'subscribers'
-                        ? 'text-white border-blue-500'
-                        : 'text-gray-400 border-transparent hover:text-gray-300'
-                    }`}
+                    className={`px-3 sm:px-4 py-2 font-semibold text-sm transition-all border-b-2 ${kofiSubTab === 'subscribers'
+                      ? 'text-white border-blue-500'
+                      : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
                     title="Subscribers"
                   >
                     <div className="flex items-center gap-2">
@@ -2875,11 +3211,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   </button>
                   <button
                     onClick={() => setKofiSubTab('manual-rewards')}
-                    className={`px-3 sm:px-4 py-2 font-semibold text-sm transition-all border-b-2 ${
-                      kofiSubTab === 'manual-rewards'
-                        ? 'text-white border-blue-500'
-                        : 'text-gray-400 border-transparent hover:text-gray-300'
-                    }`}
+                    className={`px-3 sm:px-4 py-2 font-semibold text-sm transition-all border-b-2 ${kofiSubTab === 'manual-rewards'
+                      ? 'text-white border-blue-500'
+                      : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
                     title="Manual Rewards"
                   >
                     <div className="flex items-center gap-2">
@@ -2972,11 +3307,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                       <span className="px-2 py-1 bg-blue-600/20 text-blue-400 text-xs font-semibold rounded">
                                         Priority: {tier.priority}
                                       </span>
-                                      <span className={`px-2 py-1 text-xs font-semibold rounded ${
-                                        tier.durationType === 'permanent'
-                                          ? 'bg-green-600/20 text-green-400'
-                                          : 'bg-yellow-600/20 text-yellow-400'
-                                      }`}>
+                                      <span className={`px-2 py-1 text-xs font-semibold rounded ${tier.durationType === 'permanent'
+                                        ? 'bg-green-600/20 text-green-400'
+                                        : 'bg-yellow-600/20 text-yellow-400'
+                                        }`}>
                                         {tier.durationType === 'permanent' ? 'Permanent' : 'With Subscription'}
                                       </span>
                                     </div>
@@ -3236,6 +3570,267 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
               </div>
             )}
 
+            {activeTab === 'twitch' && (
+              <div className="flex flex-col h-full min-h-0 w-full min-w-0">
+                <div className="flex items-center justify-between mb-6 flex-shrink-0">
+                  <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                    <Twitch size={24} />
+                    Twitch Management
+                  </h2>
+                </div>
+
+                {/* Sub-tabs */}
+                <div className="flex gap-2 border-b border-gray-800 flex-shrink-0 pb-2 mb-4">
+                  <button
+                    onClick={() => setTwitchSubTab('tiers')}
+                    className={`px-3 sm:px-4 py-2 font-semibold text-sm transition-all border-b-2 ${twitchSubTab === 'tiers'
+                      ? 'text-white border-blue-500'
+                      : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
+                    title="Tiers"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Crown size={16} />
+                      <span className="hidden sm:inline">Tiers</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setTwitchSubTab('subscribers')}
+                    className={`px-3 sm:px-4 py-2 font-semibold text-sm transition-all border-b-2 ${twitchSubTab === 'subscribers'
+                      ? 'text-white border-blue-500'
+                      : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
+                    title="Subscribers"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Users size={16} />
+                      <span className="hidden sm:inline">Subscribers</span>
+                    </div>
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+                  {/* Tiers Tab */}
+                  {twitchSubTab === 'tiers' && (
+                    <div className="space-y-4">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <p className="text-gray-400 text-sm">Manage Twitch subscription tiers and their rewards</p>
+                        <button
+                          onClick={() => {
+                            const newTier: TwitchTier = {
+                              id: Date.now().toString(),
+                              name: '',
+                              twitchTierLevel: '1000',
+                              description: '',
+                              rewards: [],
+                              enabled: true,
+                              createdAt: Date.now(),
+                              updatedAt: Date.now()
+                            };
+                            setEditingTwitchTier(newTier);
+                            setEditingTwitchTierForm({
+                              name: '',
+                              twitchTierLevel: '1000',
+                              description: '',
+                              rewards: [],
+                              enabled: true
+                            });
+                            setShowTwitchTierModal(true);
+                          }}
+                          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm sm:text-base"
+                        >
+                          <Plus size={16} className="sm:w-[18px] sm:h-[18px]" />
+                          <span className="hidden sm:inline">Add Tier</span>
+                          <span className="sm:hidden">Add</span>
+                        </button>
+                      </div>
+
+                      {twitchTiers.length === 0 ? (
+                        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-8 text-center">
+                          <Crown className="mx-auto text-gray-500 mb-3" size={48} />
+                          <h3 className="text-gray-400 font-bold mb-1">No Twitch Tiers Configured</h3>
+                          <p className="text-gray-500 text-sm mb-4">Create tiers to define rewards for different Twitch subscription levels</p>
+                          <button
+                            onClick={() => {
+                              setEditingTwitchTier({
+                                id: Date.now().toString(),
+                                name: '',
+                                twitchTierLevel: '1000',
+                                description: '',
+                                rewards: [],
+                                enabled: true,
+                                createdAt: Date.now(),
+                                updatedAt: Date.now()
+                              });
+                              setShowTwitchTierModal(true);
+                            }}
+                            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm sm:text-base"
+                          >
+                            <span className="hidden sm:inline">Create First Tier</span>
+                            <span className="sm:hidden">Create Tier</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {twitchTiers
+                            .sort((a, b) => Number(b.twitchTierLevel) - Number(a.twitchTierLevel))
+                            .map((tier) => (
+                              <div key={tier.id} className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                                <div className="flex items-start justify-between">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-3 mb-2">
+                                      <h3 className="text-lg font-bold text-white">{tier.name}</h3>
+                                      {!tier.enabled && (
+                                        <span className="px-2 py-1 bg-gray-700 text-gray-400 text-xs font-semibold rounded">Disabled</span>
+                                      )}
+                                      <span className="px-2 py-1 bg-purple-600/20 text-purple-400 text-xs font-semibold rounded">
+                                        Tier: {tier.twitchTierLevel === '1000' ? '1' : tier.twitchTierLevel === '2000' ? '2' : '3'}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm text-gray-400 mb-2">
+                                      Twitch Level: <span className="font-mono text-gray-300">{tier.twitchTierLevel}</span>
+                                    </p>
+                                    {tier.description && (
+                                      <p className="text-sm text-gray-500 mb-3">{tier.description}</p>
+                                    )}
+                                    <div className="mt-3">
+                                      <p className="text-xs text-gray-500 uppercase font-bold mb-2">Rewards ({tier.rewards.length})</p>
+                                      {tier.rewards.length === 0 ? (
+                                        <p className="text-sm text-gray-500 italic">No rewards configured</p>
+                                      ) : (
+                                        <div className="space-y-1">
+                                          {tier.rewards.map((reward, idx) => (
+                                            <div key={idx} className="text-sm text-gray-300 bg-gray-900/50 rounded p-2">
+                                              <span className="font-medium">{reward.displayName}</span>
+                                              {reward.description && (
+                                                <span className="text-gray-500 ml-2">- {reward.description}</span>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2 ml-4">
+                                    <button
+                                      onClick={() => {
+                                        setEditingTwitchTier(tier);
+                                        setEditingTwitchTierForm({
+                                          name: tier.name,
+                                          twitchTierLevel: tier.twitchTierLevel,
+                                          description: tier.description,
+                                          rewards: tier.rewards,
+                                          enabled: tier.enabled
+                                        });
+                                        setShowTwitchTierModal(true);
+                                      }}
+                                      className="p-2 bg-gray-700 hover:bg-gray-600 text-white rounded transition-colors"
+                                      title="Edit"
+                                    >
+                                      <Edit size={16} />
+                                    </button>
+                                    <button
+                                      onClick={async () => {
+                                        if (!confirm(`Delete Twitch tier "${tier.name}"?`)) return;
+                                        const updated = twitchTiers.filter(t => t.id !== tier.id);
+                                        setTwitchTiers(updated);
+                                        await saveTwitchTiers(updated);
+                                      }}
+                                      className="p-2 bg-red-700 hover:bg-red-600 text-white rounded transition-colors"
+                                      title="Delete"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Subscribers Tab */}
+                  {twitchSubTab === 'subscribers' && (
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <p className="text-gray-400 text-sm">View users with active Twitch subscriptions</p>
+                        <button
+                          onClick={loadTwitchSubscribedUsers}
+                          disabled={loadingTwitchUsers}
+                          className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          <RefreshCw size={18} className={loadingTwitchUsers ? 'animate-spin' : ''} />
+                          Refresh
+                        </button>
+                      </div>
+
+                      {twitchSubscribedUsers.length === 0 ? (
+                        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-8 text-center">
+                          <Users className="mx-auto text-gray-500 mb-3" size={48} />
+                          <h3 className="text-gray-400 font-bold mb-1">No Twitch Subscribers Found</h3>
+                          <p className="text-gray-500 text-sm">Click Refresh to load Twitch subscribed users</p>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse">
+                            <thead>
+                              <tr className="border-b border-gray-700">
+                                <th className="text-left p-3 text-sm font-semibold text-gray-400">Username</th>
+                                <th className="text-left p-3 text-sm font-semibold text-gray-400">Twitch Display Name</th>
+                                <th className="text-left p-3 text-sm font-semibold text-gray-400">Tier</th>
+                                <th className="text-left p-3 text-sm font-semibold text-gray-400">Minecraft</th>
+                                <th className="text-left p-3 text-sm font-semibold text-gray-400">Status</th>
+                                <th className="text-left p-3 text-sm font-semibold text-gray-400">Last Checked</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {twitchSubscribedUsers.map((user) => (
+                                <tr key={user.id} className="border-b border-gray-800 hover:bg-gray-800/30">
+                                  <td className="p-3 text-sm text-white">{user.username}</td>
+                                  <td className="p-3 text-sm text-purple-400 font-mono">{user.twitchSubscriptionData?.displayName || 'N/A'}</td>
+                                  <td className="p-3 text-sm text-amber-400">
+                                    {user.twitchSubscriptionData?.tier === '1000' ? 'Tier 1' :
+                                      user.twitchSubscriptionData?.tier === '2000' ? 'Tier 2' :
+                                        user.twitchSubscriptionData?.tier === '3000' ? 'Tier 3' : 'N/A'}
+                                  </td>
+                                  <td className="p-3 text-sm">
+                                    {user.minecraftUuid ? (
+                                      <div className="flex items-center gap-2 text-green-400">
+                                        <CheckCircle size={16} />
+                                        <span>{user.minecraftUsername || 'Linked'}</span>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-2 text-red-400">
+                                        <X size={16} />
+                                        <span>Not Linked</span>
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="p-3 text-sm">
+                                    {user.twitchSubscriptionData?.isSub ? (
+                                      <span className="px-2 py-1 bg-green-600/20 text-green-400 text-xs font-semibold rounded">Active</span>
+                                    ) : (
+                                      <span className="px-2 py-1 bg-gray-700 text-gray-400 text-xs font-semibold rounded">Inactive</span>
+                                    )}
+                                  </td>
+                                  <td className="p-3 text-sm text-gray-400">
+                                    {user.twitchSubscriptionData?.lastChecked
+                                      ? new Date(user.twitchSubscriptionData.lastChecked).toLocaleDateString()
+                                      : 'N/A'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {activeTab === 'redeem-rewards' && (
               <div className="flex flex-col h-full min-h-0 w-full min-w-0">
                 <div className="flex items-center justify-between mb-6 flex-shrink-0">
@@ -3268,11 +3863,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                 <div className="flex gap-1 mb-6 border-b-2 border-gray-700">
                   <button
                     onClick={() => setRedeemCodeSubTab('active')}
-                    className={`px-6 py-3 font-semibold text-base transition-all border-b-2 flex items-center gap-2 ${
-                      redeemCodeSubTab === 'active'
-                        ? 'text-white border-b-green-500 bg-gray-800/50'
-                        : 'text-gray-400 border-b-transparent hover:text-gray-300 hover:bg-gray-800/30'
-                    }`}
+                    className={`px-6 py-3 font-semibold text-base transition-all border-b-2 flex items-center gap-2 ${redeemCodeSubTab === 'active'
+                      ? 'text-white border-b-green-500 bg-gray-800/50'
+                      : 'text-gray-400 border-b-transparent hover:text-gray-300 hover:bg-gray-800/30'
+                      }`}
                   >
                     <CheckCircle size={18} />
                     Active
@@ -3283,11 +3877,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   </button>
                   <button
                     onClick={() => setRedeemCodeSubTab('expired')}
-                    className={`px-6 py-3 font-semibold text-base transition-all border-b-2 flex items-center gap-2 ${
-                      redeemCodeSubTab === 'expired'
-                        ? 'text-white border-b-red-500 bg-gray-800/50'
-                        : 'text-gray-400 border-b-transparent hover:text-gray-300 hover:bg-gray-800/30'
-                    }`}
+                    className={`px-6 py-3 font-semibold text-base transition-all border-b-2 flex items-center gap-2 ${redeemCodeSubTab === 'expired'
+                      ? 'text-white border-b-red-500 bg-gray-800/50'
+                      : 'text-gray-400 border-b-transparent hover:text-gray-300 hover:bg-gray-800/30'
+                      }`}
                   >
                     <Clock size={18} />
                     Expired
@@ -3301,11 +3894,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       setRedeemCodeSubTab('claims');
                       loadCodeRedemptions();
                     }}
-                    className={`px-6 py-3 font-semibold text-base transition-all border-b-2 flex items-center gap-2 ${
-                      redeemCodeSubTab === 'claims'
-                        ? 'text-white border-b-blue-500 bg-gray-800/50'
-                        : 'text-gray-400 border-b-transparent hover:text-gray-300 hover:bg-gray-800/30'
-                    }`}
+                    className={`px-6 py-3 font-semibold text-base transition-all border-b-2 flex items-center gap-2 ${redeemCodeSubTab === 'claims'
+                      ? 'text-white border-b-blue-500 bg-gray-800/50'
+                      : 'text-gray-400 border-b-transparent hover:text-gray-300 hover:bg-gray-800/30'
+                      }`}
                   >
                     <History size={18} />
                     Claims
@@ -3462,7 +4054,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     let filteredCodes = redeemCodeSubTab === 'expired'
                       ? redeemCodes.filter(c => c.expiresAt && c.expiresAt < Date.now())
                       : redeemCodes.filter(c => !c.expiresAt || c.expiresAt >= Date.now());
-                    
+
                     // Apply sorting
                     filteredCodes = [...filteredCodes].sort((a, b) => {
                       switch (codeSortBy) {
@@ -3476,7 +4068,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           return b.createdAt - a.createdAt;
                       }
                     });
-                    
+
                     if (filteredCodes.length === 0) {
                       return (
                         <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-8 text-center">
@@ -3512,7 +4104,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         </div>
                       );
                     }
-                    
+
                     return (
                       <div className="space-y-4">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
@@ -3534,76 +4126,75 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           </div>
                         </div>
                         {filteredCodes.map((code) => (
-                        <div key={code.id} className={`bg-gray-800/50 border rounded-lg p-4 ${
-                          code.expiresAt && code.expiresAt < Date.now()
+                          <div key={code.id} className={`bg-gray-800/50 border rounded-lg p-4 ${code.expiresAt && code.expiresAt < Date.now()
                             ? 'border-red-700/50 bg-red-900/10'
                             : 'border-gray-700'
-                        }`}>
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
-                                <span className="font-mono text-lg font-bold text-white">{code.code}</span>
-                                {code.expiresAt && code.expiresAt < Date.now() ? (
-                                  <span className="px-2 py-1 bg-red-900/30 text-red-400 text-xs font-semibold rounded border border-red-700">Expired</span>
-                                ) : code.enabled ? (
-                                  <span className="px-2 py-1 bg-green-900/30 text-green-400 text-xs font-semibold rounded border border-green-700">Active</span>
-                                ) : (
-                                  <span className="px-2 py-1 bg-gray-700/50 text-gray-400 text-xs font-semibold rounded border border-gray-600">Disabled</span>
+                            }`}>
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <span className="font-mono text-lg font-bold text-white">{code.code}</span>
+                                  {code.expiresAt && code.expiresAt < Date.now() ? (
+                                    <span className="px-2 py-1 bg-red-900/30 text-red-400 text-xs font-semibold rounded border border-red-700">Expired</span>
+                                  ) : code.enabled ? (
+                                    <span className="px-2 py-1 bg-green-900/30 text-green-400 text-xs font-semibold rounded border border-green-700">Active</span>
+                                  ) : (
+                                    <span className="px-2 py-1 bg-gray-700/50 text-gray-400 text-xs font-semibold rounded border border-gray-600">Disabled</span>
+                                  )}
+                                </div>
+                                {code.description && (
+                                  <p className="text-gray-400 text-sm mb-2">{code.description}</p>
                                 )}
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                  {code.rewards.map((reward, idx) => (
+                                    <span key={idx} className="px-2 py-1 bg-blue-900/30 text-blue-400 text-xs rounded border border-blue-700">
+                                      {reward.displayName}
+                                    </span>
+                                  ))}
+                                </div>
+                                <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+                                  <span>Uses: {code.usedCount}{code.maxUses ? ` / ${code.maxUses}` : ' / ∞'}</span>
+                                  {code.expiresAt && (
+                                    <span>Expires: {new Date(code.expiresAt).toLocaleString()}</span>
+                                  )}
+                                  {code.requiresMembership && (
+                                    <span className="text-amber-400">Requires Membership</span>
+                                  )}
+                                  <span>Created: {new Date(code.createdAt).toLocaleDateString()}</span>
+                                </div>
                               </div>
-                              {code.description && (
-                                <p className="text-gray-400 text-sm mb-2">{code.description}</p>
-                              )}
-                              <div className="flex flex-wrap gap-2 mb-2">
-                                {code.rewards.map((reward, idx) => (
-                                  <span key={idx} className="px-2 py-1 bg-blue-900/30 text-blue-400 text-xs rounded border border-blue-700">
-                                    {reward.displayName}
-                                  </span>
-                                ))}
+                              <div className="flex gap-2 ml-4">
+                                <button
+                                  onClick={() => {
+                                    setEditingRedeemCode(code);
+                                    setNewRedeemCode({
+                                      code: code.code,
+                                      description: code.description,
+                                      rewards: code.rewards,
+                                      maxUses: code.maxUses,
+                                      expiresAt: code.expiresAt,
+                                      requiresMembership: code.requiresMembership,
+                                      enabled: code.enabled
+                                    });
+                                    setShowRedeemCodeModal(true);
+                                  }}
+                                  className="p-2 text-blue-400 hover:bg-blue-900/20 rounded-lg transition-colors"
+                                  title="Edit"
+                                >
+                                  <Edit size={16} />
+                                </button>
+                                <button
+                                  onClick={() => deleteRedeemCode(code.id)}
+                                  className="p-2 text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
                               </div>
-                              <div className="flex flex-wrap gap-4 text-xs text-gray-500">
-                                <span>Uses: {code.usedCount}{code.maxUses ? ` / ${code.maxUses}` : ' / ∞'}</span>
-                                {code.expiresAt && (
-                                  <span>Expires: {new Date(code.expiresAt).toLocaleString()}</span>
-                                )}
-                                {code.requiresMembership && (
-                                  <span className="text-amber-400">Requires Membership</span>
-                                )}
-                                <span>Created: {new Date(code.createdAt).toLocaleDateString()}</span>
-                              </div>
-                            </div>
-                            <div className="flex gap-2 ml-4">
-                              <button
-                                onClick={() => {
-                                  setEditingRedeemCode(code);
-                                  setNewRedeemCode({
-                                    code: code.code,
-                                    description: code.description,
-                                    rewards: code.rewards,
-                                    maxUses: code.maxUses,
-                                    expiresAt: code.expiresAt,
-                                    requiresMembership: code.requiresMembership,
-                                    enabled: code.enabled
-                                  });
-                                  setShowRedeemCodeModal(true);
-                                }}
-                                className="p-2 text-blue-400 hover:bg-blue-900/20 rounded-lg transition-colors"
-                                title="Edit"
-                              >
-                                <Edit size={16} />
-                              </button>
-                              <button
-                                onClick={() => deleteRedeemCode(code.id)}
-                                className="p-2 text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 size={16} />
-                              </button>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
                     );
                   })()}
                 </div>
@@ -3619,23 +4210,23 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     Wiki Management
                   </h2>
                   <button
-                        onClick={() => {
-                          setEditingWikiFeature(null);
-                          setNewWikiFeature({
-                            title: '',
-                            mcVersions: [],
-                            modVersions: [],
-                            categories: [],
-                            subcategories: [],
-                            description: '',
-                            descriptionType: 'markdown',
-                            media: '',
-                            details: []
-                          });
-                          setNewDetail('');
-                          setMediaPreview('');
-                          setShowWikiModal(true);
-                        }}
+                    onClick={() => {
+                      setEditingWikiFeature(null);
+                      setNewWikiFeature({
+                        title: '',
+                        mcVersions: [],
+                        modVersions: [],
+                        categories: [],
+                        subcategories: [],
+                        description: '',
+                        descriptionType: 'markdown',
+                        media: '',
+                        details: []
+                      });
+                      setNewDetail('');
+                      setMediaPreview('');
+                      setShowWikiModal(true);
+                    }}
                     className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
                   >
                     <Plus size={18} />
@@ -3871,7 +4462,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       const featureModVersions = feature.modVersions || (oldFeature.modVersion ? [oldFeature.modVersion] : []);
 
                       // Search filter
-                      const searchMatch = !wikiSearchTerm || 
+                      const searchMatch = !wikiSearchTerm ||
                         feature.title.toLowerCase().includes(wikiSearchTerm.toLowerCase()) ||
                         feature.description.toLowerCase().includes(wikiSearchTerm.toLowerCase()) ||
                         (feature.details && feature.details.some(d => d.toLowerCase().includes(wikiSearchTerm.toLowerCase())));
@@ -3932,2060 +4523,2054 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     }
 
                     return (
-                    <div className="space-y-4">
-                      <div className="text-sm text-gray-400 mb-2">
-                        Showing {filteredWikiFeatures.length} of {wikiFeatures.length} features
-                      </div>
-                      {filteredWikiFeatures.map((feature) => (
-                        <div key={feature.id} className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                <h3 className="text-lg font-bold text-white">{feature.title}</h3>
-                                {(feature.categories || (feature as any).category ? [(feature as any).category].filter(Boolean) : []).map((cat: string) => (
-                                  <span key={cat} className="px-2 py-1 bg-green-900/30 text-green-400 text-xs font-semibold rounded border border-green-700">
-                                    {cat}
-                                  </span>
-                                ))}
-                                {(feature.subcategories || ((feature as any).subcategory ? [(feature as any).subcategory] : [])).map((subcat: string) => (
-                                  <span key={subcat} className="px-2 py-1 bg-blue-900/30 text-blue-400 text-xs font-semibold rounded border border-blue-700">
-                                    {subcat}
-                                  </span>
-                                ))}
+                      <div className="space-y-4">
+                        <div className="text-sm text-gray-400 mb-2">
+                          Showing {filteredWikiFeatures.length} of {wikiFeatures.length} features
+                        </div>
+                        {filteredWikiFeatures.map((feature) => (
+                          <div key={feature.id} className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2 flex-wrap">
+                                  <h3 className="text-lg font-bold text-white">{feature.title}</h3>
+                                  {(feature.categories || (feature as any).category ? [(feature as any).category].filter(Boolean) : []).map((cat: string) => (
+                                    <span key={cat} className="px-2 py-1 bg-green-900/30 text-green-400 text-xs font-semibold rounded border border-green-700">
+                                      {cat}
+                                    </span>
+                                  ))}
+                                  {(feature.subcategories || ((feature as any).subcategory ? [(feature as any).subcategory] : [])).map((subcat: string) => (
+                                    <span key={subcat} className="px-2 py-1 bg-blue-900/30 text-blue-400 text-xs font-semibold rounded border border-blue-700">
+                                      {subcat}
+                                    </span>
+                                  ))}
+                                </div>
+                                <p className="text-gray-400 text-sm mb-2 line-clamp-2">{feature.description}</p>
+                                <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+                                  <span>MC: {(feature.mcVersions || ((feature as any).version ? [(feature as any).version] : [])).join(', ') || 'N/A'}</span>
+                                  {(feature.modVersions || ((feature as any).modVersion ? [(feature as any).modVersion] : [])).length > 0 && (
+                                    <span>Mod: {feature.modVersions?.join(', ') || (feature as any).modVersion}</span>
+                                  )}
+                                  {feature.details && feature.details.length > 0 && (
+                                    <span>{feature.details.length} detail{feature.details.length !== 1 ? 's' : ''}</span>
+                                  )}
+                                </div>
                               </div>
-                              <p className="text-gray-400 text-sm mb-2 line-clamp-2">{feature.description}</p>
-                              <div className="flex flex-wrap gap-2 text-xs text-gray-500">
-                                <span>MC: {(feature.mcVersions || ((feature as any).version ? [(feature as any).version] : [])).join(', ') || 'N/A'}</span>
-                                {(feature.modVersions || ((feature as any).modVersion ? [(feature as any).modVersion] : [])).length > 0 && (
-                                  <span>Mod: {feature.modVersions?.join(', ') || (feature as any).modVersion}</span>
-                                )}
-                                {feature.details && feature.details.length > 0 && (
-                                  <span>{feature.details.length} detail{feature.details.length !== 1 ? 's' : ''}</span>
-                                )}
+                              <div className="flex gap-2 ml-4">
+                                <button
+                                  onClick={() => {
+                                    setEditingWikiFeature(feature);
+                                    // Handle migration from old format to new format
+                                    const oldFeature = feature as any;
+                                    setNewWikiFeature({
+                                      title: feature.title,
+                                      mcVersions: feature.mcVersions || (oldFeature.version ? [oldFeature.version] : []),
+                                      modVersions: feature.modVersions || (oldFeature.modVersion ? [oldFeature.modVersion] : []),
+                                      categories: feature.categories || (oldFeature.category ? [oldFeature.category] : []),
+                                      subcategories: feature.subcategories || (oldFeature.subcategory ? [oldFeature.subcategory] : []),
+                                      description: feature.description,
+                                      descriptionType: feature.descriptionType || 'text',
+                                      media: feature.media || (oldFeature.image || oldFeature.video),
+                                      details: feature.details || []
+                                    });
+                                    setNewDetail('');
+                                    setMediaPreview(feature.media || (feature as any).image || (feature as any).video || '');
+                                    setShowWikiModal(true);
+                                  }}
+                                  className="p-2 text-blue-400 hover:bg-blue-900/20 rounded-lg transition-colors"
+                                  title="Edit"
+                                >
+                                  <Edit size={16} />
+                                </button>
+                                <button
+                                  onClick={() => deleteWikiFeature(feature.id)}
+                                  className="p-2 text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
                               </div>
-                            </div>
-                            <div className="flex gap-2 ml-4">
-                              <button
-                                onClick={() => {
-                                  setEditingWikiFeature(feature);
-                                  // Handle migration from old format to new format
-                                  const oldFeature = feature as any;
-                                  setNewWikiFeature({
-                                    title: feature.title,
-                                    mcVersions: feature.mcVersions || (oldFeature.version ? [oldFeature.version] : []),
-                                    modVersions: feature.modVersions || (oldFeature.modVersion ? [oldFeature.modVersion] : []),
-                                    categories: feature.categories || (oldFeature.category ? [oldFeature.category] : []),
-                                    subcategories: feature.subcategories || (oldFeature.subcategory ? [oldFeature.subcategory] : []),
-                                    description: feature.description,
-                                    descriptionType: feature.descriptionType || 'text',
-                                    media: feature.media || (oldFeature.image || oldFeature.video),
-                                    details: feature.details || []
-                                  });
-                                  setNewDetail('');
-                                  setMediaPreview(feature.media || (feature as any).image || (feature as any).video || '');
-                                  setShowWikiModal(true);
-                                }}
-                                className="p-2 text-blue-400 hover:bg-blue-900/20 rounded-lg transition-colors"
-                                title="Edit"
-                              >
-                                <Edit size={16} />
-                              </button>
-                              <button
-                                onClick={() => deleteWikiFeature(feature.id)}
-                                className="p-2 text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
-                                title="Delete"
-                              >
-                                <Trash2 size={16} />
-                              </button>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
                     );
                   })()}
                 </div>
               </div>
             )}
-            
+
             {activeTab === 'config' && (
-                <div className="flex flex-col h-full min-h-0 w-full min-w-0">
-                     
-                     <div className="flex gap-2 border-b border-gray-800 flex-shrink-0 pb-2 mb-4 w-full">
-                        <button
-                            onClick={() => setConfigTab('home')}
-                            className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${
-                                configTab === 'home'
-                                    ? 'text-white border-blue-500'
-                                    : 'text-gray-400 border-transparent hover:text-gray-300'
-                            }`}
-                            title="Home"
-                        >
-                            <div className="flex items-center gap-2 whitespace-nowrap">
-                                <i className="fa fa-home" aria-hidden="true"></i>
-                                <span className="hidden md:inline">Home</span>
-                            </div>
-                        </button>
-                        <button
-                            onClick={() => setConfigTab('navbar')}
-                            className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${
-                                configTab === 'navbar'
-                                    ? 'text-white border-blue-500'
-                                    : 'text-gray-400 border-transparent hover:text-gray-300'
-                            }`}
-                            title="Navbar"
-                        >
-                            <div className="flex items-center gap-2 whitespace-nowrap">
-                                <i className="fa fa-bars" aria-hidden="true"></i>
-                                <span className="hidden md:inline">Navbar</span>
-                            </div>
-                        </button>
-                        <button
-                            onClick={() => setConfigTab('links')}
-                            className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${
-                                configTab === 'links'
-                                    ? 'text-white border-blue-500'
-                                    : 'text-gray-400 border-transparent hover:text-gray-300'
-                            }`}
-                            title="Links/Social"
-                        >
-                            <div className="flex items-center gap-2 whitespace-nowrap">
-                                <LinkIcon size={16} className="flex-shrink-0" />
-                                <span className="hidden md:inline">Links/Social</span>
-                            </div>
-                        </button>
-                        <button
-                            onClick={() => setConfigTab('footer')}
-                            className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${
-                                configTab === 'footer'
-                                    ? 'text-white border-blue-500'
-                                    : 'text-gray-400 border-transparent hover:text-gray-300'
-                            }`}
-                            title="Footer"
-                        >
-                            <div className="flex items-center gap-2 whitespace-nowrap">
-                                <i className="fa fa-window-minimize" aria-hidden="true"></i>
-                                <span className="hidden md:inline">Footer</span>
-                            </div>
-                        </button>
-                     </div>
+              <div className="flex flex-col h-full min-h-0 w-full min-w-0">
 
-                     
-                     <div className="flex-shrink-0 mb-2">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
-                        <h2 className="text-xl sm:text-2xl font-bold text-white">System Configuration</h2>
-                        <button onClick={saveGeneralConfig} className="bg-green-700 hover:bg-green-600 text-white px-3 sm:px-4 py-2 rounded font-bold flex items-center gap-2 text-xs sm:text-sm shadow-lg shadow-green-900/20 transition-all w-full sm:w-auto justify-center"><Save size={14} className="sm:w-4 sm:h-4" /> <span className="hidden sm:inline">Save All Changes</span><span className="sm:hidden">Save</span></button>
+                <div className="flex gap-2 border-b border-gray-800 flex-shrink-0 pb-2 mb-4 w-full">
+                  <button
+                    onClick={() => setConfigTab('home')}
+                    className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${configTab === 'home'
+                      ? 'text-white border-blue-500'
+                      : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
+                    title="Home"
+                  >
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <i className="fa fa-home" aria-hidden="true"></i>
+                      <span className="hidden md:inline">Home</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setConfigTab('navbar')}
+                    className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${configTab === 'navbar'
+                      ? 'text-white border-blue-500'
+                      : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
+                    title="Navbar"
+                  >
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <i className="fa fa-bars" aria-hidden="true"></i>
+                      <span className="hidden md:inline">Navbar</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setConfigTab('links')}
+                    className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${configTab === 'links'
+                      ? 'text-white border-blue-500'
+                      : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
+                    title="Links/Social"
+                  >
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <LinkIcon size={16} className="flex-shrink-0" />
+                      <span className="hidden md:inline">Links/Social</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setConfigTab('footer')}
+                    className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${configTab === 'footer'
+                      ? 'text-white border-blue-500'
+                      : 'text-gray-400 border-transparent hover:text-gray-300'
+                      }`}
+                    title="Footer"
+                  >
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      <i className="fa fa-window-minimize" aria-hidden="true"></i>
+                      <span className="hidden md:inline">Footer</span>
+                    </div>
+                  </button>
+                </div>
+
+
+                <div className="flex-shrink-0 mb-2">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                    <h2 className="text-xl sm:text-2xl font-bold text-white">System Configuration</h2>
+                    <button onClick={saveGeneralConfig} className="bg-green-700 hover:bg-green-600 text-white px-3 sm:px-4 py-2 rounded font-bold flex items-center gap-2 text-xs sm:text-sm shadow-lg shadow-green-900/20 transition-all w-full sm:w-auto justify-center"><Save size={14} className="sm:w-4 sm:h-4" /> <span className="hidden sm:inline">Save All Changes</span><span className="sm:hidden">Save</span></button>
+                  </div>
+                </div>
+
+
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2" style={{ willChange: 'scroll-position' }}>
+                  <div className="w-full min-w-0 max-w-full" style={{ contentVisibility: 'auto' }}>
+
+                    {configTab === 'home' && (
+                      <div className="space-y-6 w-full min-w-0" style={{ contentVisibility: 'auto' }}>
+                        <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
+                          <h3 className="text-sm font-bold text-gray-400 uppercase mb-4 flex items-center gap-2"><i className="fa fa-home" aria-hidden="true"></i> Home Page Content</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Headline</label>
+                              <input
+                                value={heroConfig.headline}
+                                onChange={(e) => setHeroConfig({ ...heroConfig, headline: e.target.value })}
+                                className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Subheadline</label>
+                              <input
+                                value={heroConfig.subheadline}
+                                onChange={(e) => setHeroConfig({ ...heroConfig, subheadline: e.target.value })}
+                                className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                              />
+                            </div>
+                            <div className="md:col-span-1">
+                              <label className="block text-xs text-gray-500 mb-1">Headline Color</label>
+                              <div className="flex gap-2 items-center">
+                                <input
+                                  type="color"
+                                  value={(() => {
+                                    const color = heroConfig.headlineColor || '';
+                                    const hexMatch = color.match(/#[0-9a-fA-F]{6}/);
+                                    return hexMatch ? hexMatch[0] : '#34d399';
+                                  })()}
+                                  onChange={(e) => setHeroConfig({ ...heroConfig, headlineColor: e.target.value })}
+                                  className="w-12 h-10 bg-black/30 border border-gray-700 rounded cursor-pointer flex-shrink-0"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="#34d399 or linear-gradient(to right, #34d399, #059669)"
+                                  value={heroConfig.headlineColor || ''}
+                                  onChange={(e) => setHeroConfig({ ...heroConfig, headlineColor: e.target.value })}
+                                  className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                                />
+                              </div>
+                              <p className="text-[10px] text-gray-500 mt-1">Hex color (e.g., #34d399) or CSS gradient</p>
+                            </div>
+                            <div className="md:col-span-1">
+                              <label className="block text-xs text-gray-500 mb-1">Headline Glow Color</label>
+                              <div className="flex gap-2 items-center">
+                                <input
+                                  type="color"
+                                  value={(() => {
+                                    const color = heroConfig.headlineGlowColor || '';
+                                    const hexMatch = color.match(/#[0-9a-fA-F]{6}/);
+                                    return hexMatch ? hexMatch[0] : '#34d399';
+                                  })()}
+                                  onChange={(e) => setHeroConfig({ ...heroConfig, headlineGlowColor: e.target.value })}
+                                  className="w-12 h-10 bg-black/30 border border-gray-700 rounded cursor-pointer flex-shrink-0"
+                                />
+                                <input
+                                  type="text"
+                                  placeholder="#34d399 or rgb(52, 211, 153)"
+                                  value={heroConfig.headlineGlowColor || ''}
+                                  onChange={(e) => setHeroConfig({ ...heroConfig, headlineGlowColor: e.target.value })}
+                                  className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                                />
+                              </div>
+                              <p className="text-[10px] text-gray-500 mt-1">Hex color (e.g., #34d399) or CSS gradient</p>
+                            </div>
+                            <div className="md:col-span-2">
+                              <label className="block text-xs text-gray-500 mb-1">Description</label>
+                              <textarea
+                                value={heroConfig.description}
+                                onChange={(e) => setHeroConfig({ ...heroConfig, description: e.target.value })}
+                                className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                                rows={3}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Latest Mod Version</label>
+                              <input
+                                value={heroConfig.latestModVersion}
+                                onChange={(e) => setHeroConfig({ ...heroConfig, latestModVersion: e.target.value })}
+                                className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-500 mb-1">Latest MC Versions</label>
+                              <input
+                                value={heroConfig.latestMcVersions}
+                                onChange={(e) => setHeroConfig({ ...heroConfig, latestMcVersions: e.target.value })}
+                                className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                              />
+                            </div>
+                          </div>
                         </div>
-                     </div>
 
-                     
-                     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2" style={{ willChange: 'scroll-position' }}>
-                     <div className="w-full min-w-0 max-w-full" style={{ contentVisibility: 'auto' }}>
-                     
-                     {configTab === 'home' && (
-                     <div className="space-y-6 w-full min-w-0" style={{ contentVisibility: 'auto' }}>
-                     <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
-                         <h3 className="text-sm font-bold text-gray-400 uppercase mb-4 flex items-center gap-2"><i className="fa fa-home" aria-hidden="true"></i> Home Page Content</h3>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
-                             <div>
-                                 <label className="block text-xs text-gray-500 mb-1">Headline</label>
-                                 <input 
-                                     value={heroConfig.headline} 
-                                     onChange={(e) => setHeroConfig({...heroConfig, headline: e.target.value})} 
-                                     className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" 
-                                 />
-                             </div>
-                             <div>
-                                 <label className="block text-xs text-gray-500 mb-1">Subheadline</label>
-                                 <input 
-                                     value={heroConfig.subheadline} 
-                                     onChange={(e) => setHeroConfig({...heroConfig, subheadline: e.target.value})} 
-                                     className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" 
-                                 />
-                             </div>
-                            <div className="md:col-span-1">
-                                <label className="block text-xs text-gray-500 mb-1">Headline Color</label>
-                                <div className="flex gap-2 items-center">
-                                    <input 
-                                        type="color" 
-                                        value={(() => {
-                                            const color = heroConfig.headlineColor || '';
-                                            const hexMatch = color.match(/#[0-9a-fA-F]{6}/);
-                                            return hexMatch ? hexMatch[0] : '#34d399';
-                                        })()} 
-                                        onChange={(e) => setHeroConfig({...heroConfig, headlineColor: e.target.value})} 
-                                        className="w-12 h-10 bg-black/30 border border-gray-700 rounded cursor-pointer flex-shrink-0" 
-                                    />
-                                    <input 
-                                        type="text" 
-                                        placeholder="#34d399 or linear-gradient(to right, #34d399, #059669)" 
-                                        value={heroConfig.headlineColor || ''} 
-                                        onChange={(e) => setHeroConfig({...heroConfig, headlineColor: e.target.value})} 
-                                        className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" 
-                                    />
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full min-w-0">
+                          <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
+                            <h3 className="text-sm font-bold text-gray-400 uppercase mb-4">Minecraft Versions</h3>
+                            <div className="flex gap-2 mb-4"><input placeholder="e.g. 1.21" value={configMcVer} onChange={e => setConfigMcVer(e.target.value)} className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /><button onClick={() => { if (configMcVer) { onUpdateConfig({ ...config, mcVersions: [configMcVer, ...config.mcVersions] }); setConfigMcVer(""); } }} className="bg-blue-600 text-white px-3 py-2 rounded"><Plus size={18} /></button></div>
+                            <div className="flex flex-wrap gap-2">{config.mcVersions.map(v => <span key={v} className="px-3 py-1.5 bg-gray-800 rounded text-sm text-gray-300 border border-gray-700 flex items-center gap-2 group">{v}<button onClick={() => onUpdateConfig({ ...config, mcVersions: config.mcVersions.filter(x => x !== v) })} className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100"><X size={14} /></button></span>)}</div>
+                          </div>
+                          <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
+                            <h3 className="text-sm font-bold text-gray-400 uppercase mb-4">Mod Versions</h3>
+                            <div className="flex gap-2 mb-4"><input placeholder="e.g. 1.6.0" value={configModVer} onChange={e => setConfigModVer(e.target.value)} className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /><button onClick={() => { if (configModVer) { onUpdateConfig({ ...config, modVersions: [configModVer, ...config.modVersions] }); setConfigModVer(""); } }} className="bg-blue-600 text-white px-3 py-2 rounded"><Plus size={18} /></button></div>
+                            <div className="flex flex-wrap gap-2">{config.modVersions.map(v => <span key={v} className="px-3 py-1.5 bg-gray-800 rounded text-sm text-gray-300 border border-gray-700 flex items-center gap-2 group">{v}<button onClick={() => onUpdateConfig({ ...config, modVersions: config.modVersions.filter(x => x !== v) })} className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100"><X size={14} /></button></span>)}</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+
+                    {configTab === 'navbar' && (
+                      <div className="space-y-6 animate-fadeIn w-full min-w-0" style={{ contentVisibility: 'auto' }}>
+                        <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
+                          <h3 className="text-sm font-bold text-gray-400 uppercase mb-4 flex items-center gap-2"><Settings size={16} /> Navbar Icon Configuration</h3>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                            <div className="flex flex-col">
+                              <label className="block text-xs text-gray-500 mb-2">Website Icon</label>
+                              <div className="relative mb-4">
+                                {navbarIconConfig.icon ? (
+                                  <img
+                                    src={navbarIconConfig.icon}
+                                    alt="Navbar Icon"
+                                    className="border-2 border-gray-700"
+                                    style={{
+                                      width: `${navbarIconConfig.size || 40}px`,
+                                      height: `${navbarIconConfig.size || 40}px`,
+                                      borderRadius: `${navbarIconConfig.borderRadius || 8}px`,
+                                      backgroundColor: navbarIconConfig.backgroundColor === 'transparent' ? 'transparent' : navbarIconConfig.backgroundColor || 'transparent',
+                                      opacity: navbarIconConfig.backgroundOpacity || 1,
+                                      padding: `${navbarIconConfig.padding || 0}px`,
+                                      border: `${navbarIconConfig.borderWidth || 0}px solid ${navbarIconConfig.borderColor === 'transparent' ? 'transparent' : navbarIconConfig.borderColor || 'transparent'}`,
+                                      objectFit: 'contain'
+                                    }}
+                                  />
+                                ) : (
+                                  <div
+                                    className="border-2 border-dashed border-gray-700 flex items-center justify-center bg-gray-900/50"
+                                    style={{
+                                      width: `${navbarIconConfig.size || 40}px`,
+                                      height: `${navbarIconConfig.size || 40}px`,
+                                      borderRadius: `${navbarIconConfig.borderRadius || 8}px`
+                                    }}
+                                  >
+                                    <Upload size={20} className="text-gray-500" />
+                                  </div>
+                                )}
+                              </div>
+
+
+                              <div className="mt-auto hidden md:block">
+                                <div
+                                  className={`bg-green-900/20 border-2 rounded-lg px-3 py-2 transition-colors ${navbarDragActive
+                                    ? 'border-green-500 bg-green-900/40'
+                                    : 'border-green-500/30'
+                                    }`}
+                                  onDragEnter={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setNavbarDragActive(true);
+                                  }}
+                                  onDragLeave={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+
+                                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                                      setNavbarDragActive(false);
+                                    }
+                                  }}
+                                  onDragOver={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                  }}
+                                  onDrop={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setNavbarDragActive(false);
+
+                                    const file = e.dataTransfer.files?.[0];
+                                    if (file && file.type.startsWith('image/')) {
+                                      setNavbarIsUploading(true);
+                                      setNavbarUploadProgress(0);
+
+                                      const reader = new FileReader();
+                                      reader.onprogress = (event) => {
+                                        if (event.lengthComputable) {
+                                          const progress = Math.round((event.loaded / event.total) * 100);
+                                          setNavbarUploadProgress(progress);
+                                        }
+                                      };
+                                      reader.onloadend = () => {
+                                        if (reader.result) {
+                                          const base64 = reader.result as string;
+
+                                          setNavbarOriginalImage(base64);
+
+                                          setNavbarIconConfig({ ...navbarIconConfig, icon: base64 });
+                                          setNavbarUploadProgress(100);
+                                          setTimeout(() => {
+                                            setNavbarIsUploading(false);
+                                            setNavbarUploadProgress(0);
+                                          }, 300);
+                                        } else {
+                                          setNavbarIsUploading(false);
+                                          setNavbarUploadProgress(0);
+                                        }
+                                      };
+                                      reader.onerror = () => {
+                                        setNavbarIsUploading(false);
+                                        setNavbarUploadProgress(0);
+                                      };
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                >
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file && file.type.startsWith('image/')) {
+                                        setNavbarIsUploading(true);
+                                        setNavbarUploadProgress(0);
+
+                                        const reader = new FileReader();
+                                        reader.onprogress = (event) => {
+                                          if (event.lengthComputable) {
+                                            const progress = Math.round((event.loaded / event.total) * 100);
+                                            setNavbarUploadProgress(progress);
+                                          }
+                                        };
+                                        reader.onloadend = () => {
+                                          if (reader.result) {
+                                            const base64 = reader.result as string;
+
+                                            setNavbarOriginalImage(base64);
+
+                                            setNavbarIconConfig({ ...navbarIconConfig, icon: base64 });
+                                            setNavbarUploadProgress(100);
+                                            setTimeout(() => {
+                                              setNavbarIsUploading(false);
+                                              setNavbarUploadProgress(0);
+                                            }, 300);
+                                          } else {
+                                            setNavbarIsUploading(false);
+                                            setNavbarUploadProgress(0);
+                                          }
+                                        };
+                                        reader.onerror = () => {
+                                          setNavbarIsUploading(false);
+                                          setNavbarUploadProgress(0);
+                                        };
+                                        reader.readAsDataURL(file);
+                                      }
+                                      if (e.target) e.target.value = '';
+                                    }}
+                                    className="hidden"
+                                    id="navbar-icon-upload"
+                                  />
+                                  <div className="flex flex-col gap-2 mb-1">
+                                    <button
+                                      onClick={() => document.getElementById('navbar-icon-upload')?.click()}
+                                      className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
+                                      title={navbarIconConfig.icon ? 'Change Icon' : 'Upload Icon'}
+                                    >
+                                      <Upload size={14} />
+                                      <span className="hidden sm:inline">{navbarIconConfig.icon ? 'Change Icon' : 'Upload Icon'}</span>
+                                    </button>
+                                    {navbarIconConfig.icon && (
+                                      <button
+                                        onClick={() => {
+
+                                          const imageToCrop = navbarOriginalImage || navbarIconConfig.icon;
+                                          if (imageToCrop) {
+
+                                            if (!navbarOriginalImage && navbarIconConfig.icon) {
+                                              setNavbarOriginalImage(navbarIconConfig.icon);
+                                            }
+                                            setShowNavbarCropEditor(true);
+                                            setNavbarCropScale(1);
+                                            setNavbarCropPosition({ x: 0, y: 0 });
+                                          }
+                                        }}
+                                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
+                                        title="Crop"
+                                      >
+                                        <Crop size={14} />
+                                        <span className="hidden sm:inline">Crop</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-gray-500 leading-tight">
+                                    {navbarDragActive ? 'Drop image here' : 'Recommended: Square image (e.g., 128x128px)'}
+                                  </p>
                                 </div>
-                                <p className="text-[10px] text-gray-500 mt-1">Hex color (e.g., #34d399) or CSS gradient</p>
+                              </div>
                             </div>
-                            <div className="md:col-span-1">
-                                <label className="block text-xs text-gray-500 mb-1">Headline Glow Color</label>
-                                <div className="flex gap-2 items-center">
-                                    <input 
-                                        type="color" 
-                                        value={(() => {
-                                            const color = heroConfig.headlineGlowColor || '';
-                                            const hexMatch = color.match(/#[0-9a-fA-F]{6}/);
-                                            return hexMatch ? hexMatch[0] : '#34d399';
-                                        })()} 
-                                        onChange={(e) => setHeroConfig({...heroConfig, headlineGlowColor: e.target.value})} 
-                                        className="w-12 h-10 bg-black/30 border border-gray-700 rounded cursor-pointer flex-shrink-0" 
-                                    />
-                                    <input 
-                                        type="text" 
-                                        placeholder="#34d399 or rgb(52, 211, 153)" 
-                                        value={heroConfig.headlineGlowColor || ''} 
-                                        onChange={(e) => setHeroConfig({...heroConfig, headlineGlowColor: e.target.value})} 
-                                        className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" 
-                                    />
+
+
+                            <div>
+
+                              {navbarIsUploading && (
+                                <div className="mb-3">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs text-gray-400">Uploading icon...</span>
+                                    <span className="text-xs text-gray-400">{navbarUploadProgress}%</span>
+                                  </div>
+                                  <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+                                    <div
+                                      className="bg-green-500 h-full transition-all duration-300 ease-out"
+                                      style={{ width: `${navbarUploadProgress}%` }}
+                                    ></div>
+                                  </div>
                                 </div>
-                                <p className="text-[10px] text-gray-500 mt-1">Hex color (e.g., #34d399) or CSS gradient</p>
+                              )}
+
+                              <div className="md:hidden mb-2">
+                                <div className="flex flex-row gap-1.5">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file && file.type.startsWith('image/')) {
+                                        setNavbarIsUploading(true);
+                                        setNavbarUploadProgress(0);
+
+                                        const reader = new FileReader();
+                                        reader.onprogress = (event) => {
+                                          if (event.lengthComputable) {
+                                            const progress = Math.round((event.loaded / event.total) * 100);
+                                            setNavbarUploadProgress(progress);
+                                          }
+                                        };
+                                        reader.onloadend = () => {
+                                          if (reader.result) {
+                                            const base64 = reader.result as string;
+                                            setNavbarOriginalImage(base64);
+                                            setNavbarIconConfig({ ...navbarIconConfig, icon: base64 });
+                                            setNavbarUploadProgress(100);
+                                            setTimeout(() => {
+                                              setNavbarIsUploading(false);
+                                              setNavbarUploadProgress(0);
+                                            }, 300);
+                                          } else {
+                                            setNavbarIsUploading(false);
+                                            setNavbarUploadProgress(0);
+                                          }
+                                        };
+                                        reader.onerror = () => {
+                                          setNavbarIsUploading(false);
+                                          setNavbarUploadProgress(0);
+                                        };
+                                        reader.readAsDataURL(file);
+                                      }
+                                      if (e.target) e.target.value = '';
+                                    }}
+                                    className="hidden"
+                                    id="navbar-icon-upload-mobile"
+                                  />
+                                  <button
+                                    onClick={() => document.getElementById('navbar-icon-upload-mobile')?.click()}
+                                    className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors flex items-center justify-center text-xs"
+                                    title={navbarIconConfig.icon ? 'Change Icon' : 'Upload Icon'}
+                                  >
+                                    <Upload size={12} />
+                                  </button>
+                                  {navbarIconConfig.icon && (
+                                    <>
+                                      <button
+                                        onClick={() => {
+                                          const imageToCrop = navbarOriginalImage || navbarIconConfig.icon;
+                                          if (imageToCrop) {
+                                            if (!navbarOriginalImage && navbarIconConfig.icon) {
+                                              setNavbarOriginalImage(navbarIconConfig.icon);
+                                            }
+                                            setShowNavbarCropEditor(true);
+                                            setNavbarCropScale(1);
+                                            setNavbarCropPosition({ x: 0, y: 0 });
+                                          }
+                                        }}
+                                        className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center text-xs"
+                                        title="Crop"
+                                      >
+                                        <Crop size={12} />
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setNavbarIconConfig({ ...navbarIconConfig, icon: undefined });
+                                          setNavbarOriginalImage('');
+                                        }}
+                                        className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center justify-center text-xs"
+                                        title="Remove Icon"
+                                      >
+                                        <Trash2 size={12} />
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setNavbarIconConfig({
+                                            ...navbarIconConfig,
+                                            size: 40,
+                                            borderRadius: 8,
+                                            backgroundColor: 'transparent',
+                                            backgroundOpacity: 1,
+                                            padding: 0,
+                                            borderColor: 'transparent',
+                                            borderWidth: 0
+                                          });
+                                          setNavbarPreviewZoom(1);
+                                        }}
+                                        className="px-2 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors flex items-center justify-center text-xs"
+                                        title="Reset All Settings"
+                                      >
+                                        <RotateCcw size={12} />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between mb-2">
+                                <label className="block text-xs text-gray-500">Preview</label>
+                                {navbarIconConfig.icon && (
+                                  <div className="hidden md:flex flex-row gap-2">
+                                    <button
+                                      onClick={() => {
+                                        setNavbarIconConfig({ ...navbarIconConfig, icon: undefined });
+                                        setNavbarOriginalImage('');
+                                      }}
+                                      className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
+                                      title="Remove Icon"
+                                    >
+                                      <Trash2 size={14} />
+                                      <span className="hidden sm:inline">Remove</span>
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setNavbarIconConfig({
+                                          ...navbarIconConfig,
+                                          size: 40,
+                                          borderRadius: 8,
+                                          backgroundColor: 'transparent',
+                                          backgroundOpacity: 1,
+                                          padding: 0,
+                                          borderColor: 'transparent',
+                                          borderWidth: 0
+                                        });
+                                        setNavbarPreviewZoom(1);
+                                      }}
+                                      className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
+                                      title="Reset All Settings"
+                                    >
+                                      <RotateCcw size={14} />
+                                      <span className="hidden sm:inline">Reset All</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="bg-gray-900/50 border-2 border-gray-700 rounded-lg p-8 flex items-center justify-center flex-1" style={{ minHeight: '200px', width: '100%' }}>
+                                {navbarIconConfig.icon ? (
+                                  <div
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      maxWidth: '100%',
+                                      maxHeight: '100%'
+                                    }}
+                                  >
+                                    <img
+                                      src={navbarIconConfig.icon}
+                                      alt="Preview"
+                                      style={{
+                                        maxWidth: '100%',
+                                        maxHeight: '100%',
+                                        width: 'auto',
+                                        height: 'auto',
+                                        borderRadius: `${navbarIconConfig.borderRadius || 8}px`,
+                                        backgroundColor: navbarIconConfig.backgroundColor === 'transparent' ? 'transparent' : navbarIconConfig.backgroundColor || 'transparent',
+                                        opacity: navbarIconConfig.backgroundOpacity || 1,
+                                        padding: `${navbarIconConfig.padding || 0}px`,
+                                        border: `${navbarIconConfig.borderWidth || 0}px solid ${navbarIconConfig.borderColor === 'transparent' ? 'transparent' : navbarIconConfig.borderColor || 'transparent'}`,
+                                        objectFit: 'contain',
+                                        transition: 'all 0.2s ease'
+                                      }}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="text-gray-500 text-sm">Upload an icon to see preview</div>
+                                )}
+                              </div>
                             </div>
-                             <div className="md:col-span-2">
-                                 <label className="block text-xs text-gray-500 mb-1">Description</label>
-                                 <textarea 
-                                     value={heroConfig.description} 
-                                     onChange={(e) => setHeroConfig({...heroConfig, description: e.target.value})} 
-                                     className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" 
-                                     rows={3} 
-                                 />
-                             </div>
-                             <div>
-                                 <label className="block text-xs text-gray-500 mb-1">Latest Mod Version</label>
-                                 <input 
-                                     value={heroConfig.latestModVersion} 
-                                     onChange={(e) => setHeroConfig({...heroConfig, latestModVersion: e.target.value})} 
-                                     className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" 
-                                 />
-                         </div>
-                             <div>
-                                 <label className="block text-xs text-gray-500 mb-1">Latest MC Versions</label>
-                                 <input 
-                                     value={heroConfig.latestMcVersions} 
-                                     onChange={(e) => setHeroConfig({...heroConfig, latestMcVersions: e.target.value})} 
-                                     className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" 
-                                 />
-                     </div>
-                         </div>
-                     </div>
-                     
-                     
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full min-w-0">
-                         <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
-                             <h3 className="text-sm font-bold text-gray-400 uppercase mb-4">Minecraft Versions</h3>
-                             <div className="flex gap-2 mb-4"><input placeholder="e.g. 1.21" value={configMcVer} onChange={e => setConfigMcVer(e.target.value)} className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /><button onClick={() => { if(configMcVer) { onUpdateConfig({...config, mcVersions: [configMcVer, ...config.mcVersions]}); setConfigMcVer(""); }}} className="bg-blue-600 text-white px-3 py-2 rounded"><Plus size={18}/></button></div>
-                             <div className="flex flex-wrap gap-2">{config.mcVersions.map(v => <span key={v} className="px-3 py-1.5 bg-gray-800 rounded text-sm text-gray-300 border border-gray-700 flex items-center gap-2 group">{v}<button onClick={() => onUpdateConfig({...config, mcVersions: config.mcVersions.filter(x => x !== v)})} className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100"><X size={14}/></button></span>)}</div>
-                         </div>
-                         <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
-                             <h3 className="text-sm font-bold text-gray-400 uppercase mb-4">Mod Versions</h3>
-                             <div className="flex gap-2 mb-4"><input placeholder="e.g. 1.6.0" value={configModVer} onChange={e => setConfigModVer(e.target.value)} className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /><button onClick={() => { if(configModVer) { onUpdateConfig({...config, modVersions: [configModVer, ...config.modVersions]}); setConfigModVer(""); }}} className="bg-blue-600 text-white px-3 py-2 rounded"><Plus size={18}/></button></div>
-                             <div className="flex flex-wrap gap-2">{config.modVersions.map(v => <span key={v} className="px-3 py-1.5 bg-gray-800 rounded text-sm text-gray-300 border border-gray-700 flex items-center gap-2 group">{v}<button onClick={() => onUpdateConfig({...config, modVersions: config.modVersions.filter(x => x !== v)})} className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100"><X size={14}/></button></span>)}</div>
-                         </div>
-                     </div>
-                     </div>
-                     )}
+                          </div>
 
-                     
-                     {configTab === 'navbar' && (
-                     <div className="space-y-6 animate-fadeIn w-full min-w-0" style={{ contentVisibility: 'auto' }}>
-                     <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
-                         <h3 className="text-sm font-bold text-gray-400 uppercase mb-4 flex items-center gap-2"><Settings size={16} /> Navbar Icon Configuration</h3>
-                         
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                             
-                             <div className="flex flex-col">
-                                 <label className="block text-xs text-gray-500 mb-2">Website Icon</label>
-                                 <div className="relative mb-4">
-                                     {navbarIconConfig.icon ? (
-                                         <img 
-                                             src={navbarIconConfig.icon} 
-                                             alt="Navbar Icon" 
-                                             className="border-2 border-gray-700"
-                                             style={{
-                                                 width: `${navbarIconConfig.size || 40}px`,
-                                                 height: `${navbarIconConfig.size || 40}px`,
-                                                 borderRadius: `${navbarIconConfig.borderRadius || 8}px`,
-                                                 backgroundColor: navbarIconConfig.backgroundColor === 'transparent' ? 'transparent' : navbarIconConfig.backgroundColor || 'transparent',
-                                                 opacity: navbarIconConfig.backgroundOpacity || 1,
-                                                 padding: `${navbarIconConfig.padding || 0}px`,
-                                                 border: `${navbarIconConfig.borderWidth || 0}px solid ${navbarIconConfig.borderColor === 'transparent' ? 'transparent' : navbarIconConfig.borderColor || 'transparent'}`,
-                                                 objectFit: 'contain'
-                                             }}
-                                         />
-                                     ) : (
-                                         <div 
-                                             className="border-2 border-dashed border-gray-700 flex items-center justify-center bg-gray-900/50"
-                                             style={{
-                                                 width: `${navbarIconConfig.size || 40}px`,
-                                                 height: `${navbarIconConfig.size || 40}px`,
-                                                 borderRadius: `${navbarIconConfig.borderRadius || 8}px`
-                                             }}
-                                         >
-                                             <Upload size={20} className="text-gray-500" />
-                                         </div>
-                                     )}
-                                 </div>
-                                 
-                                 
-                                 <div className="mt-auto hidden md:block">
-                                     <div 
-                                         className={`bg-green-900/20 border-2 rounded-lg px-3 py-2 transition-colors ${
-                                             navbarDragActive 
-                                                 ? 'border-green-500 bg-green-900/40' 
-                                                 : 'border-green-500/30'
-                                         }`}
-                                         onDragEnter={(e) => {
-                                             e.preventDefault();
-                                             e.stopPropagation();
-                                             setNavbarDragActive(true);
-                                         }}
-                                         onDragLeave={(e) => {
-                                             e.preventDefault();
-                                             e.stopPropagation();
 
-                                             if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                                                 setNavbarDragActive(false);
-                                             }
-                                         }}
-                                         onDragOver={(e) => {
-                                             e.preventDefault();
-                                             e.stopPropagation();
-                                         }}
-                                         onDrop={(e) => {
-                                             e.preventDefault();
-                                             e.stopPropagation();
-                                             setNavbarDragActive(false);
-                                             
-                                             const file = e.dataTransfer.files?.[0];
-                                             if (file && file.type.startsWith('image/')) {
-                                                 setNavbarIsUploading(true);
-                                                 setNavbarUploadProgress(0);
-                                                 
-                                                 const reader = new FileReader();
-                                                 reader.onprogress = (event) => {
-                                                     if (event.lengthComputable) {
-                                                         const progress = Math.round((event.loaded / event.total) * 100);
-                                                         setNavbarUploadProgress(progress);
-                                                     }
-                                                 };
-                                                 reader.onloadend = () => {
-                                                     if (reader.result) {
-                                                         const base64 = reader.result as string;
+                          <div className="space-y-3 border-t border-gray-800 pt-4 mt-6">
 
-                                                         setNavbarOriginalImage(base64);
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <label className="block text-xs text-gray-500">Size: {navbarIconConfig.size || 40}px</label>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => {
+                                      const newSize = Math.max(20, (navbarIconConfig.size || 40) - 1);
+                                      setNavbarIconConfig({ ...navbarIconConfig, size: newSize });
 
-                                                         setNavbarIconConfig({...navbarIconConfig, icon: base64});
-                                                         setNavbarUploadProgress(100);
-                                                         setTimeout(() => {
-                                                             setNavbarIsUploading(false);
-                                                             setNavbarUploadProgress(0);
-                                                         }, 300);
-                                                     } else {
-                                                         setNavbarIsUploading(false);
-                                                         setNavbarUploadProgress(0);
-                                                     }
-                                                 };
-                                                 reader.onerror = () => {
-                                                     setNavbarIsUploading(false);
-                                                     setNavbarUploadProgress(0);
-                                                 };
-                                                 reader.readAsDataURL(file);
-                                             }
-                                         }}
-                                     >
-                                         <input
-                                             type="file"
-                                             accept="image/*"
-                                             onChange={(e) => {
-                                                 const file = e.target.files?.[0];
-                                                 if (file && file.type.startsWith('image/')) {
-                                                     setNavbarIsUploading(true);
-                                                     setNavbarUploadProgress(0);
-                                                     
-                                                     const reader = new FileReader();
-                                                     reader.onprogress = (event) => {
-                                                         if (event.lengthComputable) {
-                                                             const progress = Math.round((event.loaded / event.total) * 100);
-                                                             setNavbarUploadProgress(progress);
-                                                         }
-                                                     };
-                                                     reader.onloadend = () => {
-                                                         if (reader.result) {
-                                                             const base64 = reader.result as string;
+                                      const baseSize = 40;
+                                      const inverseSize = 2 * baseSize - newSize;
+                                      const newZoom = inverseSize / newSize;
+                                      setNavbarPreviewZoom(newZoom);
+                                    }}
+                                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                                    title="Decrease Size"
+                                  >
+                                    <Minimize2 size={12} />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const newSize = Math.min(200, (navbarIconConfig.size || 40) + 1);
+                                      setNavbarIconConfig({ ...navbarIconConfig, size: newSize });
 
-                                                             setNavbarOriginalImage(base64);
+                                      const baseSize = 40;
+                                      const inverseSize = 2 * baseSize - newSize;
+                                      const newZoom = inverseSize / newSize;
+                                      setNavbarPreviewZoom(newZoom);
+                                    }}
+                                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                                    title="Increase Size"
+                                  >
+                                    <Maximize2 size={12} />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setNavbarIconConfig({ ...navbarIconConfig, size: 40 });
+                                      setNavbarPreviewZoom(1);
+                                    }}
+                                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                                  >
+                                    Reset
+                                  </button>
+                                </div>
+                              </div>
+                              <input
+                                type="range"
+                                min="20"
+                                max="200"
+                                value={navbarIconConfig.size || 40}
+                                onChange={(e) => {
+                                  const newSize = parseInt(e.target.value) || 40;
+                                  setNavbarIconConfig({ ...navbarIconConfig, size: newSize });
 
-                                                             setNavbarIconConfig({...navbarIconConfig, icon: base64});
-                                                             setNavbarUploadProgress(100);
-                                                             setTimeout(() => {
-                                                                 setNavbarIsUploading(false);
-                                                                 setNavbarUploadProgress(0);
-                                                             }, 300);
-                                                         } else {
-                                                             setNavbarIsUploading(false);
-                                                             setNavbarUploadProgress(0);
-                                                         }
-                                                     };
-                                                     reader.onerror = () => {
-                                                         setNavbarIsUploading(false);
-                                                         setNavbarUploadProgress(0);
-                                                     };
-                                                     reader.readAsDataURL(file);
-                                                 }
-                                                 if (e.target) e.target.value = '';
-                                             }}
-                                             className="hidden"
-                                             id="navbar-icon-upload"
-                                         />
-                                         <div className="flex flex-col gap-2 mb-1">
-                                             <button
-                                                 onClick={() => document.getElementById('navbar-icon-upload')?.click()}
-                                                 className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
-                                                 title={navbarIconConfig.icon ? 'Change Icon' : 'Upload Icon'}
-                                             >
-                                                 <Upload size={14} />
-                                                 <span className="hidden sm:inline">{navbarIconConfig.icon ? 'Change Icon' : 'Upload Icon'}</span>
-                                             </button>
-                                             {navbarIconConfig.icon && (
-                                                 <button
-                                                     onClick={() => {
+                                  const baseSize = 40;
+                                  const inverseSize = 2 * baseSize - newSize;
+                                  const newZoom = inverseSize / newSize;
+                                  setNavbarPreviewZoom(newZoom);
+                                }}
+                                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                style={{ accentColor: '#22c55e' }}
+                              />
+                            </div>
 
-                                                         const imageToCrop = navbarOriginalImage || navbarIconConfig.icon;
-                                                         if (imageToCrop) {
 
-                                                             if (!navbarOriginalImage && navbarIconConfig.icon) {
-                                                                 setNavbarOriginalImage(navbarIconConfig.icon);
-                                                             }
-                                                             setShowNavbarCropEditor(true);
-                                                             setNavbarCropScale(1);
-                                                             setNavbarCropPosition({ x: 0, y: 0 });
-                                                         }
-                                                     }}
-                                                     className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
-                                                     title="Crop"
-                                                 >
-                                                     <Crop size={14} />
-                                                     <span className="hidden sm:inline">Crop</span>
-                                                 </button>
-                                             )}
-                                         </div>
-                                         <p className="text-[10px] text-gray-500 leading-tight">
-                                             {navbarDragActive ? 'Drop image here' : 'Recommended: Square image (e.g., 128x128px)'}
-                                         </p>
-                                     </div>
-                                 </div>
-                             </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <label className="block text-xs text-gray-500">Roundness: {navbarIconConfig.borderRadius || 8}px</label>
+                                  <button
+                                    onClick={() => setNavbarIconConfig({ ...navbarIconConfig, borderRadius: 8 })}
+                                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                                  >
+                                    Reset
+                                  </button>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="50"
+                                  value={navbarIconConfig.borderRadius || 8}
+                                  onChange={(e) => setNavbarIconConfig({ ...navbarIconConfig, borderRadius: parseInt(e.target.value) || 0 })}
+                                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                  style={{ accentColor: '#22c55e' }}
+                                />
+                              </div>
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <label className="block text-xs text-gray-500">Opacity: {Math.round((navbarIconConfig.backgroundOpacity || 1) * 100)}%</label>
+                                  <button
+                                    onClick={() => setNavbarIconConfig({ ...navbarIconConfig, backgroundOpacity: 1 })}
+                                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                                  >
+                                    Reset
+                                  </button>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="1"
+                                  step="0.01"
+                                  value={navbarIconConfig.backgroundOpacity || 1}
+                                  onChange={(e) => setNavbarIconConfig({ ...navbarIconConfig, backgroundOpacity: parseFloat(e.target.value) || 1 })}
+                                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                  style={{ accentColor: '#22c55e' }}
+                                />
+                              </div>
+                            </div>
 
-                             
-                             <div>
-                                 
-                                 {navbarIsUploading && (
-                                     <div className="mb-3">
-                                         <div className="flex items-center justify-between mb-1">
-                                             <span className="text-xs text-gray-400">Uploading icon...</span>
-                                             <span className="text-xs text-gray-400">{navbarUploadProgress}%</span>
-                                         </div>
-                                         <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
-                                             <div 
-                                                 className="bg-green-500 h-full transition-all duration-300 ease-out"
-                                                 style={{ width: `${navbarUploadProgress}%` }}
-                                             ></div>
-                                         </div>
-                                     </div>
-                                 )}
-                                 
-                                 <div className="md:hidden mb-2">
-                                     <div className="flex flex-row gap-1.5">
-                                         <input
-                                             type="file"
-                                             accept="image/*"
-                                             onChange={(e) => {
-                                                 const file = e.target.files?.[0];
-                                                 if (file && file.type.startsWith('image/')) {
-                                                     setNavbarIsUploading(true);
-                                                     setNavbarUploadProgress(0);
-                                                     
-                                                     const reader = new FileReader();
-                                                     reader.onprogress = (event) => {
-                                                         if (event.lengthComputable) {
-                                                             const progress = Math.round((event.loaded / event.total) * 100);
-                                                             setNavbarUploadProgress(progress);
-                                                         }
-                                                     };
-                                                     reader.onloadend = () => {
-                                                         if (reader.result) {
-                                                             const base64 = reader.result as string;
-                                                             setNavbarOriginalImage(base64);
-                                                             setNavbarIconConfig({...navbarIconConfig, icon: base64});
-                                                             setNavbarUploadProgress(100);
-                                                             setTimeout(() => {
-                                                                 setNavbarIsUploading(false);
-                                                                 setNavbarUploadProgress(0);
-                                                             }, 300);
-                                                         } else {
-                                                             setNavbarIsUploading(false);
-                                                             setNavbarUploadProgress(0);
-                                                         }
-                                                     };
-                                                     reader.onerror = () => {
-                                                         setNavbarIsUploading(false);
-                                                         setNavbarUploadProgress(0);
-                                                     };
-                                                     reader.readAsDataURL(file);
-                                                 }
-                                                 if (e.target) e.target.value = '';
-                                             }}
-                                             className="hidden"
-                                             id="navbar-icon-upload-mobile"
-                                         />
-                                         <button
-                                             onClick={() => document.getElementById('navbar-icon-upload-mobile')?.click()}
-                                             className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors flex items-center justify-center text-xs"
-                                             title={navbarIconConfig.icon ? 'Change Icon' : 'Upload Icon'}
-                                         >
-                                             <Upload size={12} />
-                                         </button>
-                                         {navbarIconConfig.icon && (
-                                             <>
-                                                 <button
-                                                     onClick={() => {
-                                                         const imageToCrop = navbarOriginalImage || navbarIconConfig.icon;
-                                                         if (imageToCrop) {
-                                                             if (!navbarOriginalImage && navbarIconConfig.icon) {
-                                                                 setNavbarOriginalImage(navbarIconConfig.icon);
-                                                             }
-                                                             setShowNavbarCropEditor(true);
-                                                             setNavbarCropScale(1);
-                                                             setNavbarCropPosition({ x: 0, y: 0 });
-                                                         }
-                                                     }}
-                                                     className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center text-xs"
-                                                     title="Crop"
-                                                 >
-                                                     <Crop size={12} />
-                                                 </button>
-                                                 <button
-                                                     onClick={() => {
-                                                         setNavbarIconConfig({...navbarIconConfig, icon: undefined});
-                                                         setNavbarOriginalImage('');
-                                                     }}
-                                                     className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center justify-center text-xs"
-                                                     title="Remove Icon"
-                                                 >
-                                                     <Trash2 size={12} />
-                                                 </button>
-                                                 <button
-                                                     onClick={() => {
-                                                         setNavbarIconConfig({
-                                                             ...navbarIconConfig,
-                                                             size: 40,
-                                                             borderRadius: 8,
-                                                             backgroundColor: 'transparent',
-                                                             backgroundOpacity: 1,
-                                                             padding: 0,
-                                                             borderColor: 'transparent',
-                                                             borderWidth: 0
-                                                         });
-                                                         setNavbarPreviewZoom(1);
-                                                     }}
-                                                     className="px-2 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors flex items-center justify-center text-xs"
-                                                     title="Reset All Settings"
-                                                 >
-                                                     <RotateCcw size={12} />
-                                                 </button>
-                                             </>
-                                         )}
-                                     </div>
-                                 </div>
-                                 <div className="flex items-center justify-between mb-2">
-                                     <label className="block text-xs text-gray-500">Preview</label>
-                                     {navbarIconConfig.icon && (
-                                         <div className="hidden md:flex flex-row gap-2">
-                                             <button
-                                                 onClick={() => {
-                                                     setNavbarIconConfig({...navbarIconConfig, icon: undefined});
-                                                     setNavbarOriginalImage('');
-                                                 }}
-                                                 className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
-                                                 title="Remove Icon"
-                                             >
-                                                 <Trash2 size={14} />
-                                                 <span className="hidden sm:inline">Remove</span>
-                                             </button>
-                                             <button
-                                                 onClick={() => {
-                                                     setNavbarIconConfig({
-                                                         ...navbarIconConfig,
-                                                         size: 40,
-                                                         borderRadius: 8,
-                                                         backgroundColor: 'transparent',
-                                                         backgroundOpacity: 1,
-                                                         padding: 0,
-                                                         borderColor: 'transparent',
-                                                         borderWidth: 0
-                                                     });
-                                                     setNavbarPreviewZoom(1);
-                                                 }}
-                                                 className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
-                                                 title="Reset All Settings"
-                                             >
-                                                 <RotateCcw size={14} />
-                                                 <span className="hidden sm:inline">Reset All</span>
-                                             </button>
-                                         </div>
-                                     )}
-                                 </div>
-                                 <div className="bg-gray-900/50 border-2 border-gray-700 rounded-lg p-8 flex items-center justify-center flex-1" style={{ minHeight: '200px', width: '100%' }}>
-                                     {navbarIconConfig.icon ? (
-                                         <div 
-                                             style={{
-                                                 width: '100%',
-                                                 height: '100%',
-                                                 display: 'flex',
-                                                 alignItems: 'center',
-                                                 justifyContent: 'center',
-                                                 maxWidth: '100%',
-                                                 maxHeight: '100%'
-                                             }}
-                                         >
-                                             <img 
-                                                 src={navbarIconConfig.icon} 
-                                                 alt="Preview" 
-                                                 style={{
-                                                     maxWidth: '100%',
-                                                     maxHeight: '100%',
-                                                     width: 'auto',
-                                                     height: 'auto',
-                                                     borderRadius: `${navbarIconConfig.borderRadius || 8}px`,
-                                                     backgroundColor: navbarIconConfig.backgroundColor === 'transparent' ? 'transparent' : navbarIconConfig.backgroundColor || 'transparent',
-                                                     opacity: navbarIconConfig.backgroundOpacity || 1,
-                                                     padding: `${navbarIconConfig.padding || 0}px`,
-                                                     border: `${navbarIconConfig.borderWidth || 0}px solid ${navbarIconConfig.borderColor === 'transparent' ? 'transparent' : navbarIconConfig.borderColor || 'transparent'}`,
-                                                     objectFit: 'contain',
-                                                     transition: 'all 0.2s ease'
-                                                 }}
-                                             />
-                                         </div>
-                                     ) : (
-                                         <div className="text-gray-500 text-sm">Upload an icon to see preview</div>
-                                     )}
-                                 </div>
-                             </div>
-                         </div>
 
-                         
-                         <div className="space-y-3 border-t border-gray-800 pt-4 mt-6">
-                             
-                             <div>
-                                 <div className="flex items-center justify-between mb-2">
-                                     <label className="block text-xs text-gray-500">Size: {navbarIconConfig.size || 40}px</label>
-                                     <div className="flex gap-2">
-                                         <button
-                                             onClick={() => {
-                                                 const newSize = Math.max(20, (navbarIconConfig.size || 40) - 1);
-                                                 setNavbarIconConfig({...navbarIconConfig, size: newSize});
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <label className="block text-xs text-gray-500">Padding: {navbarIconConfig.padding || 0}px</label>
+                                  <button
+                                    onClick={() => setNavbarIconConfig({ ...navbarIconConfig, padding: 0 })}
+                                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                                  >
+                                    Reset
+                                  </button>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="20"
+                                  value={navbarIconConfig.padding || 0}
+                                  onChange={(e) => setNavbarIconConfig({ ...navbarIconConfig, padding: parseInt(e.target.value) || 0 })}
+                                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                  style={{ accentColor: '#22c55e' }}
+                                />
+                              </div>
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <label className="block text-xs text-gray-500">Border Width: {navbarIconConfig.borderWidth || 0}px</label>
+                                  <button
+                                    onClick={() => setNavbarIconConfig({ ...navbarIconConfig, borderWidth: 0 })}
+                                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                                  >
+                                    Reset
+                                  </button>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="10"
+                                  value={navbarIconConfig.borderWidth || 0}
+                                  onChange={(e) => setNavbarIconConfig({ ...navbarIconConfig, borderWidth: parseInt(e.target.value) || 0 })}
+                                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                  style={{ accentColor: '#22c55e' }}
+                                />
+                              </div>
+                            </div>
 
-                                                 const baseSize = 40;
-                                                 const inverseSize = 2 * baseSize - newSize;
-                                                 const newZoom = inverseSize / newSize;
-                                                 setNavbarPreviewZoom(newZoom);
-                                             }}
-                                             className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
-                                             title="Decrease Size"
-                                         >
-                                             <Minimize2 size={12} />
-                                         </button>
-                                         <button
-                                             onClick={() => {
-                                                 const newSize = Math.min(200, (navbarIconConfig.size || 40) + 1);
-                                                 setNavbarIconConfig({...navbarIconConfig, size: newSize});
 
-                                                 const baseSize = 40;
-                                                 const inverseSize = 2 * baseSize - newSize;
-                                                 const newZoom = inverseSize / newSize;
-                                                 setNavbarPreviewZoom(newZoom);
-                                             }}
-                                             className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
-                                             title="Increase Size"
-                                         >
-                                             <Maximize2 size={12} />
-                                         </button>
-                                         <button
-                                             onClick={() => {
-                                                 setNavbarIconConfig({...navbarIconConfig, size: 40});
-                                                 setNavbarPreviewZoom(1);
-                                             }}
-                                             className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
-                                         >
-                                             Reset
-                                         </button>
-                                     </div>
-                                 </div>
-                                 <input
-                                     type="range"
-                                     min="20"
-                                     max="200"
-                                     value={navbarIconConfig.size || 40}
-                                     onChange={(e) => {
-                                         const newSize = parseInt(e.target.value) || 40;
-                                         setNavbarIconConfig({...navbarIconConfig, size: newSize});
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs text-gray-500 mb-2">Background Color</label>
+                                <div className="flex gap-2 items-center">
+                                  <input
+                                    type="color"
+                                    value={(() => {
+                                      const color = navbarIconConfig.backgroundColor || 'transparent';
+                                      const hexMatch = color.match(/#[0-9a-fA-F]{6}/);
+                                      return hexMatch ? hexMatch[0] : '#000000';
+                                    })()}
+                                    onChange={(e) => setNavbarIconConfig({ ...navbarIconConfig, backgroundColor: e.target.value })}
+                                    className="w-12 h-10 bg-black/30 border border-gray-700 rounded cursor-pointer flex-shrink-0"
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="transparent or #hex"
+                                    value={navbarIconConfig.backgroundColor || 'transparent'}
+                                    onChange={(e) => setNavbarIconConfig({ ...navbarIconConfig, backgroundColor: e.target.value || 'transparent' })}
+                                    className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                                  />
+                                </div>
+                                <p className="text-[10px] text-gray-500 mt-1">Hex color (e.g., #000000) or transparent</p>
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-500 mb-2">Border Color</label>
+                                <div className="flex gap-2 items-center">
+                                  <input
+                                    type="color"
+                                    value={(() => {
+                                      const color = navbarIconConfig.borderColor || 'transparent';
+                                      const hexMatch = color.match(/#[0-9a-fA-F]{6}/);
+                                      return hexMatch ? hexMatch[0] : '#ffffff';
+                                    })()}
+                                    onChange={(e) => setNavbarIconConfig({ ...navbarIconConfig, borderColor: e.target.value })}
+                                    className="w-12 h-10 bg-black/30 border border-gray-700 rounded cursor-pointer flex-shrink-0"
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="transparent or #hex"
+                                    value={navbarIconConfig.borderColor || 'transparent'}
+                                    onChange={(e) => setNavbarIconConfig({ ...navbarIconConfig, borderColor: e.target.value || 'transparent' })}
+                                    className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                                  />
+                                </div>
+                                <p className="text-[10px] text-gray-500 mt-1">Hex color (e.g., #ffffff) or transparent</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
-                                         const baseSize = 40;
-                                         const inverseSize = 2 * baseSize - newSize;
-                                         const newZoom = inverseSize / newSize;
-                                         setNavbarPreviewZoom(newZoom);
-                                     }}
-                                     className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                     style={{ accentColor: '#22c55e' }}
-                                 />
-                             </div>
-                             
-                             
-                             <div className="grid grid-cols-2 gap-4">
-                                 <div>
-                                     <div className="flex items-center justify-between mb-2">
-                                         <label className="block text-xs text-gray-500">Roundness: {navbarIconConfig.borderRadius || 8}px</label>
-                                         <button
-                                             onClick={() => setNavbarIconConfig({...navbarIconConfig, borderRadius: 8})}
-                                             className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
-                                         >
-                                             Reset
-                                         </button>
-                                     </div>
-                                     <input
-                                         type="range"
-                                         min="0"
-                                         max="50"
-                                         value={navbarIconConfig.borderRadius || 8}
-                                         onChange={(e) => setNavbarIconConfig({...navbarIconConfig, borderRadius: parseInt(e.target.value) || 0})}
-                                         className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                     style={{ accentColor: '#22c55e' }}
-                                     />
-                                 </div>
-                                 <div>
-                                     <div className="flex items-center justify-between mb-2">
-                                         <label className="block text-xs text-gray-500">Opacity: {Math.round((navbarIconConfig.backgroundOpacity || 1) * 100)}%</label>
-                                         <button
-                                             onClick={() => setNavbarIconConfig({...navbarIconConfig, backgroundOpacity: 1})}
-                                             className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
-                                         >
-                                             Reset
-                                         </button>
-                                     </div>
-                                     <input
-                                         type="range"
-                                         min="0"
-                                         max="1"
-                                         step="0.01"
-                                         value={navbarIconConfig.backgroundOpacity || 1}
-                                         onChange={(e) => setNavbarIconConfig({...navbarIconConfig, backgroundOpacity: parseFloat(e.target.value) || 1})}
-                                         className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                     style={{ accentColor: '#22c55e' }}
-                                     />
-                                 </div>
-                             </div>
-                             
-                             
-                             <div className="grid grid-cols-2 gap-4">
-                                 <div>
-                                     <div className="flex items-center justify-between mb-2">
-                                         <label className="block text-xs text-gray-500">Padding: {navbarIconConfig.padding || 0}px</label>
-                                         <button
-                                             onClick={() => setNavbarIconConfig({...navbarIconConfig, padding: 0})}
-                                             className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
-                                         >
-                                             Reset
-                                         </button>
-                                     </div>
-                                     <input
-                                         type="range"
-                                         min="0"
-                                         max="20"
-                                         value={navbarIconConfig.padding || 0}
-                                         onChange={(e) => setNavbarIconConfig({...navbarIconConfig, padding: parseInt(e.target.value) || 0})}
-                                         className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                     style={{ accentColor: '#22c55e' }}
-                                     />
-                                 </div>
-                                 <div>
-                                     <div className="flex items-center justify-between mb-2">
-                                         <label className="block text-xs text-gray-500">Border Width: {navbarIconConfig.borderWidth || 0}px</label>
-                                         <button
-                                             onClick={() => setNavbarIconConfig({...navbarIconConfig, borderWidth: 0})}
-                                             className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
-                                         >
-                                             Reset
-                                         </button>
-                                     </div>
-                                     <input
-                                         type="range"
-                                         min="0"
-                                         max="10"
-                                         value={navbarIconConfig.borderWidth || 0}
-                                         onChange={(e) => setNavbarIconConfig({...navbarIconConfig, borderWidth: parseInt(e.target.value) || 0})}
-                                         className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                     style={{ accentColor: '#22c55e' }}
-                                     />
-                                 </div>
-                             </div>
-                             
-                             
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                 <div>
-                                     <label className="block text-xs text-gray-500 mb-2">Background Color</label>
-                                     <div className="flex gap-2 items-center">
-                                         <input 
-                                             type="color" 
-                                             value={(() => {
-                                                 const color = navbarIconConfig.backgroundColor || 'transparent';
-                                                 const hexMatch = color.match(/#[0-9a-fA-F]{6}/);
-                                                 return hexMatch ? hexMatch[0] : '#000000';
-                                             })()} 
-                                             onChange={(e) => setNavbarIconConfig({...navbarIconConfig, backgroundColor: e.target.value})} 
-                                             className="w-12 h-10 bg-black/30 border border-gray-700 rounded cursor-pointer flex-shrink-0" 
-                                         />
-                                         <input
-                                             type="text"
-                                             placeholder="transparent or #hex"
-                                             value={navbarIconConfig.backgroundColor || 'transparent'}
-                                             onChange={(e) => setNavbarIconConfig({...navbarIconConfig, backgroundColor: e.target.value || 'transparent'})}
-                                             className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
-                                         />
-                                     </div>
-                                     <p className="text-[10px] text-gray-500 mt-1">Hex color (e.g., #000000) or transparent</p>
-                                 </div>
-                                 <div>
-                                     <label className="block text-xs text-gray-500 mb-2">Border Color</label>
-                                     <div className="flex gap-2 items-center">
-                                         <input 
-                                             type="color" 
-                                             value={(() => {
-                                                 const color = navbarIconConfig.borderColor || 'transparent';
-                                                 const hexMatch = color.match(/#[0-9a-fA-F]{6}/);
-                                                 return hexMatch ? hexMatch[0] : '#ffffff';
-                                             })()} 
-                                             onChange={(e) => setNavbarIconConfig({...navbarIconConfig, borderColor: e.target.value})} 
-                                             className="w-12 h-10 bg-black/30 border border-gray-700 rounded cursor-pointer flex-shrink-0" 
-                                         />
-                                         <input
-                                             type="text"
-                                             placeholder="transparent or #hex"
-                                             value={navbarIconConfig.borderColor || 'transparent'}
-                                             onChange={(e) => setNavbarIconConfig({...navbarIconConfig, borderColor: e.target.value || 'transparent'})}
-                                             className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
-                                         />
-                                     </div>
-                                     <p className="text-[10px] text-gray-500 mt-1">Hex color (e.g., #ffffff) or transparent</p>
-                                 </div>
-                             </div>
-                         </div>
-                     </div>
-                     </div>
-                     )}
 
-                     
-                     {configTab === 'links' && (
-                     <div className="space-y-6 animate-fadeIn w-full min-w-0" style={{ contentVisibility: 'auto' }}>
-                    <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
-                         <h3 className="text-sm font-bold text-gray-400 uppercase mb-4 flex items-center gap-2"><LinkIcon size={16} /> External Links</h3>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                             <div><label className="block text-xs text-gray-500 mb-1">CurseForge</label><input value={linkConfig.curseforge || ""} onChange={(e) => setLinkConfig({...linkConfig, curseforge: e.target.value})} className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /></div>
-                             <div><label className="block text-xs text-gray-500 mb-1">Modrinth</label><input value={linkConfig.modrinth || ""} onChange={(e) => setLinkConfig({...linkConfig, modrinth: e.target.value})} className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /></div>
-                             <div><label className="block text-xs text-gray-500 mb-1">Discord</label><input value={linkConfig.discord || ""} onChange={(e) => setLinkConfig({...linkConfig, discord: e.target.value})} className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /></div>
-                             <div><label className="block text-xs text-gray-500 mb-1">Source Code</label><input value={linkConfig.source || ""} onChange={(e) => setLinkConfig({...linkConfig, source: e.target.value})} className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /></div>
-                             <div><label className="block text-xs text-gray-500 mb-1 flex items-center gap-1"><Coffee size={12} /> Ko-fi</label><input value={linkConfig.kofi || ""} onChange={(e) => setLinkConfig({...linkConfig, kofi: e.target.value})} placeholder="https://ko-fi.com/yourusername" className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /></div>
-                         </div>
-                     </div>
+                    {configTab === 'links' && (
+                      <div className="space-y-6 animate-fadeIn w-full min-w-0" style={{ contentVisibility: 'auto' }}>
+                        <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
+                          <h3 className="text-sm font-bold text-gray-400 uppercase mb-4 flex items-center gap-2"><LinkIcon size={16} /> External Links</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div><label className="block text-xs text-gray-500 mb-1">CurseForge</label><input value={linkConfig.curseforge || ""} onChange={(e) => setLinkConfig({ ...linkConfig, curseforge: e.target.value })} className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /></div>
+                            <div><label className="block text-xs text-gray-500 mb-1">Modrinth</label><input value={linkConfig.modrinth || ""} onChange={(e) => setLinkConfig({ ...linkConfig, modrinth: e.target.value })} className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /></div>
+                            <div><label className="block text-xs text-gray-500 mb-1">Discord</label><input value={linkConfig.discord || ""} onChange={(e) => setLinkConfig({ ...linkConfig, discord: e.target.value })} className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /></div>
+                            <div><label className="block text-xs text-gray-500 mb-1">Source Code</label><input value={linkConfig.source || ""} onChange={(e) => setLinkConfig({ ...linkConfig, source: e.target.value })} className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /></div>
+                            <div><label className="block text-xs text-gray-500 mb-1 flex items-center gap-1"><Coffee size={12} /> Ko-fi</label><input value={linkConfig.kofi || ""} onChange={(e) => setLinkConfig({ ...linkConfig, kofi: e.target.value })} placeholder="https://ko-fi.com/yourusername" className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /></div>
+                          </div>
+                        </div>
 
-                    
-                    <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
-                        <h3 className="text-sm font-bold text-gray-400 uppercase mb-4 flex items-center gap-2">
+
+                        <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
+                          <h3 className="text-sm font-bold text-gray-400 uppercase mb-4 flex items-center gap-2">
                             <i className="fab fa-curseforge text-orange-500" aria-hidden="true"></i>
                             CurseForge Sync
-                        </h3>
-                        <div className="space-y-4">
+                          </h3>
+                          <div className="space-y-4">
                             <div>
-                                <label className="block text-xs text-gray-500 mb-1">
-                                    Project ID
-                                </label>
-                                <input 
-                                    type="text"
-                                    value={curseforgeProjectSlug || CurseForgeService.extractProjectId(linkConfig.curseforge) || ''} 
-                                    onChange={(e) => setCurseforgeProjectSlug(e.target.value)} 
-                                    placeholder="1377354"
-                                    className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-colors hover:border-gray-600" 
-                                />
-                                <p className="text-[10px] text-gray-600 mt-1">
-                                    Auto-detected from CurseForge URL. Enter manually if needed.
-                                </p>
+                              <label className="block text-xs text-gray-500 mb-1">
+                                Project ID
+                              </label>
+                              <input
+                                type="text"
+                                value={curseforgeProjectSlug || CurseForgeService.extractProjectId(linkConfig.curseforge) || ''}
+                                onChange={(e) => setCurseforgeProjectSlug(e.target.value)}
+                                placeholder="1377354"
+                                className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-colors hover:border-gray-600"
+                              />
+                              <p className="text-[10px] text-gray-600 mt-1">
+                                Auto-detected from CurseForge URL. Enter manually if needed.
+                              </p>
                             </div>
                             <div>
-                                <label className="block text-xs text-gray-500 mb-2">
-                                    Auto-sync Interval
-                                </label>
-                                <select
-                                    value={curseforgeSyncInterval}
-                                    onChange={(e) => setCurseforgeSyncInterval(parseInt(e.target.value))}
-                                    className="w-full bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg px-3 py-2.5 h-10 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8"
-                                >
-                                    <option value={0}>Disabled</option>
-                                    <option value={6}>Every 6 hours</option>
-                                    <option value={12}>Every 12 hours</option>
-                                </select>
+                              <label className="block text-xs text-gray-500 mb-2">
+                                Auto-sync Interval
+                              </label>
+                              <select
+                                value={curseforgeSyncInterval}
+                                onChange={(e) => setCurseforgeSyncInterval(parseInt(e.target.value))}
+                                className="w-full bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg px-3 py-2.5 h-10 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8"
+                              >
+                                <option value={0}>Disabled</option>
+                                <option value={6}>Every 6 hours</option>
+                                <option value={12}>Every 12 hours</option>
+                              </select>
                             </div>
                             <div>
-                                <button
-                                    onClick={handleSyncFromCurseForge}
-                                    disabled={isSyncingCurseForge}
-                                    className="w-full px-4 py-2.5 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-                                >
-                                    {isSyncingCurseForge ? (
-                                        <>
-                                            <RefreshCw size={16} className="animate-spin" />
-                                            Syncing...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <RefreshCw size={16} />
-                                            Sync Now
-                                        </>
-                                    )}
-                                </button>
+                              <button
+                                onClick={handleSyncFromCurseForge}
+                                disabled={isSyncingCurseForge}
+                                className="w-full px-4 py-2.5 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                              >
+                                {isSyncingCurseForge ? (
+                                  <>
+                                    <RefreshCw size={16} className="animate-spin" />
+                                    Syncing...
+                                  </>
+                                ) : (
+                                  <>
+                                    <RefreshCw size={16} />
+                                    Sync Now
+                                  </>
+                                )}
+                              </button>
                             </div>
+                          </div>
                         </div>
-                    </div>
 
-                     <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
-                         <h3 className="text-sm font-bold text-gray-400 uppercase mb-4 flex items-center gap-2"><UserCheck size={16} /> Social Handles</h3>
-                         <div className="space-y-6">
-                             
-                             <div className="border border-gray-800 rounded-lg p-4">
-                                 <h4 className="text-sm font-semibold text-gray-300 mb-4">Author</h4>
-                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                     <div>
-                                         <label className="block text-xs text-gray-500 mb-1">Author Name</label>
-                                         <input 
-                                             value={socialHandlesConfig.author || ''} 
-                                             onChange={(e) => setSocialHandlesConfig({...socialHandlesConfig, author: e.target.value})} 
-                                             className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" 
-                                         />
-                                     </div>
-                                 </div>
-                                 <div className="space-y-3">
-                                     <div className="flex items-center justify-between mb-2">
-                                         <label className="block text-xs text-gray-500">Social Links</label>
-                                         {showAddLinkInput.person !== 'author' ? (
-                                             <button
-                                                 type="button"
-                                                 onClick={(e) => {
-                                                     e.preventDefault();
-                                                     e.stopPropagation();
-                                                     setShowAddLinkInput({person: 'author', url: ''});
-                                                 }}
-                                                 className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded border border-blue-700/50 hover:border-blue-600 transition-colors cursor-pointer"
-                                             >
-                                                 + Add Custom Link
-                                             </button>
-                                         ) : (
-                                             <div className="flex gap-2 items-center">
-                                                 <input
-                                                     type="url"
-                                                     placeholder="https://twitch.tv/username"
-                                                     value={showAddLinkInput.url}
-                                                     onChange={(e) => setShowAddLinkInput({...showAddLinkInput, url: e.target.value})}
-                                                     onKeyDown={(e) => {
-                                                         if (e.key === 'Enter') {
-                                                             e.preventDefault();
-                                                             const linkUrl = showAddLinkInput.url.trim();
-                                                             if (linkUrl) {
-                                                                 // Auto-detect platform from URL
-                                                                 const url = linkUrl.toLowerCase();
-                                                                 let detectedKey = '';
-                                                                 if (url.includes('twitch.tv') || url.includes('twitch.com')) {
-                                                                     detectedKey = 'twitch';
-                                                                 } else if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                                                                     detectedKey = 'youtube';
-                                                                 } else if (url.includes('instagram.com')) {
-                                                                     detectedKey = 'instagram';
-                                                                 } else if (url.includes('linkedin.com')) {
-                                                                     detectedKey = 'linkedin';
-                                                                 } else if (url.includes('facebook.com')) {
-                                                                     detectedKey = 'facebook';
-                                                                 } else if (url.includes('twitter.com') || url.includes('x.com')) {
-                                                                     detectedKey = 'twitter';
-                                                                 } else if (url.includes('github.com')) {
-                                                                     detectedKey = 'github';
-                                                                 } else if (url.includes('@') || url.includes('mailto:')) {
-                                                                     detectedKey = 'email';
-                                                                 } else {
-                                                                     try {
-                                                                         const urlObj = new URL(linkUrl);
-                                                                         detectedKey = urlObj.hostname.replace('www.', '').split('.')[0];
-                                                                     } catch {
-                                                                         detectedKey = 'website';
-                                                                     }
-                                                                 }
-                                                                 
-                                                                 const normalizedKey = detectedKey || 'website';
-                                                                 const currentLinks = socialHandlesConfig.authorLinks || {};
-                                                                 
-                                                                 setSocialHandlesConfig({
-                                                                     ...socialHandlesConfig,
-                                                                     authorLinks: {
-                                                                         ...currentLinks,
-                                                                         [normalizedKey]: linkUrl
-                                                                     }
-                                                                 });
-                                                                 
-                                                                 if (!authorLinksOrder.includes(normalizedKey)) {
-                                                                     setAuthorLinksOrder([...authorLinksOrder, normalizedKey]);
-                                                                 }
-                                                                 
-                                                                 setShowAddLinkInput({person: null, url: ''});
-                                                             }
-                                                         } else if (e.key === 'Escape') {
-                                                             setShowAddLinkInput({person: null, url: ''});
-                                                         }
-                                                     }}
-                                                     className="text-xs bg-black/30 border border-gray-700 rounded px-2 py-1 text-white w-48"
-                                                     autoFocus
-                                                 />
-                                                 <button
-                                                     type="button"
-                                                     onClick={(e) => {
-                                                         e.preventDefault();
-                                                         const linkUrl = showAddLinkInput.url.trim();
-                                                         if (linkUrl) {
-                                                             const url = linkUrl.toLowerCase();
-                                                             let detectedKey = '';
-                                                             if (url.includes('twitch.tv') || url.includes('twitch.com')) {
-                                                                 detectedKey = 'twitch';
-                                                             } else if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                                                                 detectedKey = 'youtube';
-                                                             } else if (url.includes('instagram.com')) {
-                                                                 detectedKey = 'instagram';
-                                                             } else if (url.includes('linkedin.com')) {
-                                                                 detectedKey = 'linkedin';
-                                                             } else if (url.includes('facebook.com')) {
-                                                                 detectedKey = 'facebook';
-                                                             } else if (url.includes('twitter.com') || url.includes('x.com')) {
-                                                                 detectedKey = 'twitter';
-                                                             } else if (url.includes('github.com')) {
-                                                                 detectedKey = 'github';
-                                                             } else if (url.includes('@') || url.includes('mailto:')) {
-                                                                 detectedKey = 'email';
-                                                             } else {
-                                                                 try {
-                                                                     const urlObj = new URL(linkUrl);
-                                                                     detectedKey = urlObj.hostname.replace('www.', '').split('.')[0];
-                                                                 } catch {
-                                                                     detectedKey = 'website';
-                                                                 }
-                                                             }
-                                                             
-                                                             const normalizedKey = detectedKey || 'website';
-                                                             const currentLinks = socialHandlesConfig.authorLinks || {};
-                                                             
-                                                             setSocialHandlesConfig({
-                                                                 ...socialHandlesConfig,
-                                                                 authorLinks: {
-                                                                     ...currentLinks,
-                                                                     [normalizedKey]: linkUrl
-                                                                 }
-                                                             });
-                                                             
-                                                             if (!authorLinksOrder.includes(normalizedKey)) {
-                                                                 setAuthorLinksOrder([...authorLinksOrder, normalizedKey]);
-                                                             }
-                                                             
-                                                             setShowAddLinkInput({person: null, url: ''});
-                                                         }
-                                                     }}
-                                                     className="text-xs text-green-400 hover:text-green-300 px-2 py-1"
-                                                     title="Add"
-                                                 >
-                                                     ✓
-                                                 </button>
-                                                 <button
-                                                     type="button"
-                                                     onClick={(e) => {
-                                                         e.preventDefault();
-                                                         setShowAddLinkInput({person: null, url: ''});
-                                                     }}
-                                                     className="text-xs text-red-400 hover:text-red-300 px-2 py-1"
-                                                     title="Cancel"
-                                                 >
-                                                     ✕
-                                                 </button>
-                                             </div>
-                                         )}
-                                     </div>
-                                     {authorLinksOrder.map((key, index) => {
-                                         const value = socialHandlesConfig.authorLinks?.[key] || '';
-                                         if (!value && !socialHandlesConfig.authorLinks?.[key]) return null;
-                                         
-                                         return (
-                                             <div 
-                                                 key={key} 
-                                                 className="flex gap-2 items-center group"
-                                                 draggable
-                                                 onDragStart={(e) => {
-                                                     setDraggedLink({person: 'author', key});
-                                                     e.dataTransfer.effectAllowed = 'move';
-                                                 }}
-                                                 onDragOver={(e) => {
-                                                     e.preventDefault();
-                                                     e.dataTransfer.dropEffect = 'move';
-                                                 }}
-                                                 onDrop={(e) => {
-                                                     e.preventDefault();
-                                                     if (draggedLink && draggedLink.person === 'author' && draggedLink.key !== key) {
-                                                         const newOrder = [...authorLinksOrder];
-                                                         const draggedIndex = newOrder.indexOf(draggedLink.key);
-                                                         const targetIndex = newOrder.indexOf(key);
-                                                         newOrder.splice(draggedIndex, 1);
-                                                         newOrder.splice(targetIndex, 0, draggedLink.key);
-                                                         setAuthorLinksOrder(newOrder);
-                                                     }
-                                                     setDraggedLink(null);
-                                                 }}
-                                                 onDragEnd={() => setDraggedLink(null)}
-                                             >
-                                                 <label className="w-24 text-xs text-gray-500 flex items-center capitalize">{key}:</label>
-                                                 <input 
-                                                     type={key === 'email' || key.includes('mail') ? 'email' : 'url'}
-                                                     placeholder={key === 'email' || key.includes('mail') ? 'email@example.com' : `https://${key}.com/username`}
-                                                     value={value || ''} 
-                                                     onChange={(e) => setSocialHandlesConfig({
-                                                         ...socialHandlesConfig, 
-                                                         authorLinks: {...socialHandlesConfig.authorLinks, [key]: e.target.value}
-                                                     })} 
-                                                     className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" 
-                                                 />
-                                                 <button
-                                                     type="button"
-                                                     onClick={(e) => {
-                                                         e.preventDefault();
-                                                         e.stopPropagation();
-                                                         if (index > 0) {
-                                                             const newOrder = [...authorLinksOrder];
-                                                             [newOrder[index], newOrder[index - 1]] = [newOrder[index - 1], newOrder[index]];
-                                                             setAuthorLinksOrder(newOrder);
-                                                         }
-                                                     }}
-                                                     className="text-gray-600 hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                     title="Move up"
-                                                     disabled={index === 0}
-                                                 >
-                                                     <ArrowUp size={14} />
-                                                 </button>
-                                                 <button
-                                                     type="button"
-                                                     onClick={(e) => {
-                                                         e.preventDefault();
-                                                         e.stopPropagation();
-                                                         if (index < authorLinksOrder.length - 1) {
-                                                             const newOrder = [...authorLinksOrder];
-                                                             [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
-                                                             setAuthorLinksOrder(newOrder);
-                                                         }
-                                                     }}
-                                                     className="text-gray-600 hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                     title="Move down"
-                                                     disabled={index === authorLinksOrder.length - 1}
-                                                 >
-                                                     <ArrowDown size={14} />
-                                                 </button>
-                                                 <button
-                                                     type="button"
-                                                     className="text-gray-600 hover:text-gray-400 cursor-move opacity-0 group-hover:opacity-100 transition-opacity"
-                                                     title="Drag to reorder"
-                                                 >
-                                                     <GripVertical size={16} />
-                                                 </button>
-                                                 <button
-                                                     type="button"
-                                                     onClick={() => {
-                                                         const newLinks = {...socialHandlesConfig.authorLinks};
-                                                         delete newLinks[key];
-                                                         setSocialHandlesConfig({
-                                                             ...socialHandlesConfig,
-                                                             authorLinks: newLinks
-                                                         });
-                                                         setAuthorLinksOrder(authorLinksOrder.filter(k => k !== key));
-                                                     }}
-                                                     className="text-red-400 hover:text-red-300 p-1"
-                                                     title="Remove link"
-                                                 >
-                                                     <X size={16} />
-                                                 </button>
-                                             </div>
-                                         );
-                                     })}
-                                 </div>
-                             </div>
+                        <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
+                          <h3 className="text-sm font-bold text-gray-400 uppercase mb-4 flex items-center gap-2"><UserCheck size={16} /> Social Handles</h3>
+                          <div className="space-y-6">
 
-                             
-                             <div className="border border-gray-800 rounded-lg p-4">
-                                 <h4 className="text-sm font-semibold text-gray-300 mb-4">Lead Developer</h4>
-                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                     <div>
-                                         <label className="block text-xs text-gray-500 mb-1">Lead Dev Name</label>
-                                         <input 
-                                             value={socialHandlesConfig.leadDev || ''} 
-                                             onChange={(e) => setSocialHandlesConfig({...socialHandlesConfig, leadDev: e.target.value})} 
-                                             className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" 
-                                         />
-                                     </div>
-                                 </div>
-                                 <div className="space-y-3">
-                                     <div className="flex items-center justify-between mb-2">
-                                         <label className="block text-xs text-gray-500">Social Links</label>
-                                         {showAddLinkInput.person !== 'leadDev' ? (
-                                             <button
-                                                 type="button"
-                                                 onClick={(e) => {
-                                                     e.preventDefault();
-                                                     e.stopPropagation();
-                                                     setShowAddLinkInput({person: 'leadDev', url: ''});
-                                                 }}
-                                                 className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded border border-blue-700/50 hover:border-blue-600 transition-colors cursor-pointer"
-                                             >
-                                                 + Add Custom Link
-                                             </button>
-                                         ) : (
-                                             <div className="flex gap-2 items-center">
-                                                 <input
-                                                     type="url"
-                                                     placeholder="https://twitch.tv/username"
-                                                     value={showAddLinkInput.url}
-                                                     onChange={(e) => setShowAddLinkInput({...showAddLinkInput, url: e.target.value})}
-                                                     onKeyDown={(e) => {
-                                                         if (e.key === 'Enter') {
-                                                             e.preventDefault();
-                                                             const linkUrl = showAddLinkInput.url.trim();
-                                                             if (linkUrl) {
-                                                                 const url = linkUrl.toLowerCase();
-                                                                 let detectedKey = '';
-                                                                 if (url.includes('twitch.tv') || url.includes('twitch.com')) {
-                                                                     detectedKey = 'twitch';
-                                                                 } else if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                                                                     detectedKey = 'youtube';
-                                                                 } else if (url.includes('instagram.com')) {
-                                                                     detectedKey = 'instagram';
-                                                                 } else if (url.includes('linkedin.com')) {
-                                                                     detectedKey = 'linkedin';
-                                                                 } else if (url.includes('facebook.com')) {
-                                                                     detectedKey = 'facebook';
-                                                                 } else if (url.includes('twitter.com') || url.includes('x.com')) {
-                                                                     detectedKey = 'twitter';
-                                                                 } else if (url.includes('github.com')) {
-                                                                     detectedKey = 'github';
-                                                                 } else if (url.includes('@') || url.includes('mailto:')) {
-                                                                     detectedKey = 'email';
-                                                                 } else {
-                                                                     try {
-                                                                         const urlObj = new URL(linkUrl);
-                                                                         detectedKey = urlObj.hostname.replace('www.', '').split('.')[0];
-                                                                     } catch {
-                                                                         detectedKey = 'website';
-                                                                     }
-                                                                 }
-                                                                 
-                                                                 const normalizedKey = detectedKey || 'website';
-                                                                 const currentLinks = socialHandlesConfig.leadDevLinks || {};
-                                                                 
-                                                                 setSocialHandlesConfig({
-                                                                     ...socialHandlesConfig,
-                                                                     leadDevLinks: {
-                                                                         ...currentLinks,
-                                                                         [normalizedKey]: linkUrl
-                                                                     }
-                                                                 });
-                                                                 
-                                                                 if (!leadDevLinksOrder.includes(normalizedKey)) {
-                                                                     setLeadDevLinksOrder([...leadDevLinksOrder, normalizedKey]);
-                                                                 }
-                                                                 
-                                                                 setShowAddLinkInput({person: null, url: ''});
-                                                             }
-                                                         } else if (e.key === 'Escape') {
-                                                             setShowAddLinkInput({person: null, url: ''});
-                                                         }
-                                                     }}
-                                                     className="text-xs bg-black/30 border border-gray-700 rounded px-2 py-1 text-white w-48"
-                                                     autoFocus
-                                                 />
-                                                 <button
-                                                     type="button"
-                                                     onClick={(e) => {
-                                                         e.preventDefault();
-                                                         const linkUrl = showAddLinkInput.url.trim();
-                                                         if (linkUrl) {
-                                                             const url = linkUrl.toLowerCase();
-                                                             let detectedKey = '';
-                                                             if (url.includes('twitch.tv') || url.includes('twitch.com')) {
-                                                                 detectedKey = 'twitch';
-                                                             } else if (url.includes('youtube.com') || url.includes('youtu.be')) {
-                                                                 detectedKey = 'youtube';
-                                                             } else if (url.includes('instagram.com')) {
-                                                                 detectedKey = 'instagram';
-                                                             } else if (url.includes('linkedin.com')) {
-                                                                 detectedKey = 'linkedin';
-                                                             } else if (url.includes('facebook.com')) {
-                                                                 detectedKey = 'facebook';
-                                                             } else if (url.includes('twitter.com') || url.includes('x.com')) {
-                                                                 detectedKey = 'twitter';
-                                                             } else if (url.includes('github.com')) {
-                                                                 detectedKey = 'github';
-                                                             } else if (url.includes('@') || url.includes('mailto:')) {
-                                                                 detectedKey = 'email';
-                                                             } else {
-                                                                 try {
-                                                                     const urlObj = new URL(linkUrl);
-                                                                     detectedKey = urlObj.hostname.replace('www.', '').split('.')[0];
-                                                                 } catch {
-                                                                     detectedKey = 'website';
-                                                                 }
-                                                             }
-                                                             
-                                                             const normalizedKey = detectedKey || 'website';
-                                                             const currentLinks = socialHandlesConfig.leadDevLinks || {};
-                                                             
-                                                             setSocialHandlesConfig({
-                                                                 ...socialHandlesConfig,
-                                                                 leadDevLinks: {
-                                                                     ...currentLinks,
-                                                                     [normalizedKey]: linkUrl
-                                                                 }
-                                                             });
-                                                             
-                                                             if (!leadDevLinksOrder.includes(normalizedKey)) {
-                                                                 setLeadDevLinksOrder([...leadDevLinksOrder, normalizedKey]);
-                                                             }
-                                                             
-                                                             setShowAddLinkInput({person: null, url: ''});
-                                                         }
-                                                     }}
-                                                     className="text-xs text-green-400 hover:text-green-300 px-2 py-1"
-                                                     title="Add"
-                                                 >
-                                                     ✓
-                                                 </button>
-                                                 <button
-                                                     type="button"
-                                                     onClick={(e) => {
-                                                         e.preventDefault();
-                                                         setShowAddLinkInput({person: null, url: ''});
-                                                     }}
-                                                     className="text-xs text-red-400 hover:text-red-300 px-2 py-1"
-                                                     title="Cancel"
-                                                 >
-                                                     ✕
-                                                 </button>
-                                             </div>
-                                         )}
-                                     </div>
-                                     {leadDevLinksOrder.map((key, index) => {
-                                         const value = socialHandlesConfig.leadDevLinks?.[key] || '';
-                                         if (!value && !socialHandlesConfig.leadDevLinks?.[key]) return null;
-                                         
-                                         return (
-                                             <div 
-                                                 key={key} 
-                                                 className="flex gap-2 items-center group"
-                                                 draggable
-                                                 onDragStart={(e) => {
-                                                     setDraggedLink({person: 'leadDev', key});
-                                                     e.dataTransfer.effectAllowed = 'move';
-                                                 }}
-                                                 onDragOver={(e) => {
-                                                     e.preventDefault();
-                                                     e.dataTransfer.dropEffect = 'move';
-                                                 }}
-                                                 onDrop={(e) => {
-                                                     e.preventDefault();
-                                                     if (draggedLink && draggedLink.person === 'leadDev' && draggedLink.key !== key) {
-                                                         const newOrder = [...leadDevLinksOrder];
-                                                         const draggedIndex = newOrder.indexOf(draggedLink.key);
-                                                         const targetIndex = newOrder.indexOf(key);
-                                                         newOrder.splice(draggedIndex, 1);
-                                                         newOrder.splice(targetIndex, 0, draggedLink.key);
-                                                         setLeadDevLinksOrder(newOrder);
-                                                     }
-                                                     setDraggedLink(null);
-                                                 }}
-                                                 onDragEnd={() => setDraggedLink(null)}
-                                             >
-                                                 <label className="w-24 text-xs text-gray-500 flex items-center capitalize">{key}:</label>
-                                                 <input 
-                                                     type={key === 'email' || key.includes('mail') ? 'email' : 'url'}
-                                                     placeholder={key === 'email' || key.includes('mail') ? 'email@example.com' : `https://${key}.com/username`}
-                                                     value={value || ''} 
-                                                     onChange={(e) => setSocialHandlesConfig({
-                                                         ...socialHandlesConfig, 
-                                                         leadDevLinks: {...socialHandlesConfig.leadDevLinks, [key]: e.target.value}
-                                                     })} 
-                                                     className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" 
-                                                 />
-                                                 <button
-                                                     type="button"
-                                                     onClick={(e) => {
-                                                         e.preventDefault();
-                                                         e.stopPropagation();
-                                                         if (index > 0) {
-                                                             const newOrder = [...leadDevLinksOrder];
-                                                             [newOrder[index], newOrder[index - 1]] = [newOrder[index - 1], newOrder[index]];
-                                                             setLeadDevLinksOrder(newOrder);
-                                                         }
-                                                     }}
-                                                     className="text-gray-600 hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                     title="Move up"
-                                                     disabled={index === 0}
-                                                 >
-                                                     <ArrowUp size={14} />
-                                                 </button>
-                                                 <button
-                                                     type="button"
-                                                     onClick={(e) => {
-                                                         e.preventDefault();
-                                                         e.stopPropagation();
-                                                         if (index < leadDevLinksOrder.length - 1) {
-                                                             const newOrder = [...leadDevLinksOrder];
-                                                             [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
-                                                             setLeadDevLinksOrder(newOrder);
-                                                         }
-                                                     }}
-                                                     className="text-gray-600 hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                     title="Move down"
-                                                     disabled={index === leadDevLinksOrder.length - 1}
-                                                 >
-                                                     <ArrowDown size={14} />
-                                                 </button>
-                                                 <button
-                                                     type="button"
-                                                     className="text-gray-600 hover:text-gray-400 cursor-move opacity-0 group-hover:opacity-100 transition-opacity"
-                                                     title="Drag to reorder"
-                                                 >
-                                                     <GripVertical size={16} />
-                                                 </button>
-                                                 <button
-                                                     type="button"
-                                                     onClick={() => {
-                                                         const newLinks = {...socialHandlesConfig.leadDevLinks};
-                                                         delete newLinks[key];
-                                                         setSocialHandlesConfig({
-                                                             ...socialHandlesConfig,
-                                                             leadDevLinks: newLinks
-                                                         });
-                                                         setLeadDevLinksOrder(leadDevLinksOrder.filter(k => k !== key));
-                                                     }}
-                                                     className="text-red-400 hover:text-red-300 p-1"
-                                                     title="Remove link"
-                                                 >
-                                                     <X size={16} />
-                                                 </button>
-                                             </div>
-                                         );
-                                     })}
-                                 </div>
-                             </div>
-                         </div>
-                     </div>
-                     </div>
-                     )}
+                            <div className="border border-gray-800 rounded-lg p-4">
+                              <h4 className="text-sm font-semibold text-gray-300 mb-4">Author</h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div>
+                                  <label className="block text-xs text-gray-500 mb-1">Author Name</label>
+                                  <input
+                                    value={socialHandlesConfig.author || ''}
+                                    onChange={(e) => setSocialHandlesConfig({ ...socialHandlesConfig, author: e.target.value })}
+                                    className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                                  />
+                                </div>
+                              </div>
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <label className="block text-xs text-gray-500">Social Links</label>
+                                  {showAddLinkInput.person !== 'author' ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setShowAddLinkInput({ person: 'author', url: '' });
+                                      }}
+                                      className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded border border-blue-700/50 hover:border-blue-600 transition-colors cursor-pointer"
+                                    >
+                                      + Add Custom Link
+                                    </button>
+                                  ) : (
+                                    <div className="flex gap-2 items-center">
+                                      <input
+                                        type="url"
+                                        placeholder="https://twitch.tv/username"
+                                        value={showAddLinkInput.url}
+                                        onChange={(e) => setShowAddLinkInput({ ...showAddLinkInput, url: e.target.value })}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            const linkUrl = showAddLinkInput.url.trim();
+                                            if (linkUrl) {
+                                              // Auto-detect platform from URL
+                                              const url = linkUrl.toLowerCase();
+                                              let detectedKey = '';
+                                              if (url.includes('twitch.tv') || url.includes('twitch.com')) {
+                                                detectedKey = 'twitch';
+                                              } else if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                                                detectedKey = 'youtube';
+                                              } else if (url.includes('instagram.com')) {
+                                                detectedKey = 'instagram';
+                                              } else if (url.includes('linkedin.com')) {
+                                                detectedKey = 'linkedin';
+                                              } else if (url.includes('facebook.com')) {
+                                                detectedKey = 'facebook';
+                                              } else if (url.includes('twitter.com') || url.includes('x.com')) {
+                                                detectedKey = 'twitter';
+                                              } else if (url.includes('github.com')) {
+                                                detectedKey = 'github';
+                                              } else if (url.includes('@') || url.includes('mailto:')) {
+                                                detectedKey = 'email';
+                                              } else {
+                                                try {
+                                                  const urlObj = new URL(linkUrl);
+                                                  detectedKey = urlObj.hostname.replace('www.', '').split('.')[0];
+                                                } catch {
+                                                  detectedKey = 'website';
+                                                }
+                                              }
 
-                     
-                     {configTab === 'footer' && (
-                     <div className="space-y-6 animate-fadeIn w-full min-w-0" style={{ contentVisibility: 'auto' }}>
-                     <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
-                         <h3 className="text-sm font-bold text-gray-400 uppercase mb-4 flex items-center gap-2"><UserCheck size={16} /> Footer Icon Configuration</h3>
-                         
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                             
-                             <div className="flex flex-col">
-                                 <label className="block text-xs text-gray-500 mb-2">Website Icon</label>
-                                 <div className="relative mb-4">
-                                     {footerIconConfig.icon ? (
-                                         <img 
-                                             src={footerIconConfig.icon} 
-                                             alt="Footer Icon" 
-                                             className="border-2 border-gray-700"
-                                             style={{
-                                                 width: `${footerIconConfig.size || 40}px`,
-                                                 height: `${footerIconConfig.size || 40}px`,
-                                                 borderRadius: `${footerIconConfig.borderRadius || 8}px`,
-                                                 backgroundColor: footerIconConfig.backgroundColor === 'transparent' ? 'transparent' : footerIconConfig.backgroundColor || 'transparent',
-                                                 opacity: footerIconConfig.backgroundOpacity || 1,
-                                                 padding: `${footerIconConfig.padding || 0}px`,
-                                                 border: `${footerIconConfig.borderWidth || 0}px solid ${footerIconConfig.borderColor === 'transparent' ? 'transparent' : footerIconConfig.borderColor || 'transparent'}`,
-                                                 objectFit: 'contain'
-                                             }}
-                                         />
-                                     ) : (
-                                         <div 
-                                             className="border-2 border-dashed border-gray-700 flex items-center justify-center bg-gray-900/50"
-                                             style={{
-                                                 width: `${footerIconConfig.size || 40}px`,
-                                                 height: `${footerIconConfig.size || 40}px`,
-                                                 borderRadius: `${footerIconConfig.borderRadius || 8}px`
-                                             }}
-                                         >
-                                             <Upload size={20} className="text-gray-500" />
-                         </div>
-                                     )}
-                     </div>
-                                 
-                                 
-                                 <div className="mt-auto hidden md:block">
-                                     <div 
-                                         className={`bg-green-900/20 border-2 rounded-lg px-3 py-2 transition-colors ${
-                                             footerDragActive 
-                                                 ? 'border-green-500 bg-green-900/40' 
-                                                 : 'border-green-500/30'
-                                         }`}
-                                         onDragEnter={(e) => {
-                                             e.preventDefault();
-                                             e.stopPropagation();
-                                             setFooterDragActive(true);
-                                         }}
-                                         onDragLeave={(e) => {
-                                             e.preventDefault();
-                                             e.stopPropagation();
+                                              const normalizedKey = detectedKey || 'website';
+                                              const currentLinks = socialHandlesConfig.authorLinks || {};
 
-                                             if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                                                 setFooterDragActive(false);
-                                             }
-                                         }}
-                                         onDragOver={(e) => {
-                                             e.preventDefault();
-                                             e.stopPropagation();
-                                         }}
-                                         onDrop={(e) => {
-                                             e.preventDefault();
-                                             e.stopPropagation();
-                                             setFooterDragActive(false);
-                                             
-                                             const file = e.dataTransfer.files?.[0];
-                                             if (file && file.type.startsWith('image/')) {
-                                                 const reader = new FileReader();
-                                                 reader.onloadend = () => {
-                                                     if (reader.result) {
-                                                         const base64 = reader.result as string;
+                                              setSocialHandlesConfig({
+                                                ...socialHandlesConfig,
+                                                authorLinks: {
+                                                  ...currentLinks,
+                                                  [normalizedKey]: linkUrl
+                                                }
+                                              });
 
-                                                         setFooterOriginalImage(base64);
-                                                         setFooterIconConfig({...footerIconConfig, icon: base64});
-                                                     }
-                                                 };
-                                                 reader.readAsDataURL(file);
-                                             }
-                                         }}
-                                     >
-                                         <input
-                                             type="file"
-                                             accept="image/*"
-                                             onChange={(e) => {
-                                                 const file = e.target.files?.[0];
-                                                 if (file && file.type.startsWith('image/')) {
-                                                     setFooterIsUploading(true);
-                                                     setFooterUploadProgress(0);
-                                                     
-                                                     const reader = new FileReader();
-                                                     reader.onprogress = (event) => {
-                                                         if (event.lengthComputable) {
-                                                             const progress = Math.round((event.loaded / event.total) * 100);
-                                                             setFooterUploadProgress(progress);
-                                                         }
-                                                     };
-                                                     reader.onloadend = () => {
-                                                         if (reader.result) {
-                                                             const base64 = reader.result as string;
+                                              if (!authorLinksOrder.includes(normalizedKey)) {
+                                                setAuthorLinksOrder([...authorLinksOrder, normalizedKey]);
+                                              }
 
-                                                             setFooterOriginalImage(base64);
-                                                             setFooterIconConfig({...footerIconConfig, icon: base64});
-                                                             setFooterUploadProgress(100);
-                                                             setTimeout(() => {
-                                                                 setFooterIsUploading(false);
-                                                                 setFooterUploadProgress(0);
-                                                             }, 300);
-                                                         } else {
-                                                             setFooterIsUploading(false);
-                                                             setFooterUploadProgress(0);
-                                                         }
-                                                     };
-                                                     reader.onerror = () => {
-                                                         setFooterIsUploading(false);
-                                                         setFooterUploadProgress(0);
-                                                     };
-                                                     reader.readAsDataURL(file);
-                                                 }
-                                                 if (e.target) e.target.value = '';
-                                             }}
-                                             className="hidden"
-                                             id="footer-icon-upload"
-                                         />
-                                         <div className="flex flex-col gap-2 mb-1">
-                                             <button
-                                                 onClick={() => document.getElementById('footer-icon-upload')?.click()}
-                                                 className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
-                                                 title={footerIconConfig.icon ? 'Change Icon' : 'Upload Icon'}
-                                             >
-                                                 <Upload size={14} />
-                                                 <span className="hidden sm:inline">{footerIconConfig.icon ? 'Change Icon' : 'Upload Icon'}</span>
-                                             </button>
-                                             {footerIconConfig.icon && (
-                                                 <button
-                                                     onClick={() => {
+                                              setShowAddLinkInput({ person: null, url: '' });
+                                            }
+                                          } else if (e.key === 'Escape') {
+                                            setShowAddLinkInput({ person: null, url: '' });
+                                          }
+                                        }}
+                                        className="text-xs bg-black/30 border border-gray-700 rounded px-2 py-1 text-white w-48"
+                                        autoFocus
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          const linkUrl = showAddLinkInput.url.trim();
+                                          if (linkUrl) {
+                                            const url = linkUrl.toLowerCase();
+                                            let detectedKey = '';
+                                            if (url.includes('twitch.tv') || url.includes('twitch.com')) {
+                                              detectedKey = 'twitch';
+                                            } else if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                                              detectedKey = 'youtube';
+                                            } else if (url.includes('instagram.com')) {
+                                              detectedKey = 'instagram';
+                                            } else if (url.includes('linkedin.com')) {
+                                              detectedKey = 'linkedin';
+                                            } else if (url.includes('facebook.com')) {
+                                              detectedKey = 'facebook';
+                                            } else if (url.includes('twitter.com') || url.includes('x.com')) {
+                                              detectedKey = 'twitter';
+                                            } else if (url.includes('github.com')) {
+                                              detectedKey = 'github';
+                                            } else if (url.includes('@') || url.includes('mailto:')) {
+                                              detectedKey = 'email';
+                                            } else {
+                                              try {
+                                                const urlObj = new URL(linkUrl);
+                                                detectedKey = urlObj.hostname.replace('www.', '').split('.')[0];
+                                              } catch {
+                                                detectedKey = 'website';
+                                              }
+                                            }
 
-                                                         const imageToCrop = footerOriginalImage || footerIconConfig.icon;
-                                                         if (imageToCrop) {
+                                            const normalizedKey = detectedKey || 'website';
+                                            const currentLinks = socialHandlesConfig.authorLinks || {};
 
-                                                             if (!footerOriginalImage && footerIconConfig.icon) {
-                                                                 setFooterOriginalImage(footerIconConfig.icon);
-                                                             }
-                                                             setShowFooterCropEditor(true);
-                                                             setFooterCropScale(1);
-                                                             setFooterCropPosition({ x: 0, y: 0 });
-                                                         }
-                                                     }}
-                                                     className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
-                                                     title="Crop"
-                                                 >
-                                                     <Crop size={14} />
-                                                     <span className="hidden sm:inline">Crop</span>
-                                                 </button>
-                     )}
-                     </div>
-                                         <p className="text-[10px] text-gray-500 leading-tight">
-                                             {footerDragActive ? 'Drop image here' : 'Recommended: Square image (e.g., 128x128px)'}
-                                         </p>
-                                     </div>
-                                 </div>
-                             </div>
+                                            setSocialHandlesConfig({
+                                              ...socialHandlesConfig,
+                                              authorLinks: {
+                                                ...currentLinks,
+                                                [normalizedKey]: linkUrl
+                                              }
+                                            });
 
-                             
-                             <div className="flex flex-col">
-                                 <div className="flex items-center justify-between mb-2">
-                                     <label className="block text-xs text-gray-500">Preview</label>
-                                     {footerIconConfig.icon && (
-                                         <div className="hidden md:flex flex-row gap-2">
-                                             <button
-                                                 onClick={() => {
-                                                     setFooterIconConfig({...footerIconConfig, icon: undefined});
-                                                     setFooterOriginalImage('');
-                                                 }}
-                                                 className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
-                                                 title="Remove Icon"
-                                             >
-                                                 <Trash2 size={14} />
-                                                 <span className="hidden sm:inline">Remove</span>
-                                             </button>
-                                             <button
-                                                 onClick={() => {
-                                                     setFooterIconConfig({
-                                                         ...footerIconConfig,
-                                                         size: 40,
-                                                         borderRadius: 8,
-                                                         backgroundColor: 'transparent',
-                                                         backgroundOpacity: 1,
-                                                         padding: 0,
-                                                         borderColor: 'transparent',
-                                                         borderWidth: 0
-                                                     });
-                                                     setFooterPreviewZoom(1);
-                                                 }}
-                                                 className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
-                                                 title="Reset All Settings"
-                                             >
-                                                 <RotateCcw size={14} />
-                                                 <span className="hidden sm:inline">Reset All</span>
-                                             </button>
+                                            if (!authorLinksOrder.includes(normalizedKey)) {
+                                              setAuthorLinksOrder([...authorLinksOrder, normalizedKey]);
+                                            }
+
+                                            setShowAddLinkInput({ person: null, url: '' });
+                                          }
+                                        }}
+                                        className="text-xs text-green-400 hover:text-green-300 px-2 py-1"
+                                        title="Add"
+                                      >
+                                        ✓
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          setShowAddLinkInput({ person: null, url: '' });
+                                        }}
+                                        className="text-xs text-red-400 hover:text-red-300 px-2 py-1"
+                                        title="Cancel"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                                {authorLinksOrder.map((key, index) => {
+                                  const value = socialHandlesConfig.authorLinks?.[key] || '';
+                                  if (!value && !socialHandlesConfig.authorLinks?.[key]) return null;
+
+                                  return (
+                                    <div
+                                      key={key}
+                                      className="flex gap-2 items-center group"
+                                      draggable
+                                      onDragStart={(e) => {
+                                        setDraggedLink({ person: 'author', key });
+                                        e.dataTransfer.effectAllowed = 'move';
+                                      }}
+                                      onDragOver={(e) => {
+                                        e.preventDefault();
+                                        e.dataTransfer.dropEffect = 'move';
+                                      }}
+                                      onDrop={(e) => {
+                                        e.preventDefault();
+                                        if (draggedLink && draggedLink.person === 'author' && draggedLink.key !== key) {
+                                          const newOrder = [...authorLinksOrder];
+                                          const draggedIndex = newOrder.indexOf(draggedLink.key);
+                                          const targetIndex = newOrder.indexOf(key);
+                                          newOrder.splice(draggedIndex, 1);
+                                          newOrder.splice(targetIndex, 0, draggedLink.key);
+                                          setAuthorLinksOrder(newOrder);
+                                        }
+                                        setDraggedLink(null);
+                                      }}
+                                      onDragEnd={() => setDraggedLink(null)}
+                                    >
+                                      <label className="w-24 text-xs text-gray-500 flex items-center capitalize">{key}:</label>
+                                      <input
+                                        type={key === 'email' || key.includes('mail') ? 'email' : 'url'}
+                                        placeholder={key === 'email' || key.includes('mail') ? 'email@example.com' : `https://${key}.com/username`}
+                                        value={value || ''}
+                                        onChange={(e) => setSocialHandlesConfig({
+                                          ...socialHandlesConfig,
+                                          authorLinks: { ...socialHandlesConfig.authorLinks, [key]: e.target.value }
+                                        })}
+                                        className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          if (index > 0) {
+                                            const newOrder = [...authorLinksOrder];
+                                            [newOrder[index], newOrder[index - 1]] = [newOrder[index - 1], newOrder[index]];
+                                            setAuthorLinksOrder(newOrder);
+                                          }
+                                        }}
+                                        className="text-gray-600 hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Move up"
+                                        disabled={index === 0}
+                                      >
+                                        <ArrowUp size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          if (index < authorLinksOrder.length - 1) {
+                                            const newOrder = [...authorLinksOrder];
+                                            [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+                                            setAuthorLinksOrder(newOrder);
+                                          }
+                                        }}
+                                        className="text-gray-600 hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Move down"
+                                        disabled={index === authorLinksOrder.length - 1}
+                                      >
+                                        <ArrowDown size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="text-gray-600 hover:text-gray-400 cursor-move opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Drag to reorder"
+                                      >
+                                        <GripVertical size={16} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newLinks = { ...socialHandlesConfig.authorLinks };
+                                          delete newLinks[key];
+                                          setSocialHandlesConfig({
+                                            ...socialHandlesConfig,
+                                            authorLinks: newLinks
+                                          });
+                                          setAuthorLinksOrder(authorLinksOrder.filter(k => k !== key));
+                                        }}
+                                        className="text-red-400 hover:text-red-300 p-1"
+                                        title="Remove link"
+                                      >
+                                        <X size={16} />
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+
+                            <div className="border border-gray-800 rounded-lg p-4">
+                              <h4 className="text-sm font-semibold text-gray-300 mb-4">Lead Developer</h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                <div>
+                                  <label className="block text-xs text-gray-500 mb-1">Lead Dev Name</label>
+                                  <input
+                                    value={socialHandlesConfig.leadDev || ''}
+                                    onChange={(e) => setSocialHandlesConfig({ ...socialHandlesConfig, leadDev: e.target.value })}
+                                    className="w-full bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                                  />
+                                </div>
+                              </div>
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between mb-2">
+                                  <label className="block text-xs text-gray-500">Social Links</label>
+                                  {showAddLinkInput.person !== 'leadDev' ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setShowAddLinkInput({ person: 'leadDev', url: '' });
+                                      }}
+                                      className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded border border-blue-700/50 hover:border-blue-600 transition-colors cursor-pointer"
+                                    >
+                                      + Add Custom Link
+                                    </button>
+                                  ) : (
+                                    <div className="flex gap-2 items-center">
+                                      <input
+                                        type="url"
+                                        placeholder="https://twitch.tv/username"
+                                        value={showAddLinkInput.url}
+                                        onChange={(e) => setShowAddLinkInput({ ...showAddLinkInput, url: e.target.value })}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            const linkUrl = showAddLinkInput.url.trim();
+                                            if (linkUrl) {
+                                              const url = linkUrl.toLowerCase();
+                                              let detectedKey = '';
+                                              if (url.includes('twitch.tv') || url.includes('twitch.com')) {
+                                                detectedKey = 'twitch';
+                                              } else if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                                                detectedKey = 'youtube';
+                                              } else if (url.includes('instagram.com')) {
+                                                detectedKey = 'instagram';
+                                              } else if (url.includes('linkedin.com')) {
+                                                detectedKey = 'linkedin';
+                                              } else if (url.includes('facebook.com')) {
+                                                detectedKey = 'facebook';
+                                              } else if (url.includes('twitter.com') || url.includes('x.com')) {
+                                                detectedKey = 'twitter';
+                                              } else if (url.includes('github.com')) {
+                                                detectedKey = 'github';
+                                              } else if (url.includes('@') || url.includes('mailto:')) {
+                                                detectedKey = 'email';
+                                              } else {
+                                                try {
+                                                  const urlObj = new URL(linkUrl);
+                                                  detectedKey = urlObj.hostname.replace('www.', '').split('.')[0];
+                                                } catch {
+                                                  detectedKey = 'website';
+                                                }
+                                              }
+
+                                              const normalizedKey = detectedKey || 'website';
+                                              const currentLinks = socialHandlesConfig.leadDevLinks || {};
+
+                                              setSocialHandlesConfig({
+                                                ...socialHandlesConfig,
+                                                leadDevLinks: {
+                                                  ...currentLinks,
+                                                  [normalizedKey]: linkUrl
+                                                }
+                                              });
+
+                                              if (!leadDevLinksOrder.includes(normalizedKey)) {
+                                                setLeadDevLinksOrder([...leadDevLinksOrder, normalizedKey]);
+                                              }
+
+                                              setShowAddLinkInput({ person: null, url: '' });
+                                            }
+                                          } else if (e.key === 'Escape') {
+                                            setShowAddLinkInput({ person: null, url: '' });
+                                          }
+                                        }}
+                                        className="text-xs bg-black/30 border border-gray-700 rounded px-2 py-1 text-white w-48"
+                                        autoFocus
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          const linkUrl = showAddLinkInput.url.trim();
+                                          if (linkUrl) {
+                                            const url = linkUrl.toLowerCase();
+                                            let detectedKey = '';
+                                            if (url.includes('twitch.tv') || url.includes('twitch.com')) {
+                                              detectedKey = 'twitch';
+                                            } else if (url.includes('youtube.com') || url.includes('youtu.be')) {
+                                              detectedKey = 'youtube';
+                                            } else if (url.includes('instagram.com')) {
+                                              detectedKey = 'instagram';
+                                            } else if (url.includes('linkedin.com')) {
+                                              detectedKey = 'linkedin';
+                                            } else if (url.includes('facebook.com')) {
+                                              detectedKey = 'facebook';
+                                            } else if (url.includes('twitter.com') || url.includes('x.com')) {
+                                              detectedKey = 'twitter';
+                                            } else if (url.includes('github.com')) {
+                                              detectedKey = 'github';
+                                            } else if (url.includes('@') || url.includes('mailto:')) {
+                                              detectedKey = 'email';
+                                            } else {
+                                              try {
+                                                const urlObj = new URL(linkUrl);
+                                                detectedKey = urlObj.hostname.replace('www.', '').split('.')[0];
+                                              } catch {
+                                                detectedKey = 'website';
+                                              }
+                                            }
+
+                                            const normalizedKey = detectedKey || 'website';
+                                            const currentLinks = socialHandlesConfig.leadDevLinks || {};
+
+                                            setSocialHandlesConfig({
+                                              ...socialHandlesConfig,
+                                              leadDevLinks: {
+                                                ...currentLinks,
+                                                [normalizedKey]: linkUrl
+                                              }
+                                            });
+
+                                            if (!leadDevLinksOrder.includes(normalizedKey)) {
+                                              setLeadDevLinksOrder([...leadDevLinksOrder, normalizedKey]);
+                                            }
+
+                                            setShowAddLinkInput({ person: null, url: '' });
+                                          }
+                                        }}
+                                        className="text-xs text-green-400 hover:text-green-300 px-2 py-1"
+                                        title="Add"
+                                      >
+                                        ✓
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          setShowAddLinkInput({ person: null, url: '' });
+                                        }}
+                                        className="text-xs text-red-400 hover:text-red-300 px-2 py-1"
+                                        title="Cancel"
+                                      >
+                                        ✕
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                                {leadDevLinksOrder.map((key, index) => {
+                                  const value = socialHandlesConfig.leadDevLinks?.[key] || '';
+                                  if (!value && !socialHandlesConfig.leadDevLinks?.[key]) return null;
+
+                                  return (
+                                    <div
+                                      key={key}
+                                      className="flex gap-2 items-center group"
+                                      draggable
+                                      onDragStart={(e) => {
+                                        setDraggedLink({ person: 'leadDev', key });
+                                        e.dataTransfer.effectAllowed = 'move';
+                                      }}
+                                      onDragOver={(e) => {
+                                        e.preventDefault();
+                                        e.dataTransfer.dropEffect = 'move';
+                                      }}
+                                      onDrop={(e) => {
+                                        e.preventDefault();
+                                        if (draggedLink && draggedLink.person === 'leadDev' && draggedLink.key !== key) {
+                                          const newOrder = [...leadDevLinksOrder];
+                                          const draggedIndex = newOrder.indexOf(draggedLink.key);
+                                          const targetIndex = newOrder.indexOf(key);
+                                          newOrder.splice(draggedIndex, 1);
+                                          newOrder.splice(targetIndex, 0, draggedLink.key);
+                                          setLeadDevLinksOrder(newOrder);
+                                        }
+                                        setDraggedLink(null);
+                                      }}
+                                      onDragEnd={() => setDraggedLink(null)}
+                                    >
+                                      <label className="w-24 text-xs text-gray-500 flex items-center capitalize">{key}:</label>
+                                      <input
+                                        type={key === 'email' || key.includes('mail') ? 'email' : 'url'}
+                                        placeholder={key === 'email' || key.includes('mail') ? 'email@example.com' : `https://${key}.com/username`}
+                                        value={value || ''}
+                                        onChange={(e) => setSocialHandlesConfig({
+                                          ...socialHandlesConfig,
+                                          leadDevLinks: { ...socialHandlesConfig.leadDevLinks, [key]: e.target.value }
+                                        })}
+                                        className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          if (index > 0) {
+                                            const newOrder = [...leadDevLinksOrder];
+                                            [newOrder[index], newOrder[index - 1]] = [newOrder[index - 1], newOrder[index]];
+                                            setLeadDevLinksOrder(newOrder);
+                                          }
+                                        }}
+                                        className="text-gray-600 hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Move up"
+                                        disabled={index === 0}
+                                      >
+                                        <ArrowUp size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          if (index < leadDevLinksOrder.length - 1) {
+                                            const newOrder = [...leadDevLinksOrder];
+                                            [newOrder[index], newOrder[index + 1]] = [newOrder[index + 1], newOrder[index]];
+                                            setLeadDevLinksOrder(newOrder);
+                                          }
+                                        }}
+                                        className="text-gray-600 hover:text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Move down"
+                                        disabled={index === leadDevLinksOrder.length - 1}
+                                      >
+                                        <ArrowDown size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="text-gray-600 hover:text-gray-400 cursor-move opacity-0 group-hover:opacity-100 transition-opacity"
+                                        title="Drag to reorder"
+                                      >
+                                        <GripVertical size={16} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newLinks = { ...socialHandlesConfig.leadDevLinks };
+                                          delete newLinks[key];
+                                          setSocialHandlesConfig({
+                                            ...socialHandlesConfig,
+                                            leadDevLinks: newLinks
+                                          });
+                                          setLeadDevLinksOrder(leadDevLinksOrder.filter(k => k !== key));
+                                        }}
+                                        className="text-red-400 hover:text-red-300 p-1"
+                                        title="Remove link"
+                                      >
+                                        <X size={16} />
+                                      </button>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+
+                    {configTab === 'footer' && (
+                      <div className="space-y-6 animate-fadeIn w-full min-w-0" style={{ contentVisibility: 'auto' }}>
+                        <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
+                          <h3 className="text-sm font-bold text-gray-400 uppercase mb-4 flex items-center gap-2"><UserCheck size={16} /> Footer Icon Configuration</h3>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                            <div className="flex flex-col">
+                              <label className="block text-xs text-gray-500 mb-2">Website Icon</label>
+                              <div className="relative mb-4">
+                                {footerIconConfig.icon ? (
+                                  <img
+                                    src={footerIconConfig.icon}
+                                    alt="Footer Icon"
+                                    className="border-2 border-gray-700"
+                                    style={{
+                                      width: `${footerIconConfig.size || 40}px`,
+                                      height: `${footerIconConfig.size || 40}px`,
+                                      borderRadius: `${footerIconConfig.borderRadius || 8}px`,
+                                      backgroundColor: footerIconConfig.backgroundColor === 'transparent' ? 'transparent' : footerIconConfig.backgroundColor || 'transparent',
+                                      opacity: footerIconConfig.backgroundOpacity || 1,
+                                      padding: `${footerIconConfig.padding || 0}px`,
+                                      border: `${footerIconConfig.borderWidth || 0}px solid ${footerIconConfig.borderColor === 'transparent' ? 'transparent' : footerIconConfig.borderColor || 'transparent'}`,
+                                      objectFit: 'contain'
+                                    }}
+                                  />
+                                ) : (
+                                  <div
+                                    className="border-2 border-dashed border-gray-700 flex items-center justify-center bg-gray-900/50"
+                                    style={{
+                                      width: `${footerIconConfig.size || 40}px`,
+                                      height: `${footerIconConfig.size || 40}px`,
+                                      borderRadius: `${footerIconConfig.borderRadius || 8}px`
+                                    }}
+                                  >
+                                    <Upload size={20} className="text-gray-500" />
+                                  </div>
+                                )}
+                              </div>
+
+
+                              <div className="mt-auto hidden md:block">
+                                <div
+                                  className={`bg-green-900/20 border-2 rounded-lg px-3 py-2 transition-colors ${footerDragActive
+                                    ? 'border-green-500 bg-green-900/40'
+                                    : 'border-green-500/30'
+                                    }`}
+                                  onDragEnter={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setFooterDragActive(true);
+                                  }}
+                                  onDragLeave={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+
+                                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                                      setFooterDragActive(false);
+                                    }
+                                  }}
+                                  onDragOver={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                  }}
+                                  onDrop={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setFooterDragActive(false);
+
+                                    const file = e.dataTransfer.files?.[0];
+                                    if (file && file.type.startsWith('image/')) {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => {
+                                        if (reader.result) {
+                                          const base64 = reader.result as string;
+
+                                          setFooterOriginalImage(base64);
+                                          setFooterIconConfig({ ...footerIconConfig, icon: base64 });
+                                        }
+                                      };
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                >
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file && file.type.startsWith('image/')) {
+                                        setFooterIsUploading(true);
+                                        setFooterUploadProgress(0);
+
+                                        const reader = new FileReader();
+                                        reader.onprogress = (event) => {
+                                          if (event.lengthComputable) {
+                                            const progress = Math.round((event.loaded / event.total) * 100);
+                                            setFooterUploadProgress(progress);
+                                          }
+                                        };
+                                        reader.onloadend = () => {
+                                          if (reader.result) {
+                                            const base64 = reader.result as string;
+
+                                            setFooterOriginalImage(base64);
+                                            setFooterIconConfig({ ...footerIconConfig, icon: base64 });
+                                            setFooterUploadProgress(100);
+                                            setTimeout(() => {
+                                              setFooterIsUploading(false);
+                                              setFooterUploadProgress(0);
+                                            }, 300);
+                                          } else {
+                                            setFooterIsUploading(false);
+                                            setFooterUploadProgress(0);
+                                          }
+                                        };
+                                        reader.onerror = () => {
+                                          setFooterIsUploading(false);
+                                          setFooterUploadProgress(0);
+                                        };
+                                        reader.readAsDataURL(file);
+                                      }
+                                      if (e.target) e.target.value = '';
+                                    }}
+                                    className="hidden"
+                                    id="footer-icon-upload"
+                                  />
+                                  <div className="flex flex-col gap-2 mb-1">
+                                    <button
+                                      onClick={() => document.getElementById('footer-icon-upload')?.click()}
+                                      className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
+                                      title={footerIconConfig.icon ? 'Change Icon' : 'Upload Icon'}
+                                    >
+                                      <Upload size={14} />
+                                      <span className="hidden sm:inline">{footerIconConfig.icon ? 'Change Icon' : 'Upload Icon'}</span>
+                                    </button>
+                                    {footerIconConfig.icon && (
+                                      <button
+                                        onClick={() => {
+
+                                          const imageToCrop = footerOriginalImage || footerIconConfig.icon;
+                                          if (imageToCrop) {
+
+                                            if (!footerOriginalImage && footerIconConfig.icon) {
+                                              setFooterOriginalImage(footerIconConfig.icon);
+                                            }
+                                            setShowFooterCropEditor(true);
+                                            setFooterCropScale(1);
+                                            setFooterCropPosition({ x: 0, y: 0 });
+                                          }
+                                        }}
+                                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
+                                        title="Crop"
+                                      >
+                                        <Crop size={14} />
+                                        <span className="hidden sm:inline">Crop</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                  <p className="text-[10px] text-gray-500 leading-tight">
+                                    {footerDragActive ? 'Drop image here' : 'Recommended: Square image (e.g., 128x128px)'}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+
+                            <div className="flex flex-col">
+                              <div className="flex items-center justify-between mb-2">
+                                <label className="block text-xs text-gray-500">Preview</label>
+                                {footerIconConfig.icon && (
+                                  <div className="hidden md:flex flex-row gap-2">
+                                    <button
+                                      onClick={() => {
+                                        setFooterIconConfig({ ...footerIconConfig, icon: undefined });
+                                        setFooterOriginalImage('');
+                                      }}
+                                      className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
+                                      title="Remove Icon"
+                                    >
+                                      <Trash2 size={14} />
+                                      <span className="hidden sm:inline">Remove</span>
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setFooterIconConfig({
+                                          ...footerIconConfig,
+                                          size: 40,
+                                          borderRadius: 8,
+                                          backgroundColor: 'transparent',
+                                          backgroundOpacity: 1,
+                                          padding: 0,
+                                          borderColor: 'transparent',
+                                          borderWidth: 0
+                                        });
+                                        setFooterPreviewZoom(1);
+                                      }}
+                                      className="px-3 py-1.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
+                                      title="Reset All Settings"
+                                    >
+                                      <RotateCcw size={14} />
+                                      <span className="hidden sm:inline">Reset All</span>
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+
+                              {footerIsUploading && (
+                                <div className="mb-3">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs text-gray-400">Uploading icon...</span>
+                                    <span className="text-xs text-gray-400">{footerUploadProgress}%</span>
+                                  </div>
+                                  <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+                                    <div
+                                      className="bg-green-500 h-full transition-all duration-300 ease-out"
+                                      style={{ width: `${footerUploadProgress}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="md:hidden mb-2">
+                                <div className="flex flex-row gap-1.5">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file && file.type.startsWith('image/')) {
+                                        setFooterIsUploading(true);
+                                        setFooterUploadProgress(0);
+
+                                        const reader = new FileReader();
+                                        reader.onprogress = (event) => {
+                                          if (event.lengthComputable) {
+                                            const progress = Math.round((event.loaded / event.total) * 100);
+                                            setFooterUploadProgress(progress);
+                                          }
+                                        };
+                                        reader.onloadend = () => {
+                                          if (reader.result) {
+                                            const base64 = reader.result as string;
+                                            setFooterOriginalImage(base64);
+                                            setFooterIconConfig({ ...footerIconConfig, icon: base64 });
+                                            setFooterUploadProgress(100);
+                                            setTimeout(() => {
+                                              setFooterIsUploading(false);
+                                              setFooterUploadProgress(0);
+                                            }, 300);
+                                          } else {
+                                            setFooterIsUploading(false);
+                                            setFooterUploadProgress(0);
+                                          }
+                                        };
+                                        reader.onerror = () => {
+                                          setFooterIsUploading(false);
+                                          setFooterUploadProgress(0);
+                                        };
+                                        reader.readAsDataURL(file);
+                                      }
+                                      if (e.target) e.target.value = '';
+                                    }}
+                                    className="hidden"
+                                    id="footer-icon-upload-mobile"
+                                  />
+                                  <button
+                                    onClick={() => document.getElementById('footer-icon-upload-mobile')?.click()}
+                                    className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors flex items-center justify-center text-xs"
+                                    title={footerIconConfig.icon ? 'Change Icon' : 'Upload Icon'}
+                                  >
+                                    <Upload size={12} />
+                                  </button>
+                                  {footerIconConfig.icon && (
+                                    <>
+                                      <button
+                                        onClick={() => {
+                                          const imageToCrop = footerOriginalImage || footerIconConfig.icon;
+                                          if (imageToCrop) {
+                                            if (!footerOriginalImage && footerIconConfig.icon) {
+                                              setFooterOriginalImage(footerIconConfig.icon);
+                                            }
+                                            setShowFooterCropEditor(true);
+                                            setFooterCropScale(1);
+                                            setFooterCropPosition({ x: 0, y: 0 });
+                                          }
+                                        }}
+                                        className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center text-xs"
+                                        title="Crop"
+                                      >
+                                        <Crop size={12} />
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setFooterIconConfig({ ...footerIconConfig, icon: undefined });
+                                          setFooterOriginalImage('');
+                                        }}
+                                        className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center justify-center text-xs"
+                                        title="Remove Icon"
+                                      >
+                                        <Trash2 size={12} />
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setFooterIconConfig({
+                                            ...footerIconConfig,
+                                            size: 40,
+                                            borderRadius: 8,
+                                            backgroundColor: 'transparent',
+                                            backgroundOpacity: 1,
+                                            padding: 0,
+                                            borderColor: 'transparent',
+                                            borderWidth: 0
+                                          });
+                                          setFooterPreviewZoom(1);
+                                        }}
+                                        className="px-2 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors flex items-center justify-center text-xs"
+                                        title="Reset All Settings"
+                                      >
+                                        <RotateCcw size={12} />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="bg-gray-900/50 border-2 border-gray-700 rounded-lg p-8 flex items-center justify-center flex-1" style={{ minHeight: '200px', width: '100%' }}>
+                                {footerIconConfig.icon ? (
+                                  <div
+                                    style={{
+                                      width: '100%',
+                                      height: '100%',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      maxWidth: '100%',
+                                      maxHeight: '100%'
+                                    }}
+                                  >
+                                    <img
+                                      src={footerIconConfig.icon}
+                                      alt="Preview"
+                                      style={{
+                                        maxWidth: '100%',
+                                        maxHeight: '100%',
+                                        width: 'auto',
+                                        height: 'auto',
+                                        borderRadius: `${footerIconConfig.borderRadius || 8}px`,
+                                        backgroundColor: footerIconConfig.backgroundColor === 'transparent' ? 'transparent' : footerIconConfig.backgroundColor || 'transparent',
+                                        opacity: footerIconConfig.backgroundOpacity || 1,
+                                        padding: `${footerIconConfig.padding || 0}px`,
+                                        border: `${footerIconConfig.borderWidth || 0}px solid ${footerIconConfig.borderColor === 'transparent' ? 'transparent' : footerIconConfig.borderColor || 'transparent'}`,
+                                        objectFit: 'contain',
+                                        transition: 'all 0.2s ease'
+                                      }}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="text-gray-500 text-sm">Upload an icon to see preview</div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+
+                          <div className="space-y-3 border-t border-gray-800 pt-4 mt-6">
+
+                            <div>
+                              <div className="flex items-center justify-between mb-2">
+                                <label className="block text-xs text-gray-500">Size: {footerIconConfig.size || 40}px</label>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => {
+                                      const newSize = Math.max(20, (footerIconConfig.size || 40) - 1);
+                                      setFooterIconConfig({ ...footerIconConfig, size: newSize });
+
+                                      const baseSize = 40;
+                                      const inverseSize = 2 * baseSize - newSize;
+                                      const newZoom = inverseSize / newSize;
+                                      setFooterPreviewZoom(newZoom);
+                                    }}
+                                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                                    title="Decrease Size"
+                                  >
+                                    <Minimize2 size={12} />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      const newSize = Math.min(200, (footerIconConfig.size || 40) + 1);
+                                      setFooterIconConfig({ ...footerIconConfig, size: newSize });
+
+                                      const baseSize = 40;
+                                      const inverseSize = 2 * baseSize - newSize;
+                                      const newZoom = inverseSize / newSize;
+                                      setFooterPreviewZoom(newZoom);
+                                    }}
+                                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                                    title="Increase Size"
+                                  >
+                                    <Maximize2 size={12} />
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setFooterIconConfig({ ...footerIconConfig, size: 40 });
+                                      setFooterPreviewZoom(1);
+                                    }}
+                                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                                  >
+                                    Reset
+                                  </button>
+                                </div>
+                              </div>
+                              <input
+                                type="range"
+                                min="20"
+                                max="200"
+                                value={footerIconConfig.size || 40}
+                                onChange={(e) => {
+                                  const newSize = parseInt(e.target.value) || 40;
+                                  setFooterIconConfig({ ...footerIconConfig, size: newSize });
+
+                                  const baseSize = 40;
+                                  const inverseSize = 2 * baseSize - newSize;
+                                  const newZoom = inverseSize / newSize;
+                                  setFooterPreviewZoom(newZoom);
+                                }}
+                                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                style={{ accentColor: '#22c55e' }}
+                              />
+                            </div>
+
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <label className="block text-xs text-gray-500">Roundness: {footerIconConfig.borderRadius || 8}px</label>
+                                  <button
+                                    onClick={() => setFooterIconConfig({ ...footerIconConfig, borderRadius: 8 })}
+                                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                                  >
+                                    Reset
+                                  </button>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="50"
+                                  value={footerIconConfig.borderRadius || 8}
+                                  onChange={(e) => setFooterIconConfig({ ...footerIconConfig, borderRadius: parseInt(e.target.value) || 0 })}
+                                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                  style={{ accentColor: '#22c55e' }}
+                                />
+                              </div>
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <label className="block text-xs text-gray-500">Opacity: {Math.round((footerIconConfig.backgroundOpacity || 1) * 100)}%</label>
+                                  <button
+                                    onClick={() => setFooterIconConfig({ ...footerIconConfig, backgroundOpacity: 1 })}
+                                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                                  >
+                                    Reset
+                                  </button>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="1"
+                                  step="0.01"
+                                  value={footerIconConfig.backgroundOpacity || 1}
+                                  onChange={(e) => setFooterIconConfig({ ...footerIconConfig, backgroundOpacity: parseFloat(e.target.value) || 1 })}
+                                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                  style={{ accentColor: '#22c55e' }}
+                                />
+                              </div>
+                            </div>
+
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <label className="block text-xs text-gray-500">Padding: {footerIconConfig.padding || 0}px</label>
+                                  <button
+                                    onClick={() => setFooterIconConfig({ ...footerIconConfig, padding: 0 })}
+                                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                                  >
+                                    Reset
+                                  </button>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="20"
+                                  value={footerIconConfig.padding || 0}
+                                  onChange={(e) => setFooterIconConfig({ ...footerIconConfig, padding: parseInt(e.target.value) || 0 })}
+                                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                  style={{ accentColor: '#22c55e' }}
+                                />
+                              </div>
+                              <div>
+                                <div className="flex items-center justify-between mb-2">
+                                  <label className="block text-xs text-gray-500">Border Width: {footerIconConfig.borderWidth || 0}px</label>
+                                  <button
+                                    onClick={() => setFooterIconConfig({ ...footerIconConfig, borderWidth: 0 })}
+                                    className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
+                                  >
+                                    Reset
+                                  </button>
+                                </div>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="10"
+                                  value={footerIconConfig.borderWidth || 0}
+                                  onChange={(e) => setFooterIconConfig({ ...footerIconConfig, borderWidth: parseInt(e.target.value) || 0 })}
+                                  className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                  style={{ accentColor: '#22c55e' }}
+                                />
+                              </div>
+                            </div>
+
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs text-gray-500 mb-2">Background Color</label>
+                                <div className="flex gap-2 items-center">
+                                  <input
+                                    type="color"
+                                    value={(() => {
+                                      const color = footerIconConfig.backgroundColor || 'transparent';
+                                      const hexMatch = color.match(/#[0-9a-fA-F]{6}/);
+                                      return hexMatch ? hexMatch[0] : '#000000';
+                                    })()}
+                                    onChange={(e) => setFooterIconConfig({ ...footerIconConfig, backgroundColor: e.target.value })}
+                                    className="w-12 h-10 bg-black/30 border border-gray-700 rounded cursor-pointer flex-shrink-0"
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="transparent or #hex"
+                                    value={footerIconConfig.backgroundColor || 'transparent'}
+                                    onChange={(e) => setFooterIconConfig({ ...footerIconConfig, backgroundColor: e.target.value || 'transparent' })}
+                                    className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                                  />
+                                </div>
+                                <p className="text-[10px] text-gray-500 mt-1">Hex color (e.g., #000000) or transparent</p>
+                              </div>
+                              <div>
+                                <label className="block text-xs text-gray-500 mb-2">Border Color</label>
+                                <div className="flex gap-2 items-center">
+                                  <input
+                                    type="color"
+                                    value={(() => {
+                                      const color = footerIconConfig.borderColor || 'transparent';
+                                      const hexMatch = color.match(/#[0-9a-fA-F]{6}/);
+                                      return hexMatch ? hexMatch[0] : '#ffffff';
+                                    })()}
+                                    onChange={(e) => setFooterIconConfig({ ...footerIconConfig, borderColor: e.target.value })}
+                                    className="w-12 h-10 bg-black/30 border border-gray-700 rounded cursor-pointer flex-shrink-0"
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="transparent or #hex"
+                                    value={footerIconConfig.borderColor || 'transparent'}
+                                    onChange={(e) => setFooterIconConfig({ ...footerIconConfig, borderColor: e.target.value || 'transparent' })}
+                                    className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                                  />
+                                </div>
+                                <p className="text-[10px] text-gray-500 mt-1">Hex color (e.g., #ffffff) or transparent</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
+              </div>
             )}
+          </div>
         </div>
-                                 
-                                 {footerIsUploading && (
-                                     <div className="mb-3">
-                                         <div className="flex items-center justify-between mb-1">
-                                             <span className="text-xs text-gray-400">Uploading icon...</span>
-                                             <span className="text-xs text-gray-400">{footerUploadProgress}%</span>
-                                         </div>
-                                         <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
-                                             <div 
-                                                 className="bg-green-500 h-full transition-all duration-300 ease-out"
-                                                 style={{ width: `${footerUploadProgress}%` }}
-                                             ></div>
-                                         </div>
-                                     </div>
-                                 )}
-                                 
-                                 <div className="md:hidden mb-2">
-                                     <div className="flex flex-row gap-1.5">
-                                         <input
-                                             type="file"
-                                             accept="image/*"
-                                             onChange={(e) => {
-                                                 const file = e.target.files?.[0];
-                                                 if (file && file.type.startsWith('image/')) {
-                                                     setFooterIsUploading(true);
-                                                     setFooterUploadProgress(0);
-                                                     
-                                                     const reader = new FileReader();
-                                                     reader.onprogress = (event) => {
-                                                         if (event.lengthComputable) {
-                                                             const progress = Math.round((event.loaded / event.total) * 100);
-                                                             setFooterUploadProgress(progress);
-                                                         }
-                                                     };
-                                                     reader.onloadend = () => {
-                                                         if (reader.result) {
-                                                             const base64 = reader.result as string;
-                                                             setFooterOriginalImage(base64);
-                                                             setFooterIconConfig({...footerIconConfig, icon: base64});
-                                                             setFooterUploadProgress(100);
-                                                             setTimeout(() => {
-                                                                 setFooterIsUploading(false);
-                                                                 setFooterUploadProgress(0);
-                                                             }, 300);
-                                                         } else {
-                                                             setFooterIsUploading(false);
-                                                             setFooterUploadProgress(0);
-                                                         }
-                                                     };
-                                                     reader.onerror = () => {
-                                                         setFooterIsUploading(false);
-                                                         setFooterUploadProgress(0);
-                                                     };
-                                                     reader.readAsDataURL(file);
-                                                 }
-                                                 if (e.target) e.target.value = '';
-                                             }}
-                                             className="hidden"
-                                             id="footer-icon-upload-mobile"
-                                         />
-                                         <button
-                                             onClick={() => document.getElementById('footer-icon-upload-mobile')?.click()}
-                                             className="px-2 py-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors flex items-center justify-center text-xs"
-                                             title={footerIconConfig.icon ? 'Change Icon' : 'Upload Icon'}
-                                         >
-                                             <Upload size={12} />
-                                         </button>
-                                         {footerIconConfig.icon && (
-                                             <>
-                                                 <button
-                                                     onClick={() => {
-                                                         const imageToCrop = footerOriginalImage || footerIconConfig.icon;
-                                                         if (imageToCrop) {
-                                                             if (!footerOriginalImage && footerIconConfig.icon) {
-                                                                 setFooterOriginalImage(footerIconConfig.icon);
-                                                             }
-                                                             setShowFooterCropEditor(true);
-                                                             setFooterCropScale(1);
-                                                             setFooterCropPosition({ x: 0, y: 0 });
-                                                         }
-                                                     }}
-                                                     className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center text-xs"
-                                                     title="Crop"
-                                                 >
-                                                     <Crop size={12} />
-                                                 </button>
-                                                 <button
-                                                     onClick={() => {
-                                                         setFooterIconConfig({...footerIconConfig, icon: undefined});
-                                                         setFooterOriginalImage('');
-                                                     }}
-                                                     className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors flex items-center justify-center text-xs"
-                                                     title="Remove Icon"
-                                                 >
-                                                     <Trash2 size={12} />
-                                                 </button>
-                                                 <button
-                                                     onClick={() => {
-                                                         setFooterIconConfig({
-                                                             ...footerIconConfig,
-                                                             size: 40,
-                                                             borderRadius: 8,
-                                                             backgroundColor: 'transparent',
-                                                             backgroundOpacity: 1,
-                                                             padding: 0,
-                                                             borderColor: 'transparent',
-                                                             borderWidth: 0
-                                                         });
-                                                         setFooterPreviewZoom(1);
-                                                     }}
-                                                     className="px-2 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors flex items-center justify-center text-xs"
-                                                     title="Reset All Settings"
-                                                 >
-                                                     <RotateCcw size={12} />
-                                                 </button>
-                                             </>
-                                         )}
-                                     </div>
-                                 </div>
-                                 <div className="bg-gray-900/50 border-2 border-gray-700 rounded-lg p-8 flex items-center justify-center flex-1" style={{ minHeight: '200px', width: '100%' }}>
-                                     {footerIconConfig.icon ? (
-                                         <div 
-                                             style={{
-                                                 width: '100%',
-                                                 height: '100%',
-                                                 display: 'flex',
-                                                 alignItems: 'center',
-                                                 justifyContent: 'center',
-                                                 maxWidth: '100%',
-                                                 maxHeight: '100%'
-                                             }}
-                                         >
-                                             <img 
-                                                 src={footerIconConfig.icon} 
-                                                 alt="Preview" 
-                                                 style={{
-                                                     maxWidth: '100%',
-                                                     maxHeight: '100%',
-                                                     width: 'auto',
-                                                     height: 'auto',
-                                                     borderRadius: `${footerIconConfig.borderRadius || 8}px`,
-                                                     backgroundColor: footerIconConfig.backgroundColor === 'transparent' ? 'transparent' : footerIconConfig.backgroundColor || 'transparent',
-                                                     opacity: footerIconConfig.backgroundOpacity || 1,
-                                                     padding: `${footerIconConfig.padding || 0}px`,
-                                                     border: `${footerIconConfig.borderWidth || 0}px solid ${footerIconConfig.borderColor === 'transparent' ? 'transparent' : footerIconConfig.borderColor || 'transparent'}`,
-                                                     objectFit: 'contain',
-                                                     transition: 'all 0.2s ease'
-                                                 }}
-                                             />
-                                         </div>
-                                     ) : (
-                                         <div className="text-gray-500 text-sm">Upload an icon to see preview</div>
-                                     )}
-                                 </div>
-                             </div>
-                         </div>
+      </div>
 
-                         
-                         <div className="space-y-3 border-t border-gray-800 pt-4 mt-6">
-                             
-                             <div>
-                                 <div className="flex items-center justify-between mb-2">
-                                     <label className="block text-xs text-gray-500">Size: {footerIconConfig.size || 40}px</label>
-                                     <div className="flex gap-2">
-                                         <button
-                                             onClick={() => {
-                                                 const newSize = Math.max(20, (footerIconConfig.size || 40) - 1);
-                                                 setFooterIconConfig({...footerIconConfig, size: newSize});
 
-                                                 const baseSize = 40;
-                                                 const inverseSize = 2 * baseSize - newSize;
-                                                 const newZoom = inverseSize / newSize;
-                                                 setFooterPreviewZoom(newZoom);
-                                             }}
-                                             className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
-                                             title="Decrease Size"
-                                         >
-                                             <Minimize2 size={12} />
-                                         </button>
-                                         <button
-                                             onClick={() => {
-                                                 const newSize = Math.min(200, (footerIconConfig.size || 40) + 1);
-                                                 setFooterIconConfig({...footerIconConfig, size: newSize});
-
-                                                 const baseSize = 40;
-                                                 const inverseSize = 2 * baseSize - newSize;
-                                                 const newZoom = inverseSize / newSize;
-                                                 setFooterPreviewZoom(newZoom);
-                                             }}
-                                             className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
-                                             title="Increase Size"
-                                         >
-                                             <Maximize2 size={12} />
-                                         </button>
-                                         <button
-                                             onClick={() => {
-                                                 setFooterIconConfig({...footerIconConfig, size: 40});
-                                                 setFooterPreviewZoom(1);
-                                             }}
-                                             className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
-                                         >
-                                             Reset
-                                         </button>
-                                     </div>
-                                 </div>
-                                 <input
-                                     type="range"
-                                     min="20"
-                                     max="200"
-                                     value={footerIconConfig.size || 40}
-                                     onChange={(e) => {
-                                         const newSize = parseInt(e.target.value) || 40;
-                                         setFooterIconConfig({...footerIconConfig, size: newSize});
-
-                                         const baseSize = 40;
-                                         const inverseSize = 2 * baseSize - newSize;
-                                         const newZoom = inverseSize / newSize;
-                                         setFooterPreviewZoom(newZoom);
-                                     }}
-                                     className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                     style={{ accentColor: '#22c55e' }}
-                                 />
-                             </div>
-                             
-                             
-                             <div className="grid grid-cols-2 gap-4">
-                                 <div>
-                                     <div className="flex items-center justify-between mb-2">
-                                         <label className="block text-xs text-gray-500">Roundness: {footerIconConfig.borderRadius || 8}px</label>
-                                         <button
-                                             onClick={() => setFooterIconConfig({...footerIconConfig, borderRadius: 8})}
-                                             className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
-                                         >
-                                             Reset
-                                         </button>
-                                     </div>
-                                     <input
-                                         type="range"
-                                         min="0"
-                                         max="50"
-                                         value={footerIconConfig.borderRadius || 8}
-                                         onChange={(e) => setFooterIconConfig({...footerIconConfig, borderRadius: parseInt(e.target.value) || 0})}
-                                         className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                     style={{ accentColor: '#22c55e' }}
-                                     />
-                                 </div>
-                                 <div>
-                                     <div className="flex items-center justify-between mb-2">
-                                         <label className="block text-xs text-gray-500">Opacity: {Math.round((footerIconConfig.backgroundOpacity || 1) * 100)}%</label>
-                                         <button
-                                             onClick={() => setFooterIconConfig({...footerIconConfig, backgroundOpacity: 1})}
-                                             className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
-                                         >
-                                             Reset
-                                         </button>
-                                     </div>
-                                     <input
-                                         type="range"
-                                         min="0"
-                                         max="1"
-                                         step="0.01"
-                                         value={footerIconConfig.backgroundOpacity || 1}
-                                         onChange={(e) => setFooterIconConfig({...footerIconConfig, backgroundOpacity: parseFloat(e.target.value) || 1})}
-                                         className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                     style={{ accentColor: '#22c55e' }}
-                                     />
-                                 </div>
-                             </div>
-                             
-                             
-                             <div className="grid grid-cols-2 gap-4">
-                                 <div>
-                                     <div className="flex items-center justify-between mb-2">
-                                         <label className="block text-xs text-gray-500">Padding: {footerIconConfig.padding || 0}px</label>
-                                         <button
-                                             onClick={() => setFooterIconConfig({...footerIconConfig, padding: 0})}
-                                             className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
-                                         >
-                                             Reset
-                                         </button>
-                                     </div>
-                                     <input
-                                         type="range"
-                                         min="0"
-                                         max="20"
-                                         value={footerIconConfig.padding || 0}
-                                         onChange={(e) => setFooterIconConfig({...footerIconConfig, padding: parseInt(e.target.value) || 0})}
-                                         className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                     style={{ accentColor: '#22c55e' }}
-                                     />
-                                 </div>
-                                 <div>
-                                     <div className="flex items-center justify-between mb-2">
-                                         <label className="block text-xs text-gray-500">Border Width: {footerIconConfig.borderWidth || 0}px</label>
-                                         <button
-                                             onClick={() => setFooterIconConfig({...footerIconConfig, borderWidth: 0})}
-                                             className="text-xs text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-gray-800 transition-colors"
-                                         >
-                                             Reset
-                                         </button>
-                                     </div>
-                                     <input
-                                         type="range"
-                                         min="0"
-                                         max="10"
-                                         value={footerIconConfig.borderWidth || 0}
-                                         onChange={(e) => setFooterIconConfig({...footerIconConfig, borderWidth: parseInt(e.target.value) || 0})}
-                                         className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                     style={{ accentColor: '#22c55e' }}
-                                     />
-                                 </div>
-                             </div>
-                             
-                             
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                 <div>
-                                     <label className="block text-xs text-gray-500 mb-2">Background Color</label>
-                                     <div className="flex gap-2 items-center">
-                                         <input 
-                                             type="color" 
-                                             value={(() => {
-                                                 const color = footerIconConfig.backgroundColor || 'transparent';
-                                                 const hexMatch = color.match(/#[0-9a-fA-F]{6}/);
-                                                 return hexMatch ? hexMatch[0] : '#000000';
-                                             })()} 
-                                             onChange={(e) => setFooterIconConfig({...footerIconConfig, backgroundColor: e.target.value})} 
-                                             className="w-12 h-10 bg-black/30 border border-gray-700 rounded cursor-pointer flex-shrink-0" 
-                                         />
-                                         <input
-                                             type="text"
-                                             placeholder="transparent or #hex"
-                                             value={footerIconConfig.backgroundColor || 'transparent'}
-                                             onChange={(e) => setFooterIconConfig({...footerIconConfig, backgroundColor: e.target.value || 'transparent'})}
-                                             className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
-                                         />
-                                     </div>
-                                     <p className="text-[10px] text-gray-500 mt-1">Hex color (e.g., #000000) or transparent</p>
-                                 </div>
-                                 <div>
-                                     <label className="block text-xs text-gray-500 mb-2">Border Color</label>
-                                     <div className="flex gap-2 items-center">
-                                         <input 
-                                             type="color" 
-                                             value={(() => {
-                                                 const color = footerIconConfig.borderColor || 'transparent';
-                                                 const hexMatch = color.match(/#[0-9a-fA-F]{6}/);
-                                                 return hexMatch ? hexMatch[0] : '#ffffff';
-                                             })()} 
-                                             onChange={(e) => setFooterIconConfig({...footerIconConfig, borderColor: e.target.value})} 
-                                             className="w-12 h-10 bg-black/30 border border-gray-700 rounded cursor-pointer flex-shrink-0" 
-                                         />
-                                         <input
-                                             type="text"
-                                             placeholder="transparent or #hex"
-                                             value={footerIconConfig.borderColor || 'transparent'}
-                                             onChange={(e) => setFooterIconConfig({...footerIconConfig, borderColor: e.target.value || 'transparent'})}
-                                             className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
-                                         />
-                                     </div>
-                                     <p className="text-[10px] text-gray-500 mt-1">Hex color (e.g., #ffffff) or transparent</p>
-                                 </div>
-                             </div>
-                         </div>
-                     </div>
-                     </div>
-                     )}
-                     </div>
-                     </div>
-                </div>
-            )}
-            </div>
-        </div>
-        </div>
-
-      
       {showRejectModal && rejectingSuggestion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="bg-[#1e1e1e] border border-gray-700 rounded-xl shadow-2xl max-w-md w-full p-6 animate-fadeIn">
@@ -6042,7 +6627,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
         </div>
       )}
 
-      
+
       {editingBug && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="bg-[#1e1e1e] border border-gray-700 rounded-xl shadow-2xl max-w-md w-full p-6 animate-fadeIn">
@@ -6051,7 +6636,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                 <Edit size={20} />
                 Edit Issue
               </h3>
-              <button 
+              <button
                 onClick={() => {
                   setEditingBug(null);
                   setEditStatus('Open');
@@ -6062,7 +6647,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                 <X size={20} />
               </button>
             </div>
-            
+
             <div className="mb-4">
               <p className="text-sm text-gray-300 font-medium mb-2">{editingBug.title}</p>
               <p className="text-xs text-gray-500">{editingBug.description.substring(0, 100)}...</p>
@@ -6122,7 +6707,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
         </div>
       )}
 
-      
+
       {showNavbarCropEditor && navbarOriginalImage && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-[#1e1e1e] border border-gray-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-auto">
@@ -6145,7 +6730,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
               </div>
 
               <div className="space-y-4">
-                
+
                 <div className="relative bg-black rounded-lg overflow-hidden border border-gray-700" style={{ aspectRatio: '1/1', maxHeight: '400px' }}>
                   <img
                     ref={navbarImageRef}
@@ -6161,7 +6746,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       navbarImageRef.current = e.currentTarget;
                     }}
                   />
-                  
+
                   <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute inset-0 bg-black/50" style={{
                       clipPath: `inset(${(100 - 100 / navbarCropScale) / 2}% ${(100 - 100 / navbarCropScale) / 2}% ${(100 - 100 / navbarCropScale) / 2}% ${(100 - 100 / navbarCropScale) / 2}%)`
@@ -6175,7 +6760,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   </div>
                 </div>
 
-                
+
                 <div className="space-y-4">
                   <div>
                     <div className="flex items-center justify-between mb-2">
@@ -6269,7 +6854,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
         </div>
       )}
 
-      
+
       {showFooterCropEditor && footerOriginalImage && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-[#1e1e1e] border border-gray-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-auto">
@@ -6292,7 +6877,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
               </div>
 
               <div className="space-y-4">
-                
+
                 <div className="relative bg-black rounded-lg overflow-hidden border border-gray-700" style={{ aspectRatio: '1/1', maxHeight: '400px' }}>
                   <img
                     ref={footerImageRef}
@@ -6308,7 +6893,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       footerImageRef.current = e.currentTarget;
                     }}
                   />
-                  
+
                   <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute inset-0 bg-black/50" style={{
                       clipPath: `inset(${(100 - 100 / footerCropScale) / 2}% ${(100 - 100 / footerCropScale) / 2}% ${(100 - 100 / footerCropScale) / 2}% ${(100 - 100 / footerCropScale) / 2}%)`
@@ -6322,7 +6907,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   </div>
                 </div>
 
-                
+
                 <div className="space-y-4">
                   <div>
                     <div className="flex items-center justify-between mb-2">
@@ -6416,7 +7001,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
         </div>
       )}
 
-      
+
       {showCloudSyncModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="bg-[#1e1e1e] border border-gray-700 rounded-xl shadow-2xl max-w-md w-full p-6 animate-fadeIn">
@@ -6511,19 +7096,18 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     }
                     setNewChangelog({ ...newChangelog, visibility: next });
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                    (newChangelog.visibility || 'private') === 'private'
-                      ? 'bg-gray-700 text-gray-300 border border-gray-600 hover:bg-gray-600'
-                      : (newChangelog.visibility || 'private') === 'public'
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${(newChangelog.visibility || 'private') === 'private'
+                    ? 'bg-gray-700 text-gray-300 border border-gray-600 hover:bg-gray-600'
+                    : (newChangelog.visibility || 'private') === 'public'
                       ? 'bg-blue-600 text-white hover:bg-blue-700'
                       : 'bg-purple-600 text-white hover:bg-purple-700'
-                  }`}
+                    }`}
                   title={
-                    (newChangelog.visibility || 'private') === 'private' 
+                    (newChangelog.visibility || 'private') === 'private'
                       ? 'Only visible to admins in the changelog page'
                       : (newChangelog.visibility || 'private') === 'public'
-                      ? 'Visible to everyone in the changelog page'
-                      : 'Only accessible via direct link (shareable)'
+                        ? 'Visible to everyone in the changelog page'
+                        : 'Only accessible via direct link (shareable)'
                   }
                 >
                   {(newChangelog.visibility || 'private') === 'private' ? (
@@ -6595,27 +7179,27 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           alert('Please configure CurseForge project slug or URL in the Config tab first.');
                           return;
                         }
-                        
+
                         setFetchingVersion(true);
                         try {
                           const projectSlug = config.curseforgeProjectSlug || CurseForgeService.extractProjectId(config.links?.curseforge || '');
                           if (!projectSlug) {
                             throw new Error('Could not extract project slug from CurseForge URL. Please set it manually in Config.');
                           }
-                          
+
                           const latestFile = await CurseForgeService.getLatestRelease(projectSlug, config);
                           if (!latestFile) {
                             throw new Error('No release files found on CurseForge.');
                           }
-                          
+
                           const fileName = latestFile.fileName || latestFile.displayName || '';
                           const extractedVersion = CurseForgeService.extractModVersionFromFileName(fileName);
-                          
+
                           // Build download URL
-                          const projectSlugForUrl = config.curseforgeProjectSlug || 
-                                                   CurseForgeService.extractProjectSlug(config.links?.curseforge || '') ||
-                                                   projectSlug;
-                          
+                          const projectSlugForUrl = config.curseforgeProjectSlug ||
+                            CurseForgeService.extractProjectSlug(config.links?.curseforge || '') ||
+                            projectSlug;
+
                           let finalSlug = projectSlugForUrl;
                           if (/^\d+$/.test(projectSlugForUrl)) {
                             try {
@@ -6627,22 +7211,22 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                               finalSlug = projectSlugForUrl;
                             }
                           }
-                          
+
                           const downloadUrl = latestFile.id ? CurseForgeService.buildDownloadUrl(finalSlug, latestFile.id) : '';
-                          
+
                           if (extractedVersion) {
-                            setNewChangelog({ 
-                              ...newChangelog, 
+                            setNewChangelog({
+                              ...newChangelog,
                               modVersion: extractedVersion,
                               fileName: fileName, // Also set the jar name
                               downloadUrl: downloadUrl // Set download URL
                             });
                           } else {
-                            const versionMatch = latestFile.displayName?.match(/v?(\d+\.\d+\.\d+)/i) || 
-                                                latestFile.fileName?.match(/v?(\d+\.\d+\.\d+)/i);
+                            const versionMatch = latestFile.displayName?.match(/v?(\d+\.\d+\.\d+)/i) ||
+                              latestFile.fileName?.match(/v?(\d+\.\d+\.\d+)/i);
                             if (versionMatch) {
-                              setNewChangelog({ 
-                                ...newChangelog, 
+                              setNewChangelog({
+                                ...newChangelog,
                                 modVersion: versionMatch[1],
                                 fileName: fileName, // Also set the jar name
                                 downloadUrl: downloadUrl // Set download URL
@@ -6689,8 +7273,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             key={index}
                             type="button"
                             onClick={() => {
-                              setNewChangelog(prev => ({ 
-                                ...prev, 
+                              setNewChangelog(prev => ({
+                                ...prev,
                                 fileName: file.fileName,
                                 downloadUrl: file.downloadUrl
                               }));
@@ -6721,19 +7305,19 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           alert('Please configure CurseForge project slug or URL in the Config tab first.');
                           return;
                         }
-                        
+
                         setFetchingFileName(true);
                         try {
                           const projectSlug = config.curseforgeProjectSlug || CurseForgeService.extractProjectId(config.links?.curseforge || '');
                           if (!projectSlug) {
                             throw new Error('Could not extract project slug from CurseForge URL. Please set it manually in Config.');
                           }
-                          
+
                           const latestFile = await CurseForgeService.getLatestRelease(projectSlug, config);
                           if (!latestFile) {
                             throw new Error('No release files found on CurseForge.');
                           }
-                          
+
                           const fileName = latestFile.fileName || latestFile.displayName || '';
                           if (fileName) {
                             setNewChangelog({ ...newChangelog, fileName: fileName });
@@ -6805,11 +7389,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             setNewChangelog({ ...newChangelog, mcVersions: [...current, version] });
                           }
                         }}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                          (newChangelog.mcVersions || []).includes(version)
-                            ? 'bg-green-600 text-white hover:bg-green-700'
-                            : 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700'
-                        }`}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${(newChangelog.mcVersions || []).includes(version)
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700'
+                          }`}
                       >
                         {version}
                       </button>
@@ -6841,11 +7424,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         setNewChangelog({ ...newChangelog, linkedBugReports: [] });
                       }
                     }}
-                    className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      allowPatch
-                        ? 'bg-green-600 text-white hover:bg-green-700'
-                        : 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700'
-                    }`}
+                    className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors ${allowPatch
+                      ? 'bg-green-600 text-white hover:bg-green-700'
+                      : 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700'
+                      }`}
                   >
                     {allowPatch ? 'Enabled' : 'Disabled'}
                   </button>
@@ -6875,7 +7457,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     {showPreview ? 'Hide Preview' : 'Show Preview'}
                   </button>
                 </div>
-                
+
                 {newChangelog.changelogType === 'markdown' && (
                   <div className="flex flex-wrap gap-1 p-2 bg-gray-800 border border-gray-700 rounded-t-lg border-b-0">
                     <button
@@ -6975,7 +7557,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     </button>
                   </div>
                 )}
-                
+
                 {newChangelog.changelogType === 'html' && (
                   <div className="flex flex-wrap gap-1 p-2 bg-gray-800 border border-gray-700 rounded-t-lg border-b-0">
                     <button
@@ -7058,7 +7640,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     </button>
                   </div>
                 )}
-                
+
                 <div className="relative">
                   <textarea
                     ref={changelogTextareaRef}
@@ -7066,12 +7648,12 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     onChange={(e) => {
                       const value = e.target.value;
                       setNewChangelog({ ...newChangelog, changelog: value });
-                      
+
                       if ((allowPatch || newChangelog.type === 'patch') && changelogTextareaRef.current) {
                         const cursorPos = changelogTextareaRef.current.selectionStart;
                         const textBeforeCursor = value.substring(0, cursorPos);
                         const match = textBeforeCursor.match(/@([a-zA-Z0-9_-]*)$/);
-                        
+
                         if (match) {
                           const query = match[1];
                           setAutocompleteQuery(query);
@@ -7080,7 +7662,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           const lines = textBeforeMatch.split('\n');
                           const lineNumber = lines.length - 1;
                           const lineText = lines[lineNumber];
-                          
+
                           const tempDiv = document.createElement('div');
                           tempDiv.style.position = 'absolute';
                           tempDiv.style.visibility = 'hidden';
@@ -7089,12 +7671,12 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           tempDiv.style.padding = window.getComputedStyle(changelogTextareaRef.current).padding;
                           tempDiv.textContent = lineText;
                           document.body.appendChild(tempDiv);
-                          
+
                           const left = rect.left + tempDiv.offsetWidth;
                           const top = rect.top + (lineNumber + 1) * parseFloat(window.getComputedStyle(changelogTextareaRef.current).lineHeight || '20');
-                          
+
                           document.body.removeChild(tempDiv);
-                          
+
                           setAutocompletePosition({ top, left });
                           setShowBugAutocomplete(true);
                           setSelectedAutocompleteIndex(0);
@@ -7109,11 +7691,11 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       if (showBugAutocomplete && (allowPatch || newChangelog.type === 'patch')) {
                         const linkedBugReportIds = new Set(changelogs.filter(c => c.id !== editingChangelog?.id).flatMap(c => c.linkedBugReports || []));
                         const availableReports = reports.filter(r => !linkedBugReportIds.has(r.id));
-                        const filtered = availableReports.filter(r => 
-                          r.id.toLowerCase().includes(autocompleteQuery.toLowerCase()) || 
+                        const filtered = availableReports.filter(r =>
+                          r.id.toLowerCase().includes(autocompleteQuery.toLowerCase()) ||
                           r.title.toLowerCase().includes(autocompleteQuery.toLowerCase())
                         );
-                        
+
                         if (e.key === 'ArrowDown') {
                           e.preventDefault();
                           setSelectedAutocompleteIndex(prev => (prev + 1) % filtered.length);
@@ -7151,12 +7733,12 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     rows={showPreview ? 8 : 15}
                     className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-b-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 font-mono text-sm resize-y"
                   />
-                  
+
                   {showBugAutocomplete && (allowPatch || newChangelog.type === 'patch') && (
-                    <div 
+                    <div
                       className="absolute z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-48 overflow-y-auto"
-                      style={{ 
-                        top: `${autocompletePosition.top}px`, 
+                      style={{
+                        top: `${autocompletePosition.top}px`,
                         left: `${autocompletePosition.left}px`,
                         minWidth: '300px'
                       }}
@@ -7164,21 +7746,20 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       {(() => {
                         const linkedBugReportIds = new Set(changelogs.filter(c => c.id !== editingChangelog?.id).flatMap(c => c.linkedBugReports || []));
                         const availableReports = reports.filter(r => !linkedBugReportIds.has(r.id));
-                        const filtered = availableReports.filter(r => 
-                          r.id.toLowerCase().includes(autocompleteQuery.toLowerCase()) || 
+                        const filtered = availableReports.filter(r =>
+                          r.id.toLowerCase().includes(autocompleteQuery.toLowerCase()) ||
                           r.title.toLowerCase().includes(autocompleteQuery.toLowerCase())
                         );
-                        
+
                         if (filtered.length === 0) {
                           return <div className="p-2 text-sm text-gray-400">No matching bug reports</div>;
                         }
-                        
+
                         return filtered.map((report, idx) => (
                           <div
                             key={report.id}
-                            className={`p-2 cursor-pointer hover:bg-gray-700 ${
-                              idx === selectedAutocompleteIndex ? 'bg-gray-700' : ''
-                            }`}
+                            className={`p-2 cursor-pointer hover:bg-gray-700 ${idx === selectedAutocompleteIndex ? 'bg-gray-700' : ''
+                              }`}
                             onClick={() => {
                               const textarea = changelogTextareaRef.current;
                               if (textarea) {
@@ -7210,7 +7791,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                 {newChangelog.changelogType === 'html' && (
                   <p className="text-xs text-gray-500 mt-1">Supports HTML formatting</p>
                 )}
-                
+
                 {showPreview && newChangelog.changelog && (
                   <div className="mt-4 p-4 bg-black/40 border border-gray-800 rounded-lg">
                     <div className="text-xs text-gray-500 mb-2 font-semibold">Preview:</div>
@@ -7232,11 +7813,11 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     {(() => {
                       const linkedBugReportIds = new Set(changelogs.filter(c => c.id !== editingChangelog?.id).flatMap(c => c.linkedBugReports || []));
                       const availableReports = reports.filter(r => !linkedBugReportIds.has(r.id));
-                      
+
                       if (availableReports.length === 0) {
                         return <p className="text-sm text-gray-500">No available bug reports. All reports are already linked to patch notes.</p>;
                       }
-                      
+
                       return (
                         <div className="space-y-2">
                           {availableReports.map(report => (
@@ -7307,7 +7888,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       id: newId,
                       visibility: newChangelog.visibility || 'private' // Ensure visibility defaults to private
                     } as ChangelogEntry;
-                    
+
                     const updated: ChangelogEntry[] = editingChangelog
                       ? changelogs.map(c => c.id === editingChangelog.id ? changelogToSave : c)
                       : [...changelogs, changelogToSave];
@@ -7323,7 +7904,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     setChangelogs(updated);
                     const updatedConfig = { ...config, changelogs: updated };
                     onUpdateConfig(updatedConfig);
-                    
+
                     try {
                       await StorageService.saveAll(reports, suggestions, updatedConfig);
                     } catch (e: any) {
@@ -7331,7 +7912,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       alert('Failed to save changelog. Please try again.');
                       return;
                     }
-                    
+
                     // Reset form
                     setNewChangelog({
                       title: '',
@@ -7374,17 +7955,17 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-sm font-medium text-gray-300 mb-2">Tier Name *</label><input type="text" value={editingTierForm.name || ''} onChange={(e) => setEditingTierForm({...editingTierForm, name: e.target.value})} placeholder="e.g., Bronze, Silver, Gold" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500" /></div>
-                <div><label className="block text-sm font-medium text-gray-300 mb-2">Ko-fi Tier Name *</label><input type="text" value={editingTierForm.koFiTierName || ''} onChange={(e) => setEditingTierForm({...editingTierForm, koFiTierName: e.target.value})} placeholder="Exact name from Ko-fi" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500" /><p className="text-xs text-gray-500 mt-1">Must match exactly as shown in Ko-fi</p></div>
+                <div><label className="block text-sm font-medium text-gray-300 mb-2">Tier Name *</label><input type="text" value={editingTierForm.name || ''} onChange={(e) => setEditingTierForm({ ...editingTierForm, name: e.target.value })} placeholder="e.g., Bronze, Silver, Gold" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500" /></div>
+                <div><label className="block text-sm font-medium text-gray-300 mb-2">Ko-fi Tier Name *</label><input type="text" value={editingTierForm.koFiTierName || ''} onChange={(e) => setEditingTierForm({ ...editingTierForm, koFiTierName: e.target.value })} placeholder="Exact name from Ko-fi" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500" /><p className="text-xs text-gray-500 mt-1">Must match exactly as shown in Ko-fi</p></div>
               </div>
-              <div><label className="block text-sm font-medium text-gray-300 mb-2">Description</label><textarea value={editingTierForm.description || ''} onChange={(e) => setEditingTierForm({...editingTierForm, description: e.target.value})} placeholder="Describe this tier..." className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500" rows={3} /></div>
+              <div><label className="block text-sm font-medium text-gray-300 mb-2">Description</label><textarea value={editingTierForm.description || ''} onChange={(e) => setEditingTierForm({ ...editingTierForm, description: e.target.value })} placeholder="Describe this tier..." className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500" rows={3} /></div>
               <div className="grid grid-cols-3 gap-4">
-                <div><label className="block text-sm font-medium text-gray-300 mb-2">Priority</label><input type="number" value={editingTierForm.priority || 0} onChange={(e) => setEditingTierForm({...editingTierForm, priority: parseInt(e.target.value) || 0})} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500" /><p className="text-xs text-gray-500 mt-1">Higher = more important</p></div>
-                <div><label className="block text-sm font-medium text-gray-300 mb-2">Duration Type</label><select value={editingTierForm.durationType || 'subscription'} onChange={(e) => setEditingTierForm({...editingTierForm, durationType: e.target.value as 'permanent' | 'subscription'})} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"><option value="subscription">With Subscription</option><option value="permanent">Permanent</option></select></div>
-                <div className="flex items-end"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={editingTierForm.enabled !== false} onChange={(e) => setEditingTierForm({...editingTierForm, enabled: e.target.checked})} className="w-4 h-4 rounded bg-gray-800 border-gray-700 text-green-600 focus:ring-green-500" /><span className="text-sm text-gray-300">Enabled</span></label></div>
+                <div><label className="block text-sm font-medium text-gray-300 mb-2">Priority</label><input type="number" value={editingTierForm.priority || 0} onChange={(e) => setEditingTierForm({ ...editingTierForm, priority: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500" /><p className="text-xs text-gray-500 mt-1">Higher = more important</p></div>
+                <div><label className="block text-sm font-medium text-gray-300 mb-2">Duration Type</label><select value={editingTierForm.durationType || 'subscription'} onChange={(e) => setEditingTierForm({ ...editingTierForm, durationType: e.target.value as 'permanent' | 'subscription' })} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"><option value="subscription">With Subscription</option><option value="permanent">Permanent</option></select></div>
+                <div className="flex items-end"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={editingTierForm.enabled !== false} onChange={(e) => setEditingTierForm({ ...editingTierForm, enabled: e.target.checked })} className="w-4 h-4 rounded bg-gray-800 border-gray-700 text-green-600 focus:ring-green-500" /><span className="text-sm text-gray-300">Enabled</span></label></div>
               </div>
               <div className="border-t border-gray-700 pt-4">
-                <div className="flex items-center justify-between mb-4"><h4 className="text-lg font-semibold text-white">Rewards</h4><button onClick={() => { const newReward: KofiRewardItem = {id: Date.now().toString(), type: 'item', displayName: '', itemId: '', itemCount: 1}; setEditingTierForm({...editingTierForm, rewards: [...(editingTierForm.rewards || []), newReward]}); setEditingReward(newReward); }} className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm"><Plus size={16} />Add Reward</button></div>
+                <div className="flex items-center justify-between mb-4"><h4 className="text-lg font-semibold text-white">Rewards</h4><button onClick={() => { const newReward: KofiRewardItem = { id: Date.now().toString(), type: 'item', displayName: '', itemId: '', itemCount: 1 }; setEditingTierForm({ ...editingTierForm, rewards: [...(editingTierForm.rewards || []), newReward] }); setEditingReward(newReward); }} className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm"><Plus size={16} />Add Reward</button></div>
                 <div className="space-y-2">
                   {(editingTierForm.rewards || []).map((reward, idx) => (
                     <div key={reward.id || idx} className="bg-gray-800/50 border border-gray-700 rounded-lg p-3">
@@ -7396,8 +7977,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                               value={reward.displayName}
                               onChange={(e) => {
                                 const updated = [...(editingTierForm.rewards || [])];
-                                updated[idx] = {...reward, displayName: e.target.value};
-                                setEditingTierForm({...editingTierForm, rewards: updated});
+                                updated[idx] = { ...reward, displayName: e.target.value };
+                                setEditingTierForm({ ...editingTierForm, rewards: updated });
                               }}
                               placeholder="Display Name *"
                               className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
@@ -7406,8 +7987,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                               value={reward.type}
                               onChange={(e) => {
                                 const updated = [...(editingTierForm.rewards || [])];
-                                updated[idx] = {...reward, type: e.target.value as any};
-                                setEditingTierForm({...editingTierForm, rewards: updated});
+                                updated[idx] = { ...reward, type: e.target.value as any };
+                                setEditingTierForm({ ...editingTierForm, rewards: updated });
                               }}
                               className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
                             >
@@ -7426,8 +8007,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 value={reward.itemId || ''}
                                 onChange={(e) => {
                                   const updated = [...(editingTierForm.rewards || [])];
-                                  updated[idx] = {...reward, itemId: e.target.value};
-                                  setEditingTierForm({...editingTierForm, rewards: updated});
+                                  updated[idx] = { ...reward, itemId: e.target.value };
+                                  setEditingTierForm({ ...editingTierForm, rewards: updated });
                                 }}
                                 placeholder="Item ID (e.g., minecraft:diamond)"
                                 className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
@@ -7437,8 +8018,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 value={reward.itemCount || 1}
                                 onChange={(e) => {
                                   const updated = [...(editingTierForm.rewards || [])];
-                                  updated[idx] = {...reward, itemCount: parseInt(e.target.value) || 1};
-                                  setEditingTierForm({...editingTierForm, rewards: updated});
+                                  updated[idx] = { ...reward, itemCount: parseInt(e.target.value) || 1 };
+                                  setEditingTierForm({ ...editingTierForm, rewards: updated });
                                 }}
                                 placeholder="Count"
                                 className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
@@ -7451,8 +8032,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                               value={reward.command || ''}
                               onChange={(e) => {
                                 const updated = [...(editingTierForm.rewards || [])];
-                                updated[idx] = {...reward, command: e.target.value};
-                                setEditingTierForm({...editingTierForm, rewards: updated});
+                                updated[idx] = { ...reward, command: e.target.value };
+                                setEditingTierForm({ ...editingTierForm, rewards: updated });
                               }}
                               placeholder="Command (use {player} for player name)"
                               className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
@@ -7464,8 +8045,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                               value={reward.permission || ''}
                               onChange={(e) => {
                                 const updated = [...(editingTierForm.rewards || [])];
-                                updated[idx] = {...reward, permission: e.target.value};
-                                setEditingTierForm({...editingTierForm, rewards: updated});
+                                updated[idx] = { ...reward, permission: e.target.value };
+                                setEditingTierForm({ ...editingTierForm, rewards: updated });
                               }}
                               placeholder="Permission node"
                               className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
@@ -7476,8 +8057,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                               value={reward.customData || ''}
                               onChange={(e) => {
                                 const updated = [...(editingTierForm.rewards || [])];
-                                updated[idx] = {...reward, customData: e.target.value};
-                                setEditingTierForm({...editingTierForm, rewards: updated});
+                                updated[idx] = { ...reward, customData: e.target.value };
+                                setEditingTierForm({ ...editingTierForm, rewards: updated });
                               }}
                               placeholder="Custom JSON data"
                               className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500 font-mono"
@@ -7490,8 +8071,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                               value={reward.downloadUrl || ''}
                               onChange={(e) => {
                                 const updated = [...(editingTierForm.rewards || [])];
-                                updated[idx] = {...reward, downloadUrl: e.target.value};
-                                setEditingTierForm({...editingTierForm, rewards: updated});
+                                updated[idx] = { ...reward, downloadUrl: e.target.value };
+                                setEditingTierForm({ ...editingTierForm, rewards: updated });
                               }}
                               placeholder="Download URL (e.g., https://example.com/file.zip)"
                               className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
@@ -7511,7 +8092,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                       itemId: e.target.value
                                     }
                                   };
-                                  setEditingTierForm({...editingTierForm, rewards: updated});
+                                  setEditingTierForm({ ...editingTierForm, rewards: updated });
                                 }}
                                 placeholder="Item ID (e.g., buildscape:hammer)"
                                 className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
@@ -7528,7 +8109,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                       skinId: e.target.value
                                     }
                                   };
-                                  setEditingTierForm({...editingTierForm, rewards: updated});
+                                  setEditingTierForm({ ...editingTierForm, rewards: updated });
                                 }}
                                 placeholder="Skin ID (optional)"
                                 className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
@@ -7545,7 +8126,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                       textureUrl: e.target.value
                                     }
                                   };
-                                  setEditingTierForm({...editingTierForm, rewards: updated});
+                                  setEditingTierForm({ ...editingTierForm, rewards: updated });
                                 }}
                                 placeholder="Texture URL (optional)"
                                 className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
@@ -7561,7 +8142,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                       modelData: e.target.value
                                     }
                                   };
-                                  setEditingTierForm({...editingTierForm, rewards: updated});
+                                  setEditingTierForm({ ...editingTierForm, rewards: updated });
                                 }}
                                 placeholder="Custom Model Data (JSON, optional)"
                                 className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500 font-mono"
@@ -7574,8 +8155,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             value={reward.description || ''}
                             onChange={(e) => {
                               const updated = [...(editingTierForm.rewards || [])];
-                              updated[idx] = {...reward, description: e.target.value};
-                              setEditingTierForm({...editingTierForm, rewards: updated});
+                              updated[idx] = { ...reward, description: e.target.value };
+                              setEditingTierForm({ ...editingTierForm, rewards: updated });
                             }}
                             placeholder="Description (optional)"
                             className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
@@ -7584,7 +8165,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         <button
                           onClick={() => {
                             const updated = (editingTierForm.rewards || []).filter((_, i) => i !== idx);
-                            setEditingTierForm({...editingTierForm, rewards: updated});
+                            setEditingTierForm({ ...editingTierForm, rewards: updated });
                           }}
                           className="p-1.5 text-red-400 hover:text-red-300"
                           title="Remove"
@@ -7602,7 +8183,289 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
             </div>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-end mt-6 pt-4 border-t border-gray-700">
               <button onClick={() => { setShowTierModal(false); setEditingTier(null); setEditingReward(null); }} className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm sm:text-base">Cancel</button>
-              <button onClick={async () => { if (!editingTierForm.name || !editingTierForm.koFiTierName) { alert('Tier Name and Ko-fi Tier Name are required'); return; } const updatedTier: KofiTier = {...editingTier, ...editingTierForm, updatedAt: Date.now(), createdAt: editingTier.createdAt || Date.now()} as KofiTier; const updated = editingTier.id && kofiTiers.find(t => t.id === editingTier.id) ? kofiTiers.map(t => t.id === editingTier.id ? updatedTier : t) : [...kofiTiers, updatedTier]; setKofiTiers(updated); await saveKofiTiers(updated); setShowTierModal(false); setEditingTier(null); setEditingReward(null); setToast({msg: 'Tier saved successfully', type: 'success'}); }} className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm sm:text-base flex items-center justify-center gap-1.5 sm:gap-2"><Save size={14} className="sm:w-4 sm:h-4" /><span>Save Tier</span></button>
+              <button onClick={async () => { if (!editingTierForm.name || !editingTierForm.koFiTierName) { alert('Tier Name and Ko-fi Tier Name are required'); return; } const updatedTier: KofiTier = { ...editingTier, ...editingTierForm, updatedAt: Date.now(), createdAt: editingTier.createdAt || Date.now() } as KofiTier; const updated = editingTier.id && kofiTiers.find(t => t.id === editingTier.id) ? kofiTiers.map(t => t.id === editingTier.id ? updatedTier : t) : [...kofiTiers, updatedTier]; setKofiTiers(updated); await saveKofiTiers(updated); setShowTierModal(false); setEditingTier(null); setEditingReward(null); setToast({ msg: 'Tier saved successfully', type: 'success' }); }} className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm sm:text-base flex items-center justify-center gap-1.5 sm:gap-2"><Save size={14} className="sm:w-4 sm:h-4" /><span>Save Tier</span></button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Twitch Tier Editor Modal */}
+      {showTwitchTierModal && editingTwitchTier && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto" onClick={(e) => e.target === e.currentTarget && setShowTwitchTierModal(false)}>
+          <div className="bg-[#1e1e1e] border border-gray-700 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 my-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2"><Twitch size={20} className="text-purple-400" />{twitchTiers.find(t => t.id === editingTwitchTier.id) ? 'Edit Twitch Tier' : 'Create Twitch Tier'}</h3>
+              <button onClick={() => { setShowTwitchTierModal(false); setEditingTwitchTier(null); }} className="p-1 text-gray-400 hover:text-white"><X size={20} /></button>
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="block text-sm font-medium text-gray-300 mb-2">Tier Name *</label><input type="text" value={editingTwitchTierForm.name || ''} onChange={(e) => setEditingTwitchTierForm({ ...editingTwitchTierForm, name: e.target.value })} placeholder="e.g., Prime Member, Tier 1 Sub" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500" /></div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Twitch Level *</label>
+                  <select
+                    value={editingTwitchTierForm.twitchTierLevel || '1000'}
+                    onChange={(e) => setEditingTwitchTierForm({ ...editingTwitchTierForm, twitchTierLevel: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="1000">Tier 1 (1000)</option>
+                    <option value="2000">Tier 2 (2000)</option>
+                    <option value="3000">Tier 3 (3000)</option>
+                  </select>
+                </div>
+              </div>
+              <div><label className="block text-sm font-medium text-gray-300 mb-2">Description</label><textarea value={editingTwitchTierForm.description || ''} onChange={(e) => setEditingTwitchTierForm({ ...editingTwitchTierForm, description: e.target.value })} placeholder="Describe this tier..." className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500" rows={3} /></div>
+              <div className="flex items-end"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={editingTwitchTierForm.enabled !== false} onChange={(e) => setEditingTwitchTierForm({ ...editingTwitchTierForm, enabled: e.target.checked })} className="w-4 h-4 rounded bg-gray-800 border-gray-700 text-purple-600 focus:ring-purple-500" /><span className="text-sm text-gray-300">Enabled</span></label></div>
+
+              <div className="border-t border-gray-700 pt-4">
+                <div className="flex items-center justify-between mb-4"><h4 className="text-lg font-semibold text-white">Rewards</h4><button onClick={() => { const newReward: KofiRewardItem = { id: Date.now().toString(), type: 'item', displayName: '', itemId: '', itemCount: 1 }; setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: [...(editingTwitchTierForm.rewards || []), newReward] }); }} className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm"><Plus size={16} />Add Reward</button></div>
+                <div className="space-y-2">
+                  {(editingTwitchTierForm.rewards || []).map((reward, idx) => (
+                    <div key={reward.id || idx} className="bg-gray-800/50 border border-gray-700 rounded-lg p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              value={reward.displayName}
+                              onChange={(e) => {
+                                const updated = [...(editingTwitchTierForm.rewards || [])];
+                                updated[idx] = { ...reward, displayName: e.target.value };
+                                setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
+                              }}
+                              placeholder="Display Name *"
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            />
+                            <select
+                              value={reward.type}
+                              onChange={(e) => {
+                                const updated = [...(editingTwitchTierForm.rewards || [])];
+                                updated[idx] = { ...reward, type: e.target.value as any };
+                                setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
+                              }}
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            >
+                              <option value="item">Item</option>
+                              <option value="command">Command</option>
+                              <option value="permission">Permission</option>
+                              <option value="custom">Custom</option>
+                              <option value="downloadable">Downloadable</option>
+                              <option value="cosmetic">Cosmetic</option>
+                            </select>
+                          </div>
+                          {reward.type === 'item' && (
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="text"
+                                value={reward.itemId || ''}
+                                onChange={(e) => {
+                                  const updated = [...(editingTwitchTierForm.rewards || [])];
+                                  updated[idx] = { ...reward, itemId: e.target.value };
+                                  setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
+                                }}
+                                placeholder="Item ID (e.g., minecraft:diamond)"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                              />
+                              <input
+                                type="number"
+                                value={reward.itemCount || 1}
+                                onChange={(e) => {
+                                  const updated = [...(editingTwitchTierForm.rewards || [])];
+                                  updated[idx] = { ...reward, itemCount: parseInt(e.target.value) || 1 };
+                                  setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
+                                }}
+                                placeholder="Count"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                              />
+                            </div>
+                          )}
+                          {reward.type === 'command' && (
+                            <input
+                              type="text"
+                              value={reward.command || ''}
+                              onChange={(e) => {
+                                const updated = [...(editingTwitchTierForm.rewards || [])];
+                                updated[idx] = { ...reward, command: e.target.value };
+                                setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
+                              }}
+                              placeholder="Command (use {player} for player name)"
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            />
+                          )}
+                          {reward.type === 'permission' && (
+                            <input
+                              type="text"
+                              value={reward.permission || ''}
+                              onChange={(e) => {
+                                const updated = [...(editingTwitchTierForm.rewards || [])];
+                                updated[idx] = { ...reward, permission: e.target.value };
+                                setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
+                              }}
+                              placeholder="Permission node"
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            />
+                          )}
+                          {reward.type === 'custom' && (
+                            <textarea
+                              value={reward.customData || ''}
+                              onChange={(e) => {
+                                const updated = [...(editingTwitchTierForm.rewards || [])];
+                                updated[idx] = { ...reward, customData: e.target.value };
+                                setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
+                              }}
+                              placeholder="Custom JSON data"
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono"
+                              rows={2}
+                            />
+                          )}
+                          {reward.type === 'downloadable' && (
+                            <input
+                              type="url"
+                              value={reward.downloadUrl || ''}
+                              onChange={(e) => {
+                                const updated = [...(editingTwitchTierForm.rewards || [])];
+                                updated[idx] = { ...reward, downloadUrl: e.target.value };
+                                setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
+                              }}
+                              placeholder="Download URL (e.g., https://example.com/file.zip)"
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                            />
+                          )}
+                          {reward.type === 'cosmetic' && (
+                            <div className="space-y-2">
+                              <input
+                                type="text"
+                                value={reward.cosmeticData?.itemId || ''}
+                                onChange={(e) => {
+                                  const updated = [...(editingTwitchTierForm.rewards || [])];
+                                  updated[idx] = {
+                                    ...reward,
+                                    cosmeticData: {
+                                      ...reward.cosmeticData,
+                                      itemId: e.target.value
+                                    }
+                                  };
+                                  setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
+                                }}
+                                placeholder="Cosmetic ID"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                              />
+                              <input
+                                type="text"
+                                value={reward.cosmeticData?.skinId || ''}
+                                onChange={(e) => {
+                                  const updated = [...(editingTwitchTierForm.rewards || [])];
+                                  updated[idx] = {
+                                    ...reward,
+                                    cosmeticData: {
+                                      ...reward.cosmeticData,
+                                      skinId: e.target.value
+                                    }
+                                  };
+                                  setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
+                                }}
+                                placeholder="Skin ID (optional)"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                              />
+                              <input
+                                type="url"
+                                value={reward.cosmeticData?.textureUrl || ''}
+                                onChange={(e) => {
+                                  const updated = [...(editingTwitchTierForm.rewards || [])];
+                                  updated[idx] = {
+                                    ...reward,
+                                    cosmeticData: {
+                                      ...reward.cosmeticData,
+                                      textureUrl: e.target.value
+                                    }
+                                  };
+                                  setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
+                                }}
+                                placeholder="Texture URL (optional)"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                              />
+                              <textarea
+                                value={reward.cosmeticData?.modelData || ''}
+                                onChange={(e) => {
+                                  const updated = [...(editingTwitchTierForm.rewards || [])];
+                                  updated[idx] = {
+                                    ...reward,
+                                    cosmeticData: {
+                                      ...reward.cosmeticData,
+                                      modelData: e.target.value
+                                    }
+                                  };
+                                  setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
+                                }}
+                                placeholder="Custom Model Data (JSON, optional)"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono"
+                                rows={2}
+                              />
+                            </div>
+                          )}
+                          <input
+                            type="text"
+                            value={reward.description || ''}
+                            onChange={(e) => {
+                              const updated = [...(editingTwitchTierForm.rewards || [])];
+                              updated[idx] = { ...reward, description: e.target.value };
+                              setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
+                            }}
+                            placeholder="Description (optional)"
+                            className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          />
+                        </div>
+                        <button
+                          onClick={() => {
+                            const updated = (editingTwitchTierForm.rewards || []).filter((_, i) => i !== idx);
+                            setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
+                          }}
+                          className="p-1.5 text-red-400 hover:text-red-300"
+                          title="Remove"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {(!editingTwitchTierForm.rewards || editingTwitchTierForm.rewards.length === 0) && (
+                    <p className="text-sm text-gray-500 text-center py-4">No rewards added yet. Click "Add Reward" to add one.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-end mt-6 pt-4 border-t border-gray-700">
+              <button
+                onClick={() => { setShowTwitchTierModal(false); setEditingTwitchTier(null); }}
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm sm:text-base"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (!editingTwitchTierForm.name || !editingTwitchTierForm.twitchTierLevel) {
+                    alert('Tier Name and Twitch Level are required');
+                    return;
+                  }
+                  const updatedTier: TwitchTier = {
+                    ...editingTwitchTier,
+                    ...editingTwitchTierForm,
+                    updatedAt: Date.now(),
+                    createdAt: editingTwitchTier.createdAt || Date.now()
+                  } as TwitchTier;
+                  const updated = editingTwitchTier.id && twitchTiers.find(t => t.id === editingTwitchTier.id)
+                    ? twitchTiers.map(t => t.id === editingTwitchTier.id ? updatedTier : t)
+                    : [...twitchTiers, updatedTier];
+                  setTwitchTiers(updated);
+                  await saveTwitchTiers(updated);
+                  setShowTwitchTierModal(false);
+                  setEditingTwitchTier(null);
+                  setToast({ msg: 'Twitch tier saved successfully', type: 'success' });
+                }}
+                className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm sm:text-base flex items-center justify-center gap-1.5 sm:gap-2"
+              >
+                <Save size={14} className="sm:w-4 sm:h-4" />
+                <span>Save Twitch Tier</span>
+              </button>
             </div>
           </div>
         </div>
@@ -7658,7 +8521,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   value={reward.displayName}
                                   onChange={(e) => {
                                     const updated = [...manualRewardItems];
-                                    updated[idx] = {...reward, displayName: e.target.value};
+                                    updated[idx] = { ...reward, displayName: e.target.value };
                                     setManualRewardItems(updated);
                                   }}
                                   placeholder="Display Name *"
@@ -7668,7 +8531,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   value={reward.type}
                                   onChange={(e) => {
                                     const updated = [...manualRewardItems];
-                                    updated[idx] = {...reward, type: e.target.value as any};
+                                    updated[idx] = { ...reward, type: e.target.value as any };
                                     setManualRewardItems(updated);
                                   }}
                                   className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
@@ -7688,7 +8551,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     value={reward.itemId || ''}
                                     onChange={(e) => {
                                       const updated = [...manualRewardItems];
-                                      updated[idx] = {...reward, itemId: e.target.value};
+                                      updated[idx] = { ...reward, itemId: e.target.value };
                                       setManualRewardItems(updated);
                                     }}
                                     placeholder="Item ID"
@@ -7699,7 +8562,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     value={reward.itemCount || 1}
                                     onChange={(e) => {
                                       const updated = [...manualRewardItems];
-                                      updated[idx] = {...reward, itemCount: parseInt(e.target.value) || 1};
+                                      updated[idx] = { ...reward, itemCount: parseInt(e.target.value) || 1 };
                                       setManualRewardItems(updated);
                                     }}
                                     placeholder="Count"
@@ -7713,7 +8576,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   value={reward.command || ''}
                                   onChange={(e) => {
                                     const updated = [...manualRewardItems];
-                                    updated[idx] = {...reward, command: e.target.value};
+                                    updated[idx] = { ...reward, command: e.target.value };
                                     setManualRewardItems(updated);
                                   }}
                                   placeholder="Command (use {player} for player name)"
@@ -7726,7 +8589,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   value={reward.permission || ''}
                                   onChange={(e) => {
                                     const updated = [...manualRewardItems];
-                                    updated[idx] = {...reward, permission: e.target.value};
+                                    updated[idx] = { ...reward, permission: e.target.value };
                                     setManualRewardItems(updated);
                                   }}
                                   placeholder="Permission node"
@@ -7738,7 +8601,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   value={reward.customData || ''}
                                   onChange={(e) => {
                                     const updated = [...manualRewardItems];
-                                    updated[idx] = {...reward, customData: e.target.value};
+                                    updated[idx] = { ...reward, customData: e.target.value };
                                     setManualRewardItems(updated);
                                   }}
                                   placeholder="Custom JSON data"
@@ -7752,7 +8615,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   value={reward.downloadUrl || ''}
                                   onChange={(e) => {
                                     const updated = [...manualRewardItems];
-                                    updated[idx] = {...reward, downloadUrl: e.target.value};
+                                    updated[idx] = { ...reward, downloadUrl: e.target.value };
                                     setManualRewardItems(updated);
                                   }}
                                   placeholder="Download URL (e.g., https://example.com/file.zip)"
@@ -7882,7 +8745,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         setRewardUserSearch('');
                         setManualRewardReason('');
                         setManualRewardItems([]);
-                        setToast({msg: 'Manual reward granted', type: 'success'});
+                        setToast({ msg: 'Manual reward granted', type: 'success' });
                       }}
                       className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm sm:text-base flex items-center justify-center gap-1.5 sm:gap-2 w-full sm:w-auto"
                     >
@@ -7920,7 +8783,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
             <div className="space-y-4">
               <div className="bg-blue-900/20 border border-blue-700 rounded-lg p-4">
                 <p className="text-sm text-blue-300 mb-2">
-                  <strong>Note:</strong> Ko-fi doesn't provide an API to fetch tiers automatically. 
+                  <strong>Note:</strong> Ko-fi doesn't provide an API to fetch tiers automatically.
                   Please enter the tier names exactly as they appear on your Ko-fi membership page.
                 </p>
                 <p className="text-xs text-blue-400">
@@ -7984,8 +8847,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
                     // Create new tiers
                     const newTiers: KofiTier[] = [];
-                    let priority = kofiTiers.length > 0 
-                      ? Math.max(...kofiTiers.map(t => t.priority || 0), 0) + 1 
+                    let priority = kofiTiers.length > 0
+                      ? Math.max(...kofiTiers.map(t => t.priority || 0), 0) + 1
                       : 1;
 
                     for (const tierName of tierNames) {
@@ -8039,20 +8902,19 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
           </div>
         </div>
       )}
-      
+
       <canvas ref={navbarCanvasRef} className="hidden" />
       <canvas ref={footerCanvasRef} className="hidden" />
 
       {toast && (
         <div className="fixed bottom-6 right-6 z-[100] toast-enter pointer-events-none">
-          <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border text-sm font-medium ${
-            toast.type === 'success' ? 'bg-[#1e1e1e] border-green-900 text-green-400' : 
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border text-sm font-medium ${toast.type === 'success' ? 'bg-[#1e1e1e] border-green-900 text-green-400' :
             toast.type === 'info' ? 'bg-[#1e1e1e] border-blue-900 text-blue-400' :
-            'bg-[#1e1e1e] border-red-900 text-red-400'
-          }`}>
-            {toast.type === 'success' ? <CheckCircle size={20} /> : 
-             toast.type === 'info' ? <Info size={20} /> : 
-             <AlertCircle size={20} />}
+              'bg-[#1e1e1e] border-red-900 text-red-400'
+            }`}>
+            {toast.type === 'success' ? <CheckCircle size={20} /> :
+              toast.type === 'info' ? <Info size={20} /> :
+                <AlertCircle size={20} />}
             <span>{toast.msg}</span>
           </div>
         </div>
@@ -8111,7 +8973,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                 onUpdateReport(updated);
               }
             }}
-            onNavigateLogin={() => {}}
+            onNavigateLogin={() => { }}
             onNotify={(msg, type) => setToast({ msg, type: type || 'success' })}
           />
         ) : null;
@@ -8119,7 +8981,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
       {/* Redeem Code Modal */}
       {showRedeemCodeModal && typeof document !== 'undefined' && createPortal(
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
           style={{
             position: 'fixed',
@@ -8136,10 +8998,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
           }}
           onClick={(e) => e.target === e.currentTarget && setShowRedeemCodeModal(false)}
         >
-          <div 
+          <div
             className="bg-[#1e1e1e] border border-gray-700 rounded-xl shadow-2xl max-w-3xl w-full p-6"
             onClick={(e) => e.stopPropagation()}
-            style={{ 
+            style={{
               maxHeight: '90vh',
               overflowY: 'auto',
               margin: 'auto'
@@ -8528,7 +9390,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
       {/* Wiki Feature Modal */}
       {showWikiModal && typeof document !== 'undefined' && createPortal(
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
           style={{
             position: 'fixed',
@@ -8545,10 +9407,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
           }}
           onClick={(e) => e.target === e.currentTarget && setShowWikiModal(false)}
         >
-          <div 
+          <div
             className="bg-[#1e1e1e] border border-gray-700 rounded-xl shadow-2xl max-w-4xl w-full p-6"
             onClick={(e) => e.stopPropagation()}
-            style={{ 
+            style={{
               maxHeight: '90vh',
               overflowY: 'auto',
               margin: 'auto'
@@ -8614,11 +9476,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             setSubcategoryPage(0);
                           }
                         }}
-                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                          isSelected
-                            ? 'bg-green-600 text-white border-2 border-green-500'
-                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border-2 border-transparent'
-                        }`}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${isSelected
+                          ? 'bg-green-600 text-white border-2 border-green-500'
+                          : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border-2 border-transparent'
+                          }`}
                       >
                         {cat.charAt(0).toUpperCase() + cat.slice(1)}
                       </button>
@@ -8630,7 +9491,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
               {(() => {
                 const selectedCategories = newWikiFeature.categories || [];
                 if (selectedCategories.length === 0) return null;
-                
+
                 const allSubcats: Record<string, { id: string; label: string }[]> = {
                   automation: [
                     { id: 'redstone', label: 'Redstone' },
@@ -8676,10 +9537,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     { id: 'editing', label: 'Editing' }
                   ]
                 };
-                
+
                 const availableSubcats = selectedCategories.flatMap(cat => allSubcats[cat] || []);
                 const uniqueSubcats = Array.from(new Map(availableSubcats.map(s => [s.id, s])).values());
-                
+
                 return (
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Subcategories (optional)</label>
@@ -8693,9 +9554,9 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         &lt;
                       </button>
                       <div className="flex-1 overflow-hidden relative">
-                        <div 
+                        <div
                           className="flex gap-2 transition-transform duration-300 ease-in-out"
-                          style={{ 
+                          style={{
                             transform: `translateX(-${subcategoryPage * 100}%)`,
                             width: `${Math.ceil(uniqueSubcats.length / 6) * 100}%`
                           }}
@@ -8723,11 +9584,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                             setNewWikiFeature({ ...newWikiFeature, subcategories: [...current, subcat.id] });
                                           }
                                         }}
-                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${
-                                          isSelected
-                                            ? 'bg-blue-600 text-white border-2 border-blue-500'
-                                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border-2 border-transparent'
-                                        }`}
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${isSelected
+                                          ? 'bg-blue-600 text-white border-2 border-blue-500'
+                                          : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border-2 border-transparent'
+                                          }`}
                                       >
                                         {subcat.label}
                                       </button>
@@ -8774,7 +9634,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         &lt;
                       </button>
                       <div className="flex-1 overflow-hidden relative">
-                        <div 
+                        <div
                           className="flex gap-2 transition-transform duration-300 ease-in-out"
                           style={{ transform: `translateX(-${mcVersionPage * 100}%)` }}
                         >
@@ -8802,11 +9662,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                             setNewWikiFeature({ ...newWikiFeature, mcVersions: [...current, version] });
                                           }
                                         }}
-                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${
-                                          isSelected
-                                            ? 'bg-green-600 text-white border-2 border-green-500'
-                                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border-2 border-transparent'
-                                        }`}
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${isSelected
+                                          ? 'bg-green-600 text-white border-2 border-green-500'
+                                          : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border-2 border-transparent'
+                                          }`}
                                       >
                                         {version}
                                       </button>
@@ -8838,7 +9697,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       </button>
                     </div>
                   </div>
-                  
+
                   {config.modVersions && config.modVersions.length > 0 && (
                     <div className="flex-1">
                       <label className="block text-sm font-medium text-gray-300 mb-2">Mod Versions (optional)</label>
@@ -8852,7 +9711,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           &lt;
                         </button>
                         <div className="flex-1 overflow-hidden relative">
-                          <div 
+                          <div
                             className="flex gap-2 transition-transform duration-300 ease-in-out"
                             style={{ transform: `translateX(-${modVersionPage * 100}%)` }}
                           >
@@ -8879,11 +9738,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                               setNewWikiFeature({ ...newWikiFeature, modVersions: [...current, version] });
                                             }
                                           }}
-                                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${
-                                            isSelected
-                                              ? 'bg-blue-600 text-white border-2 border-blue-500'
-                                              : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border-2 border-transparent'
-                                          }`}
+                                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${isSelected
+                                            ? 'bg-blue-600 text-white border-2 border-blue-500'
+                                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border-2 border-transparent'
+                                            }`}
                                         >
                                           {version}
                                         </button>
@@ -9000,13 +9858,13 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             // Fallback: simple local enhancement
                             const enhanced = enhanceDescriptionLocally(newWikiFeature.description || '', newWikiFeature.descriptionType || 'markdown');
                             const enhancedTitle = newWikiFeature.title?.charAt(0).toUpperCase() + newWikiFeature.title?.slice(1) || newWikiFeature.title;
-                            setNewWikiFeature({ 
-                              ...newWikiFeature, 
+                            setNewWikiFeature({
+                              ...newWikiFeature,
                               title: enhancedTitle,
-                              description: enhanced, 
+                              description: enhanced,
                               descriptionType: 'markdown',
-                              details: newWikiFeature.details && newWikiFeature.details.length > 0 
-                                ? newWikiFeature.details 
+                              details: newWikiFeature.details && newWikiFeature.details.length > 0
+                                ? newWikiFeature.details
                                 : [newWikiFeature.description?.split('.')[0] || ''].filter(Boolean)
                             });
                           }
@@ -9015,13 +9873,13 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           // Fallback: simple local enhancement
                           const enhanced = enhanceDescriptionLocally(newWikiFeature.description || '', newWikiFeature.descriptionType || 'markdown');
                           const enhancedTitle = newWikiFeature.title?.charAt(0).toUpperCase() + newWikiFeature.title?.slice(1) || newWikiFeature.title;
-                          setNewWikiFeature({ 
-                            ...newWikiFeature, 
+                          setNewWikiFeature({
+                            ...newWikiFeature,
                             title: enhancedTitle,
-                            description: enhanced, 
+                            description: enhanced,
                             descriptionType: 'markdown',
-                            details: newWikiFeature.details && newWikiFeature.details.length > 0 
-                              ? newWikiFeature.details 
+                            details: newWikiFeature.details && newWikiFeature.details.length > 0
+                              ? newWikiFeature.details
                               : [newWikiFeature.description?.split('.')[0] || ''].filter(Boolean)
                           });
                           setToast({ msg: 'Applied local formatting improvements', type: 'success' });
@@ -9500,9 +10358,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     />
                     <label
                       htmlFor="media-upload-input"
-                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white cursor-pointer hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                        uploadingMedia ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
+                      className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-900 border border-gray-600 rounded-lg text-white cursor-pointer hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${uploadingMedia ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
                     >
                       {uploadingMedia ? (
                         <>
@@ -9562,10 +10419,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             const previewUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
                             return (
                               <div>
-                                <img 
-                                  src={previewUrl} 
-                                  alt="Google Drive Preview" 
-                                  className="max-w-full h-48 object-contain rounded-lg border border-gray-600" 
+                                <img
+                                  src={previewUrl}
+                                  alt="Google Drive Preview"
+                                  className="max-w-full h-48 object-contain rounded-lg border border-gray-600"
                                   onError={() => {
                                     // If preview fails, show download link
                                     return;
@@ -9584,21 +10441,21 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             </div>
                           );
                         }
-                        
+
                         // Image detection
                         if (mediaPreview.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i) || mediaPreview.includes('image') || mediaPreview.includes('imgur.com') || mediaPreview.includes('i.imgur.com')) {
                           return (
-                            <img 
-                              src={mediaPreview} 
-                              alt="Preview" 
-                              className="max-w-full h-48 object-contain rounded-lg border border-gray-600" 
+                            <img
+                              src={mediaPreview}
+                              alt="Preview"
+                              className="max-w-full h-48 object-contain rounded-lg border border-gray-600"
                               onError={() => {
                                 setToast({ msg: 'Failed to load image preview. URL may be invalid or require authentication.', type: 'error' });
-                              }} 
+                              }}
                             />
                           );
                         }
-                        
+
                         // YouTube detection
                         if (mediaPreview.includes('youtube.com') || mediaPreview.includes('youtu.be')) {
                           let embedUrl = '';
@@ -9620,7 +10477,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             />
                           );
                         }
-                        
+
                         // Vimeo detection
                         if (mediaPreview.includes('vimeo.com')) {
                           const videoId = mediaPreview.split('vimeo.com/')[1]?.split('?')[0] || mediaPreview.split('vimeo.com/')[1];
@@ -9636,13 +10493,13 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             />
                           );
                         }
-                        
+
                         // Video file detection
                         if (mediaPreview.match(/\.(mp4|webm|ogg|mov)$/i) || mediaPreview.includes('video')) {
                           return (
-                            <video 
-                              src={mediaPreview} 
-                              controls 
+                            <video
+                              src={mediaPreview}
+                              controls
                               className="max-w-full h-48 object-contain rounded-lg border border-gray-600"
                               onError={() => {
                                 setToast({ msg: 'Failed to load video preview. URL may be invalid or require authentication.', type: 'error' });
@@ -9650,7 +10507,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             />
                           );
                         }
-                        
+
                         // Unknown format - show link
                         return (
                           <div className="bg-gray-800 border border-gray-600 rounded-lg p-4 text-center">

@@ -701,6 +701,136 @@ export const handler = async (event: any, context: any) => {
       return corsResponse(200, { users: users.map(mapProfileToUser) });
     }
 
+    // Get Legacy Users (Admin)
+    if (requestAction === 'getLegacyUsers') {
+      if (profile.role !== 'admin' && profile.role !== 'owner') {
+         return corsResponse(403, { error: "Forbidden" });
+      }
+
+      const { data: users, error } = await supabaseAdmin
+        .from('legacy_users')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return corsResponse(200, { 
+        users: (users || []).map(u => ({
+          email: u.email,
+          username: u.username,
+          role: u.old_role,
+          minecraftUsername: u.old_minecraft_username,
+          minecraftUuid: u.old_minecraft_uuid,
+          kofiUsername: u.old_kofi_username,
+          createdAt: new Date(u.created_at).getTime()
+        }))
+      });
+    }
+
+    // Delete Legacy User (Admin)
+    if (requestAction === 'deleteLegacyUser') {
+      if (profile.role !== 'admin' && profile.role !== 'owner') {
+         return corsResponse(403, { error: "Forbidden" });
+      }
+      const targetEmail = body.email;
+      if (!targetEmail) return corsResponse(400, { error: "Email required" });
+
+      const { error } = await supabaseAdmin
+        .from('legacy_users')
+        .delete()
+        .eq('email', targetEmail);
+
+      if (error) throw error;
+      return corsResponse(200, { success: true });
+    }
+
+    // Create Legacy User (Admin)
+    if (requestAction === 'createLegacyUser') {
+      if (profile.role !== 'admin' && profile.role !== 'owner') {
+         return corsResponse(403, { error: "Forbidden" });
+      }
+      const { user } = body;
+      if (!user || !user.email || !user.username) return corsResponse(400, { error: "Email and username required" });
+
+      const { error } = await supabaseAdmin
+        .from('legacy_users')
+        .insert({
+          email: user.email.toLowerCase(),
+          username: user.username,
+          old_role: user.role || 'user',
+          old_minecraft_username: user.minecraftUsername || null,
+          old_minecraft_uuid: user.minecraftUuid || null,
+          old_kofi_username: user.kofiUsername || null
+        });
+
+      if (error) throw error;
+      return corsResponse(200, { success: true });
+    }
+
+    // Send Reset Link (Admin)
+    if (requestAction === 'sendResetLink') {
+      if (profile.role !== 'admin' && profile.role !== 'owner') {
+         return corsResponse(403, { error: "Forbidden" });
+      }
+      const { id: targetId } = body;
+      if (!targetId) return corsResponse(400, { error: "User ID required" });
+
+      const { data: targetProfile } = await supabaseAdmin.from('profiles').select('email, username').eq('id', targetId).single();
+      if (!targetProfile) return corsResponse(404, { error: "User not found" });
+
+      const { data, error } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'recovery',
+        email: targetProfile.email,
+        options: { redirectTo: process.env.URL ? `${process.env.URL}/reset-password` : 'http://localhost:8888/reset-password' }
+      });
+
+      if (error) throw error;
+
+      await sendProfessionalEmail(
+        targetProfile.email,
+        "Reset Your Password - Buildscape",
+        "Password Reset Requested",
+        `Hi ${targetProfile.username}, an administrator has initiated a password reset for your account. Please use the link below to set a new password.`,
+        "Reset Password",
+        data.properties.action_link
+      );
+
+      return corsResponse(200, { success: true });
+    }
+
+    // Force Reset Password with Dummy (Admin)
+    if (requestAction === 'forceResetPassword') {
+      if (profile.role !== 'admin' && profile.role !== 'owner') {
+         return corsResponse(403, { error: "Forbidden" });
+      }
+      const { id: targetId } = body;
+      if (!targetId) return corsResponse(400, { error: "User ID required" });
+
+      const { data: targetProfile } = await supabaseAdmin.from('profiles').select('email, username').eq('id', targetId).single();
+      if (!targetProfile) return corsResponse(404, { error: "User not found" });
+
+      // Generate random dummy password
+      const dummyPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-4).toUpperCase();
+      
+      const { error } = await supabaseAdmin.auth.admin.updateUserById(targetId, {
+        password: dummyPassword,
+        user_metadata: { force_password_reset: true }
+      });
+
+      if (error) throw error;
+
+      await sendProfessionalEmail(
+        targetProfile.email,
+        "Temporary Password Assigned - Buildscape",
+        "New Temporary Password",
+        `Hi ${targetProfile.username}, your password has been reset by an administrator. \n\nYour temporary password is: **${dummyPassword}**\n\nPlease log in and change your password immediately.`,
+        "Login Now",
+        process.env.URL || 'http://localhost:8888',
+        dummyPassword
+      );
+
+      return corsResponse(200, { success: true });
+    }
+
     // Update User Role (Admin) - But Owner role is protected
     if (requestAction === 'updateRole') {
       if (profile.role !== 'admin' && profile.role !== 'owner') {

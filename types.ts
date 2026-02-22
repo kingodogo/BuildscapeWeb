@@ -85,6 +85,7 @@ export interface User {
     currency?: string;
     kofiTransactionId?: string;
   };
+  forcePasswordReset?: boolean;
 }
 
 export interface AppConfigLinks {
@@ -207,6 +208,17 @@ export interface KofiTier {
   updatedAt: number; // Timestamp
 }
 
+export interface TwitchTier {
+  id: string;
+  name: string; // Tier name (e.g., "Tier 1", "Tier 2", "Tier 3")
+  twitchTierLevel: string; // 1000, 2000, 3000
+  description?: string;
+  rewards: KofiRewardItem[]; // List of rewards players get
+  enabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface ManualReward {
   id: string;
   userId: string; // Website user ID
@@ -299,4 +311,5 @@ export interface AppConfig {
   curseforgeSyncInterval?: number; // Auto-sync interval in hours (0 = disabled, 6 = 6 hours, 12 = 12 hours)
   changelogs?: ChangelogEntry[]; // Manual changelog entries
   kofiTiers?: KofiTier[]; // Ko-fi subscription tiers configuration
+  twitchTiers?: TwitchTier[]; // Twitch subscription tiers configuration
 }
