@@ -274,6 +274,17 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
       onUpdate(updatedUser);
       onNotify("Twitch account linked!", "success");
       
+      // Automatically trigger a sync now that we have the username
+      if (updatedUser.twitchUsername) {
+        onNotify("Syncing Twitch rewards...", "success");
+        const syncRes = await AuthService.verifyStreamElementsSubscription(updatedUser.twitchUsername);
+        if (syncRes.success) {
+          onNotify("Rewards synced!", "success");
+          const finalUser = await AuthService.refreshSession();
+          if (finalUser) onUpdate(finalUser);
+        }
+      }
+      
       if (!isPopup) {
         window.history.replaceState({}, '', '/profile');
       }
@@ -1483,12 +1494,12 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
               </label>
               
               <div className="bg-[#121212] rounded-lg p-4 space-y-3">
-                {currentUser.twitchSubscriptionData?.isSub ? (
+                {currentUser.twitchUsername ? (
                   <>
                     <div className="bg-purple-900/20 border border-purple-700/50 rounded-lg p-3">
                       <div className="text-xs text-purple-300 flex items-center gap-2 mb-2">
                          <div className="w-8 h-8 rounded-full overflow-hidden border border-purple-500/50">
-                            {currentUser.twitchSubscriptionData.avatar ? (
+                            {currentUser.twitchSubscriptionData?.avatar ? (
                                 <img src={currentUser.twitchSubscriptionData.avatar} alt="Twitch Avatar" className="w-full h-full object-cover" />
                             ) : (
                                 <div className="w-full h-full bg-[#9146FF] flex items-center justify-center">
@@ -1496,16 +1507,26 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                                 </div>
                             )}
                          </div>
-                        <span className="font-medium">Twitch Subscribed</span>
+                        <span className="font-medium">
+                          {currentUser.twitchSubscriptionData?.isSub ? 'Twitch Subscribed' : 'Twitch Linked'}
+                        </span>
+                        {currentUser.twitchSubscriptionData?.isSub && (
+                          <CheckCircle size={14} className="text-green-400" />
+                        )}
                       </div>
                       <div className="text-xs text-gray-400 mt-1">
                         Linked Twitch: <span className="font-mono text-gray-300">{streamerMode ? maskUsername(currentUser.twitchUsername) : currentUser.twitchUsername}</span>
                       </div>
-                      {currentUser.twitchSubscriptionData.tier && (
+                      {currentUser.twitchSubscriptionData?.isSub && currentUser.twitchSubscriptionData?.tier && (
                         <div className="text-xs text-purple-400 mt-1 font-medium">
                           Tier: {currentUser.twitchSubscriptionData.tier === '1000' ? '1' : 
                                  currentUser.twitchSubscriptionData.tier === '2000' ? '2' : 
                                  currentUser.twitchSubscriptionData.tier === '3000' ? '3' : currentUser.twitchSubscriptionData.tier}
+                        </div>
+                      )}
+                      {!currentUser.twitchSubscriptionData?.isSub && (
+                        <div className="text-[10px] text-gray-400 mt-2 bg-black/30 p-2 rounded">
+                          Account connected, but no active subscription detected on StreamElements.
                         </div>
                       )}
                     </div>

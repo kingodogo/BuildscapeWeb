@@ -842,6 +842,9 @@ function mapProfileToUser(p: any) {
     kofiUsername: p.kofi_username,
     profileIcon: p.profile_icon,
     streamerMode: p.streamer_mode,
+    twitchUsername: p.twitch_username,
+    twitchId: p.twitch_id,
+    twitchSubscriptionData: p.twitch_subscription_data,
     kofiSubscription: p.kofi_subscription
   };
 }

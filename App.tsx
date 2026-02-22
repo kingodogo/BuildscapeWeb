@@ -463,24 +463,31 @@ export default function App() {
   }, [toast]);
 
   // Supabase auth state listener
-  const lastNotifiedUserId = React.useRef<string | null>(null);
+  const lastAuthStateLog = React.useRef<{userId: string | undefined, event: string}>({userId: undefined, event: ''});
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session);
+        // Only log if the state actually changed or it's a new user
+        const currentId = session?.user?.id;
+        if (lastAuthStateLog.current.userId !== currentId || lastAuthStateLog.current.event !== event) {
+          if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+             console.log(`Auth event: ${event}`, session?.user?.email);
+             lastAuthStateLog.current = { userId: currentId, event };
+          }
+        }
         
         if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session) {
           try {
             const user = AuthService.getCurrentUser() || await AuthService.getCurrentUser();
             if (user) {
-              const prevUserId = lastNotifiedUserId.current;
+              const prevUserId = lastAuthStateLog.current.userId;
               setCurrentUser(user);
               
               // Only notify if we haven't welcomed this specific user ID in this browser session
               if (user.id !== prevUserId) {
                 handleNotify(`Welcome back, ${user.username}`);
-                lastNotifiedUserId.current = user.id;
+                lastAuthStateLog.current.userId = user.id;
               }
             }
           } catch (error) {
@@ -488,7 +495,7 @@ export default function App() {
           }
         } else if (event === 'SIGNED_OUT') {
           setCurrentUser(null);
-          lastNotifiedUserId.current = null;
+          lastAuthStateLog.current = { userId: undefined, event: 'SIGNED_OUT' };
           handleNotify("Logged out");
         } else if (event === 'USER_UPDATED' && session) {
           try {
