@@ -92,7 +92,7 @@ export const handler = async (event: any, context: any) => {
          source_id: redeemCode.id,
          rewards: redeemCode.rewards,
          granted_at: Date.now(),
-         expires_at: redeemCode.expires_at
+         expires_at: null
      });
 
      return corsResponse(200, { success: true, rewards: redeemCode.rewards });

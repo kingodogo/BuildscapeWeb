@@ -42,7 +42,7 @@ export const handler = async (event: any, context: any) => {
          
          const now = Date.now();
          const active = (data || [])
-             .filter((r: any) => !r.expires_at || r.expires_at > now)
+             .filter((r: any) => !r.expires_at || r.expires_at > now || r.source === 'code' || r.source === 'redeem_code')
              .map((r: any) => ({
                  id: r.id,
                  userId: r.user_id,

@@ -7633,6 +7633,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   <option value="item">Item</option>
                                   <option value="command">Command</option>
                                   <option value="permission">Permission</option>
+                                  <option value="cosmetic">Cosmetic</option>
+                                  <option value="downloadable">Downloadable</option>
                                   <option value="custom">Custom</option>
                                 </select>
                               </div>

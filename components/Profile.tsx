@@ -1745,7 +1745,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                                    reward.source === 'membership' ? 'Membership' :
                                    reward.source === 'streamelements' ? 'Subscription' : 'Manual'}
                                 </span>
-                                {reward.expiresAt && (
+                                {reward.expiresAt && reward.source !== 'code' ? (
                                   <span className="px-2 py-1 rounded text-[10px] font-bold bg-amber-900/30 text-amber-400 border border-amber-700/50 flex items-center gap-1">
                                     <AlertCircle size={10} />
                                     Expires: {(() => {
@@ -1756,6 +1756,11 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                                       if (hours > 0) return `${hours}h left`;
                                       return "Soon";
                                     })()}
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-1 rounded text-[10px] font-bold bg-green-900/20 text-green-400 border border-green-700/50 flex items-center gap-1">
+                                    <CheckCircle size={10} />
+                                    Permanent
                                   </span>
                                 )}
       </div>
