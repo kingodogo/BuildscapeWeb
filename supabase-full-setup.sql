@@ -372,8 +372,8 @@ SELECT create_policy_if_not_exists('profiles_select', 'profiles', 'SELECT', 'pub
 SELECT create_policy_if_not_exists('profiles_update_own', 'profiles', 'UPDATE', 'authenticated', 'auth.uid() = id');
 SELECT create_policy_if_not_exists('profiles_admin_all', 'profiles', 'ALL', 'authenticated', 'is_admin_or_owner()');
 
-SELECT create_policy_if_not_exists('Service role full access on legacy_users', 'legacy_users', 'ALL', 'service_role', 'true', 'true');
-SELECT create_policy_if_not_exists('Public read legacy_users', 'legacy_users', 'SELECT', 'anon, authenticated', 'true');
+SELECT create_policy_if_not_exists('legacy_users_select_own', 'legacy_users', 'SELECT', 'authenticated', 'LOWER(email) = auth.jwt()->>''email''');
+SELECT create_policy_if_not_exists('legacy_users_admin_all', 'legacy_users', 'ALL', 'authenticated', 'is_admin_or_owner()');
 
 SELECT create_policy_if_not_exists('reports_select', 'reports', 'SELECT', 'public', 'true');
 SELECT create_policy_if_not_exists('reports_insert', 'reports', 'INSERT', 'authenticated', 'true', 'true');
@@ -402,7 +402,10 @@ SELECT create_policy_if_not_exists('redeem_codes_admin', 'redeem_codes', 'ALL', 
 SELECT create_policy_if_not_exists('code_redemptions_admin', 'code_redemptions', 'ALL', 'authenticated', 'is_admin_or_owner()');
 SELECT create_policy_if_not_exists('code_redemptions_own', 'code_redemptions', 'SELECT', 'public', 'true');
 
-SELECT create_policy_if_not_exists('user_rewards_select', 'user_rewards', 'SELECT', 'public', 'true');
+SELECT create_policy_if_not_exists('minecraft_users_select', 'minecraft_users', 'SELECT', 'public', 'true'); -- Needed for mod & web display
+SELECT create_policy_if_not_exists('minecraft_users_update_own', 'minecraft_users', 'UPDATE', 'authenticated', 'uuid = (SELECT minecraft_uuid FROM profiles WHERE id = auth.uid()) OR is_admin_or_owner()');
+
+SELECT create_policy_if_not_exists('user_rewards_select_own', 'user_rewards', 'SELECT', 'public', 'user_id = auth.uid()::text OR minecraft_uuid = (SELECT minecraft_uuid FROM profiles WHERE id = auth.uid()) OR is_admin_or_owner()');
 SELECT create_policy_if_not_exists('kofi_payments_select', 'kofi_payments', 'SELECT', 'public', 'true');
 SELECT create_policy_if_not_exists('kofi_manual_rewards_admin', 'kofi_manual_rewards', 'ALL', 'authenticated', 'is_admin_or_owner()');
 
@@ -459,3 +462,5 @@ GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres, anon, authenticated, se
 GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO postgres, anon, authenticated, service_role;
 
 -- Done!
+SELECT 'Buildscape Database Setup Complete!' as status, 
+       (SELECT COUNT(*) FROM pg_tables WHERE schemaname = 'public') as total_tables;

@@ -1,6 +1,7 @@
 import { supabaseAdmin } from './lib/supabaseAdmin';
 import { verifyAuthToken, requireAdmin, corsResponse } from './lib/supabaseHelpers';
-import { getMinecraftProfileFromCode, getMicrosoftLoginUrl } from './lib/msAuth';
+import { getMicrosoftLoginUrl, getMinecraftProfileFromCode } from './lib/msAuth';
+import { getTwitchLoginUrl, getTwitchProfileFromCode } from './lib/twitchAuth';
 
 import nodemailer from 'nodemailer';
 
@@ -608,6 +609,62 @@ export const handler = async (event: any, context: any) => {
         console.error('linkMinecraftOAuth error:', e);
         return corsResponse(400, { error: e.message || 'Failed to link Minecraft account via Microsoft' });
       }
+    }
+
+    // --- Twitch OAuth Endpoints ---
+
+    if (requestAction === 'getTwitchLoginUrl') {
+        const { redirectUri } = body;
+        if (!redirectUri) return corsResponse(400, { error: "Redirect URI required" });
+        try {
+            const url = getTwitchLoginUrl(redirectUri);
+            return corsResponse(200, { url });
+        } catch (e: any) {
+            return corsResponse(500, { error: e.message });
+        }
+    }
+
+    if (requestAction === 'linkTwitchOAuth') {
+        const { code, redirectUri } = body;
+        if (!code || !redirectUri) return corsResponse(400, { error: "Code and Redirect URI required" });
+
+        try {
+            const twitchProfile = await getTwitchProfileFromCode(code, redirectUri);
+            
+            // twitchProfile structure: { id, login, display_name, profile_image_url, email }
+            const twitchUsername = twitchProfile.login;
+
+            const { data: updatedProfile, error: updateError } = await supabaseAdmin
+                .from('profiles')
+                .update({
+                    twitch_username: twitchUsername
+                })
+                .eq('id', userId)
+                .select()
+                .single();
+
+            if (updateError) throw updateError;
+
+            return corsResponse(200, { success: true, user: mapProfileToUser(updatedProfile) });
+        } catch (e: any) {
+            console.error('linkTwitchOAuth error:', e);
+            return corsResponse(400, { error: e.message || 'Failed to link Twitch account' });
+        }
+    }
+
+    if (requestAction === 'unlinkTwitch') {
+        const { data: updatedProfile, error: updateError } = await supabaseAdmin
+            .from('profiles')
+            .update({
+                twitch_username: null,
+                twitch_subscription_data: null
+            })
+            .eq('id', userId)
+            .select()
+            .single();
+
+        if (updateError) throw updateError;
+        return corsResponse(200, { success: true, user: mapProfileToUser(updatedProfile) });
     }
 
     // Unlink Minecraft Account

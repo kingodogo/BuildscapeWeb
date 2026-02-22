@@ -65,30 +65,41 @@ export const handler = async (event: any, context: any) => {
                 // Admin/owner can equip any cosmetic
                 valid = true;
             } else {
-                // Check if user has it permanently
+                // Check if user has it permanently (Layer 2 - Permanent)
                 const unlocked = mcUser.unlocked_cosmetics || [];
                 if (unlocked.includes(cosmeticId)) {
                     valid = true;
                 } else {
-                    // Check if user has it temporarily via rewards
-                    const now = Date.now();
-                    const { data: activeRewards } = await supabaseAdmin
-                        .from('user_rewards')
-                        .select('rewards')
-                        .eq('minecraft_uuid', normalizedUuid)
-                        .or(`expires_at.gt.${now},expires_at.is.null`);
+                    // Check if it's a default cosmetic (Layer 1)
+                    const { data: cosmetic } = await supabaseAdmin
+                        .from('cosmetics')
+                        .select('is_default')
+                        .eq('id', cosmeticId)
+                        .single();
+                    
+                    if (cosmetic?.is_default) {
+                        valid = true;
+                    } else {
+                        // Check if user has it temporarily via rewards (Layer 2 - Temporary)
+                        const now = Date.now();
+                        const { data: activeRewards } = await supabaseAdmin
+                            .from('user_rewards')
+                            .select('rewards')
+                            .eq('minecraft_uuid', normalizedUuid)
+                            .or(`expires_at.gt.${now},expires_at.is.null`);
 
-                    if (activeRewards) {
-                        for (const r of activeRewards) {
-                            if (Array.isArray(r.rewards)) {
-                                for (const reward of r.rewards) {
-                                    if (reward.type === 'cosmetic' && reward.id === cosmeticId) {
-                                        valid = true;
-                                        break;
+                        if (activeRewards) {
+                            for (const r of activeRewards) {
+                                if (Array.isArray(r.rewards)) {
+                                    for (const reward of r.rewards) {
+                                        if (reward.type === 'cosmetic' && reward.id === cosmeticId) {
+                                            valid = true;
+                                            break;
+                                        }
                                     }
                                 }
+                                if (valid) break;
                             }
-                            if (valid) break;
                         }
                     }
                 }

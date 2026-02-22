@@ -426,4 +426,32 @@ export const AuthService = {
             body: JSON.stringify({ twitchUsername })
         });
     },
+
+    getTwitchLoginUrl: async (redirectUri: string): Promise<string> => {
+        const data = await fetchWithAuth('/.netlify/functions/auth', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'getTwitchLoginUrl', redirectUri })
+        });
+        return data.url;
+    },
+
+    linkTwitchOAuth: async (code: string, redirectUri: string): Promise<User> => {
+        const data = await fetchWithAuth('/.netlify/functions/auth', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'linkTwitchOAuth', code, redirectUri })
+        });
+        const user = data.user;
+        localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+        return user;
+    },
+
+    unlinkTwitchAccount: async (): Promise<User> => {
+        const data = await fetchWithAuth('/.netlify/functions/auth', {
+            method: 'POST',
+            body: JSON.stringify({ action: 'unlinkTwitch' })
+        });
+        const user = data.user;
+        localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+        return user;
+    },
 };

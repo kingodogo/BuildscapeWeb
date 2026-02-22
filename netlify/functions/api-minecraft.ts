@@ -81,7 +81,21 @@ export const handler = async (event: any, context: any) => {
 
         let finalUnlockedIds = [...userUnlockedIds];
         
-        // Fetch active rewards (non-expired)
+        // Fetch default cosmetics (Layer 1)
+        const { data: defaultCosmetics } = await supabaseAdmin
+            .from('cosmetics')
+            .select('id')
+            .eq('is_default', true);
+            
+        if (defaultCosmetics) {
+            defaultCosmetics.forEach((c: any) => {
+                if (!finalUnlockedIds.includes(c.id)) {
+                    finalUnlockedIds.push(c.id);
+                }
+            });
+        }
+        
+        // Fetch active rewards (non-expired) (Layer 2)
         const now = Date.now();
         const { data: activeRewards } = await supabaseAdmin
             .from('user_rewards')
@@ -103,7 +117,7 @@ export const handler = async (event: any, context: any) => {
             });
         }
 
-        // Admin/owner gets ALL cosmetics
+        // Admin/owner gets ALL cosmetics (Layer 3)
         if (isAdmin) {
             const { data: allCosmetics } = await supabaseAdmin
                 .from('cosmetics')

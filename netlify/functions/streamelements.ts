@@ -31,8 +31,12 @@ export const handler = async (event: any) => {
     try {
         // ACTION: Verify and sync subscription
         if (action === 'verifySubscription') {
-            const { twitchUsername } = body;
-            if (!twitchUsername) return corsResponse(400, { error: 'Twitch username required' });
+            // Use provided username or fall back to profile data
+            const twitchUsername = body.twitchUsername || profile?.twitch_username;
+            
+            if (!twitchUsername) {
+                return corsResponse(400, { error: 'Twitch username required (not provided and not in profile)' });
+            }
 
             // 1. Call StreamElements API to check subscriber status
             // Format: GET https://api.streamelements.com/v2/channels/{channelId}/subscribers/{username}
@@ -112,6 +116,14 @@ export const handler = async (event: any) => {
                     expiresAt: new Date(Date.now() + (31 * 24 * 60 * 60 * 1000)).toISOString()
                 });
             } else {
+                // Update profile to mark as not subscribed
+                await supabaseAdmin.from('profiles').update({
+                    twitch_subscription_data: {
+                        isSub: false,
+                        lastModified: new Date().toISOString()
+                    }
+                }).eq('id', user.id);
+
                 return corsResponse(200, { 
                     success: false, 
                     isSub: false, 

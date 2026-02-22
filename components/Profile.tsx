@@ -66,9 +66,32 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
   // Twitch/StreamElements state
   const [twitchUsernameInput, setTwitchUsernameInput] = useState(currentUser.twitchUsername || "");
   const [isVerifyingTwitch, setIsVerifyingTwitch] = useState(false);
+  const [isLinkingTwitch, setIsLinkingTwitch] = useState(false);
   const [twitchError, setTwitchError] = useState("");
 
   const oauthProcessed = useRef(false);
+  const twitchSyncTriggered = useRef(false);
+
+  // Auto-sync Twitch subscription if linked but no sub data
+  useEffect(() => {
+    if (currentUser.twitchUsername && !currentUser.twitchSubscriptionData?.isSub && !twitchSyncTriggered.current) {
+      twitchSyncTriggered.current = true;
+      console.log("Auto-syncing Twitch subscription for", currentUser.twitchUsername);
+      AuthService.verifyStreamElementsSubscription(currentUser.twitchUsername)
+        .then(data => {
+          if (data.isSub) {
+            onNotify("Welcome back! Your Twitch subscription rewards have been synced.", "success");
+            // Refresh local user data
+            AuthService.refreshSession().then(user => {
+              if (user) onUpdate(user);
+            });
+          }
+        })
+        .catch(err => {
+          console.error("Auto-sync Twitch failed:", err);
+        });
+    }
+  }, [currentUser.twitchUsername, currentUser.twitchSubscriptionData, onNotify, onUpdate]);
 
   // --- OAUTH CONFIG ---
   // Derive Redirect URI dynamically: match the exact current page URL (sans query/hash)
@@ -188,6 +211,11 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
            oauthProcessed.current = true;
            handleCompleteMicrosoftOAuth(event.data.code);
         }
+      } else if (event.data?.type === 'TWITCH_OAUTH_CODE' && event.data.code) {
+        if (!oauthProcessed.current) {
+           oauthProcessed.current = true;
+           handleCompleteTwitchOAuth(event.data.code);
+        }
       } else if (event.data?.type === 'MS_OAUTH_ERROR') {
          const errorMsg = event.data.error || "Microsoft login failed";
          console.error("Microsoft OAuth Error from popup:", errorMsg); // Improved error logging
@@ -221,6 +249,54 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
     } finally {
       setIsOAuthLinking(false);
       setIsLinkingMinecraft(false);
+    }
+  };
+
+  const handleCompleteTwitchOAuth = async (code: string) => {
+    onNotify("Verifying Twitch link...", "success");
+    setIsOAuthLinking(true);
+    setIsLinkingTwitch(true);
+    setTwitchError("");
+    try {
+      const updatedUser = await AuthService.linkTwitchOAuth(code, REDIRECT_URI);
+      onUpdate(updatedUser);
+      onNotify("Twitch account linked!", "success");
+      
+      if (!isPopup) {
+        window.history.replaceState({}, '', '/profile');
+      }
+    } catch (error: any) {
+      console.error('Twitch OAuth Completion Error:', error);
+      const msg = error.message || "Twitch authentication failed";
+      setTwitchError(msg);
+      onNotify(msg, "error");
+    } finally {
+      setIsOAuthLinking(false);
+      setIsLinkingTwitch(false);
+    }
+  };
+
+  const handleTwitchOAuthRedirect = async () => {
+    setIsLinkingTwitch(true);
+    setTwitchError("");
+    try {
+      const url = await AuthService.getTwitchLoginUrl(REDIRECT_URI);
+      
+      const width = 500;
+      const height = 650;
+      const left = (window.screen.width / 2) - (width / 2);
+      const top = (window.screen.height / 2) - (height / 2);
+      
+      window.open(
+          url,
+          "Twitch Login",
+          `width=${width},height=${height},top=${top},left=${left},scrollbars=yes`
+      );
+    } catch (error: any) {
+      setTwitchError(error.message || "Failed to start Twitch login");
+      onNotify(error.message || "Failed to start Twitch login", "error");
+    } finally {
+      setIsLinkingTwitch(false);
     }
   };
 
@@ -1422,101 +1498,140 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                       )}
                     </div>
                     
-                    <button
-                      onClick={async () => {
-                        setIsVerifyingTwitch(true);
-                        setTwitchError("");
-                        try {
-                           const res = await AuthService.verifyStreamElementsSubscription(currentUser.twitchUsername!);
-                           if (res.success) {
-                               onUpdate({ ...currentUser, ...res.userData }); // Assumes backend returns updated user data or we refresh
-                               onNotify("Subscription status refreshed!", "success");
-                               // We should actually just refresh the user profile to be sure
-                               const updatedUser = await AuthService.refreshSession();
-                               if (updatedUser) onUpdate(updatedUser);
-                           } else {
-                               onNotify(res.message || "No active subscription found.", "error");
-                           }
-                        } catch (e: any) {
-                           setTwitchError(e.message || "Failed to refresh status");
-                        } finally {
-                           setIsVerifyingTwitch(false);
-                        }
-                      }}
-                      disabled={isVerifyingTwitch}
-                      className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                      {isVerifyingTwitch ? (
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      ) : (
-                        <CheckCircle size={16} />
-                      )}
-                      Refresh Status
-                    </button>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={async () => {
+                          setIsVerifyingTwitch(true);
+                          setTwitchError("");
+                          try {
+                            const res = await AuthService.verifyStreamElementsSubscription(currentUser.twitchUsername!);
+                            if (res.success) {
+                                onNotify("Subscription status refreshed!", "success");
+                                const updatedUser = await AuthService.refreshSession();
+                                if (updatedUser) onUpdate(updatedUser);
+                            } else {
+                                onNotify(res.message || "No active subscription found.", "error");
+                            }
+                          } catch (e: any) {
+                            setTwitchError(e.message || "Failed to refresh status");
+                          } finally {
+                            setIsVerifyingTwitch(false);
+                          }
+                        }}
+                        disabled={isVerifyingTwitch}
+                        className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isVerifyingTwitch ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <CheckCircle size={16} />
+                        )}
+                        Refresh Status
+                      </button>
+
+                      <button
+                        onClick={async () => {
+                          if (confirm("Unlink your Twitch account? This will also disable your current subscription rewards.")) {
+                            try {
+                              const updatedUser = await AuthService.unlinkTwitchAccount();
+                              onUpdate(updatedUser);
+                              onNotify("Twitch account unlinked.", "success");
+                            } catch (e: any) {
+                              onNotify(e.message, "error");
+                            }
+                          }
+                        }}
+                        className="w-full px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-xs font-medium transition-colors"
+                      >
+                        Unlink Account
+                      </button>
+                    </div>
+
                     <p className="text-[10px] text-gray-500 italic text-center">
                        Rewards are granted for 31 days and can be refreshed manually.
                     </p>
                   </>
                 ) : (
                   <>
-                    <div className="bg-[#9146FF]/10 border border-[#9146FF]/30 rounded-lg p-3 mb-3">
-                      <p className="text-xs text-purple-300">
-                        Link your Twitch username to claim exclusive subscriber rewards!
-                      </p>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-xs text-gray-400 mb-1.5">Twitch Username</label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={twitchUsernameInput}
-                          onChange={(e) => {
-                            setTwitchUsernameInput(e.target.value);
-                            setTwitchError("");
-                          }}
-                          className={`flex-1 bg-[#1a1a1a] border ${
-                            twitchError ? 'border-red-500' : 'border-gray-700'
-                          } rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-colors text-sm`}
-                          placeholder="Twitch Username"
-                          disabled={isVerifyingTwitch}
-                        />
-                        <button
-                          onClick={async () => {
-                            if (!twitchUsernameInput.trim()) return;
-                            setIsVerifyingTwitch(true);
-                            setTwitchError("");
-                            try {
-                              const res = await AuthService.verifyStreamElementsSubscription(twitchUsernameInput.trim());
-                              if (res.success) {
-                                onNotify("Twitch subscription verified!", "success");
-                                // Refresh user session to get updated rewards
-                                const updatedUser = await AuthService.refreshSession();
-                                if (updatedUser) onUpdate(updatedUser);
-                              } else {
-                                setTwitchError(res.message || "Account not subscribed.");
-                                onNotify(res.message || "No subscription found.", "error");
-                              }
-                            } catch (e: any) {
-                              setTwitchError(e.message);
-                              onNotify(e.message, "error");
-                            } finally {
-                              setIsVerifyingTwitch(false);
-                            }
-                          }}
-                          disabled={isVerifyingTwitch || !twitchUsernameInput.trim()}
-                          className="px-4 py-2 bg-[#9146FF] hover:bg-[#772ce8] text-white rounded-lg text-sm font-bold transition-all disabled:opacity-50 flex items-center gap-2"
-                        >
-                          {isVerifyingTwitch && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-                          {isVerifyingTwitch ? 'Checking...' : 'Verify Sub'}
-                        </button>
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={handleTwitchOAuthRedirect}
+                        disabled={isLinkingTwitch || isOAuthLinking}
+                        className="w-full px-4 py-3 bg-[#9146FF] hover:bg-[#772ce8] text-white rounded-lg font-bold transition-all flex items-center justify-center gap-3 shadow-lg shadow-purple-900/20 disabled:opacity-50"
+                      >
+                        {isLinkingTwitch ? (
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <Twitch size={20} />
+                        )}
+                        {isLinkingTwitch ? 'Connecting...' : 'Connect Twitch Account'}
+                      </button>
+                      
+                      <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-gray-800"></div>
+                        </div>
+                        <div className="relative flex justify-center text-xs uppercase">
+                          <span className="bg-[#121212] px-2 text-gray-500">Or link manually</span>
+                        </div>
                       </div>
-                      {twitchError && (
-                        <p className="mt-1.5 text-sm text-red-400 flex items-center gap-1 text-xs">
-                          <AlertCircle size={14} />
-                          {twitchError}
-                        </p>
-                      )}
+
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1.5">Twitch Username</label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={twitchUsernameInput}
+                            onChange={(e) => {
+                              setTwitchUsernameInput(e.target.value);
+                              setTwitchError("");
+                            }}
+                            className={`flex-1 bg-[#1a1a1a] border ${
+                              twitchError ? 'border-red-500' : 'border-gray-700'
+                            } rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-colors text-sm`}
+                            placeholder="Twitch Username"
+                            disabled={isVerifyingTwitch}
+                          />
+                          <button
+                            onClick={async () => {
+                              if (!twitchUsernameInput.trim()) return;
+                              setIsVerifyingTwitch(true);
+                              setTwitchError("");
+                              try {
+                                const res = await AuthService.verifyStreamElementsSubscription(twitchUsernameInput.trim());
+                                if (res.success) {
+                                  onNotify("Twitch subscription verified!", "success");
+                                  const updatedUser = await AuthService.refreshSession();
+                                  if (updatedUser) onUpdate(updatedUser);
+                                } else {
+                                  setTwitchError(res.message || "Account not subscribed.");
+                                  onNotify(res.message || "No subscription found.", "error");
+                                }
+                              } catch (e: any) {
+                                setTwitchError(e.message);
+                                onNotify(e.message, "error");
+                              } finally {
+                                setIsVerifyingTwitch(false);
+                              }
+                            }}
+                            disabled={isVerifyingTwitch || !twitchUsernameInput.trim()}
+                            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+                          >
+                            {isVerifyingTwitch && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                            {isVerifyingTwitch ? 'Checking...' : 'Verify Sub'}
+                          </button>
+                        </div>
+                        {twitchError && (
+                          <p className="mt-1.5 text-sm text-red-400 flex items-center gap-1 text-xs">
+                            <AlertCircle size={14} />
+                            {twitchError}
+                          </p>
+                        ) || (
+                           <p className="mt-2 text-[10px] text-gray-500">
+                             Manual verification uses StreamElements API. If you just subbed, it might take a few minutes to update.
+                           </p>
+                        )}
+                      </div>
                     </div>
                   </>
                 )}
