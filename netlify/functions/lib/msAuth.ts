@@ -169,6 +169,7 @@ export function getMicrosoftLoginUrl(redirectUri: string): string {
     redirect_uri: redirectUri,
     scope: 'XboxLive.signin',
     prompt: 'select_account',
+    state: 'microsoft'
   });
 
   return `https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize?${params.toString()}`;

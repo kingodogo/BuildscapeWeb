@@ -12,6 +12,7 @@ export function getTwitchLoginUrl(redirectUri: string) {
         redirect_uri: redirectUri,
         response_type: 'code',
         scope: 'user:read:email', // Basic scope to get identity
+        state: 'twitch'
     });
     
     return `https://id.twitch.tv/oauth2/authorize?${params.toString()}`;

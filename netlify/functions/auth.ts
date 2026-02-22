@@ -637,7 +637,8 @@ export const handler = async (event: any, context: any) => {
             const { data: updatedProfile, error: updateError } = await supabaseAdmin
                 .from('profiles')
                 .update({
-                    twitch_username: twitchUsername
+                    twitch_username: twitchUsername,
+                    twitch_id: twitchProfile.id
                 })
                 .eq('id', userId)
                 .select()

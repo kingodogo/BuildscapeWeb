@@ -108,16 +108,21 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
 
   useEffect(() => {
     if (isPopup && (oauthCodeInUrl || oauthErrorInUrl)) {
+      const state = urlParams.get('state');
+      const isTwitch = state === 'twitch';
+      
       if (oauthCodeInUrl) {
-        window.opener.postMessage({ type: 'MS_OAUTH_CODE', code: oauthCodeInUrl }, "*");
+        const type = isTwitch ? 'TWITCH_OAUTH_CODE' : 'MS_OAUTH_CODE';
+        window.opener.postMessage({ type, code: oauthCodeInUrl }, "*");
         window.close();
       } else if (oauthErrorInUrl) {
         const errorDesc = urlParams.get('error_description') || oauthErrorInUrl;
-        window.opener.postMessage({ type: 'MS_OAUTH_ERROR', error: errorDesc }, "*");
+        const type = isTwitch ? 'TWITCH_OAUTH_ERROR' : 'MS_OAUTH_ERROR';
+        window.opener.postMessage({ type, error: errorDesc }, "*");
         window.close();
       }
     }
-  }, [isPopup, oauthCodeInUrl, oauthErrorInUrl]);
+  }, [isPopup, oauthCodeInUrl, oauthErrorInUrl, urlParams]);
 
   if (isPopup && (oauthCodeInUrl || oauthErrorInUrl)) {
     return <div className="h-screen bg-[#121212] flex items-center justify-center text-white">Completing Link...</div>;
@@ -193,13 +198,20 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
       loadRewards();
     }
     
-    // Check for Microsoft OAuth code in URL when on accounts tab (Fallback for non-popup)
+    // Check for OAuth code in URL when on accounts tab (Fallback for non-popup)
     if (activeTab === 'accounts' && !isPopup) {
       const params = new URLSearchParams(window.location.search);
       const code = params.get('code');
-      if (code && !currentUser.minecraftUuid && !isOAuthLinking && !oauthProcessed.current) {
-        oauthProcessed.current = true;
-        handleCompleteMicrosoftOAuth(code);
+      const state = params.get('state');
+      
+      if (code && !isOAuthLinking && !oauthProcessed.current) {
+        if (state === 'twitch') {
+          oauthProcessed.current = true;
+          handleCompleteTwitchOAuth(code);
+        } else if (state === 'microsoft' || (!state && !currentUser.minecraftUuid)) {
+          oauthProcessed.current = true;
+          handleCompleteMicrosoftOAuth(code);
+        }
       }
     }
 

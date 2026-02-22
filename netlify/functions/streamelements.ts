@@ -40,15 +40,30 @@ export const handler = async (event: any) => {
 
             // 1. Call StreamElements API to check subscriber status
             // Format: GET https://api.streamelements.com/v2/channels/{channelId}/subscribers/{username}
-            const seResponse = await fetch(`https://api.streamelements.com/v2/channels/${SE_CHANNEL_ID}/subscribers/${encodeURIComponent(twitchUsername)}`, {
+            let seResponse = await fetch(`https://api.streamelements.com/v2/channels/${SE_CHANNEL_ID}/subscribers/${encodeURIComponent(twitchUsername)}`, {
                 headers: {
                     'Authorization': `Bearer ${SE_JWT}`,
                     'Accept': 'application/json'
                 }
             });
 
+            // Fallback: try lowercase if 404
+            if (!seResponse.ok && seResponse.status === 404) {
+                const lowerUsername = twitchUsername.toLowerCase();
+                if (lowerUsername !== twitchUsername) {
+                    console.log(`[StreamElements] 404 for ${twitchUsername}, trying lowercase: ${lowerUsername}`);
+                    seResponse = await fetch(`https://api.streamelements.com/v2/channels/${SE_CHANNEL_ID}/subscribers/${encodeURIComponent(lowerUsername)}`, {
+                        headers: {
+                            'Authorization': `Bearer ${SE_JWT}`,
+                            'Accept': 'application/json'
+                        }
+                    });
+                }
+            }
+
             if (!seResponse.ok) {
                 if (seResponse.status === 404) {
+                    console.log(`[StreamElements] Subscriber not found: ${twitchUsername}`);
                     return corsResponse(200, { 
                         success: false, 
                         isSub: false, 
@@ -56,10 +71,12 @@ export const handler = async (event: any) => {
                     });
                 }
                 const errText = await seResponse.text();
+                console.error(`[StreamElements] API Error for ${twitchUsername}:`, seResponse.status, errText);
                 throw new Error(`StreamElements API failed: ${errText}`);
             }
 
             const data = await seResponse.json();
+            console.log(`[StreamElements] Success for ${twitchUsername}:`, JSON.stringify(data));
             
             // Check if isSub is true (StreamElements returns this property)
             if (data.isSub) {
