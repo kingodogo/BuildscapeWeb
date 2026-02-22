@@ -372,29 +372,18 @@ export const handler = async (event: any, context: any) => {
     // ── Legacy Migration Step 1 (PUBLIC — user not logged in yet) ─────────────
     if (requestAction === 'initiateLegacyMigration') {
       const { identifier } = body;
-      if (!identifier) return corsResponse(400, { error: "Identifier required" });
+      if (!identifier) return corsResponse(400, { error: "Identifier or Username required" });
 
       const isEmail = identifier.includes('@');
       const q = supabaseAdmin.from('legacy_users').select('*');
-      const { data: legacy } = isEmail
+      const { data: legacy, error: legacyError } = isEmail
         ? await q.eq('email', identifier.toLowerCase()).maybeSingle()
         : await q.ilike('username', identifier).maybeSingle();
 
-      if (!legacy) return corsResponse(404, { error: "No legacy account found" });
+      if (legacyError) throw legacyError;
+      if (!legacy) return corsResponse(404, { error: "No legacy account found for this info. If you are new, please Register normally." });
 
-      // Ensure the user exists in Supabase Auth (create unconfirmed if first time)
-      const { data: { users } } = await supabaseAdmin.auth.admin.listUsers();
-      const exists = users.find((u: any) => u.email?.toLowerCase() === legacy.email.toLowerCase());
-      if (!exists) {
-        const { error: createErr } = await supabaseAdmin.auth.admin.createUser({
-          email: legacy.email,
-          email_confirm: false,
-          user_metadata: { username: legacy.username }
-        });
-        if (createErr && !createErr.message.includes('already')) throw createErr;
-      }
-
-      // Trigger OTP send server-side so client doesn't need the full email
+      // Trigger OTP send server-side. signInWithOtp handles creation if missing.
       const { error: otpError } = await supabaseAdmin.auth.signInWithOtp({ 
         email: legacy.email,
         options: {
@@ -403,11 +392,17 @@ export const handler = async (event: any, context: any) => {
         }
       });
       
-      if (otpError) throw otpError;
+      if (otpError) {
+        console.error("Migration OTP error:", otpError);
+        return corsResponse(500, { error: "Failed to send verification code. " + otpError.message });
+      }
 
       const parts = legacy.email.split('@');
-      const maskedEmail = parts[0].slice(0, 2) + '***@' + parts[1];
-      return corsResponse(200, { success: true, maskedEmail, username: legacy.username });
+      const maskedEmail = parts[0].length > 2 
+        ? parts[0].slice(0, 2) + '*'.repeat(parts[0].length - 2) + '@' + parts[1]
+        : '***@' + parts[1];
+
+      return corsResponse(200, { success: true, maskedEmail, username: legacy.username, email: legacy.email });
     }
 
     // --- Authenticated Endpoints (Require valid JWT) ---
@@ -452,8 +447,25 @@ export const handler = async (event: any, context: any) => {
         .single();
 
       if (updateError) throw updateError;
+
+      // Handle clearing forced password reset flag if provided
+      // This is usually done client-side during reset, but we support it here for consistency
+      let forceResetFlag = false;
+      if (body.forcePasswordReset === false) {
+        await supabaseAdmin.auth.admin.updateUserById(userId, {
+          user_metadata: { force_password_reset: false }
+        });
+        forceResetFlag = false;
+      } else {
+        // Fetch current meta to return accurate state
+        const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(userId);
+        forceResetFlag = !!user?.user_metadata?.force_password_reset;
+      }
       
-      return corsResponse(200, { success: true, user: mapProfileToUser(updatedProfile) });
+      return corsResponse(200, { 
+        success: true, 
+        user: { ...mapProfileToUser(updatedProfile), forcePasswordReset: forceResetFlag } 
+      });
     }
 
     // Update Ko-fi Username & Claim past rewards
@@ -874,13 +886,21 @@ export const handler = async (event: any, context: any) => {
     // ── Legacy Migration Step 2 (PROTECTED — user authenticated via Supabase OTP) ───
     if (requestAction === 'finalizeLegacyProfile') {
       // authUser is already verified by verifyAuthToken above
+      const userEmail = authUser.email!.toLowerCase();
+      
       const { data: legacy } = await supabaseAdmin
         .from('legacy_users')
         .select('*')
-        .eq('email', authUser.email!.toLowerCase())
+        .eq('email', userEmail)
         .maybeSingle();
 
-      if (!legacy) return corsResponse(404, { error: "No legacy data found for this account" });
+      if (!legacy) {
+        // Double check if profile already exists (maybe they hit refresh or double clicked)
+        const { data: existingProfile } = await supabaseAdmin.from('profiles').select('*').eq('id', authUser.id).maybeSingle();
+        if (existingProfile) return corsResponse(200, { success: true, user: mapProfileToUser(existingProfile), message: "Profile already restored" });
+        
+        return corsResponse(404, { error: "No legacy data found for this account. It may have been already migrated." });
+      }
 
       const { data: restoredProfile, error: upsertErr } = await supabaseAdmin
         .from('profiles')
@@ -897,6 +917,11 @@ export const handler = async (event: any, context: any) => {
         .single();
 
       if (upsertErr) throw upsertErr;
+
+      // Cleanup: Delete from legacy_users now that they are fully migrated
+      await supabaseAdmin.from('legacy_users').delete().eq('email', userEmail);
+      
+      console.log(`Migration complete for ${userEmail}`);
       return corsResponse(200, { success: true, user: mapProfileToUser(restoredProfile) });
     }
 
@@ -906,7 +931,9 @@ export const handler = async (event: any, context: any) => {
 
   } catch (err: any) {
     console.error("Function error:", err);
-    return corsResponse(500, { error: err.message || "Internal Server Error" });
+    // Suppress redundant error objects if it's already a Supabase error
+    const msg = err.error_description || err.message || "Internal Server Error";
+    return corsResponse(500, { error: msg });
   }
 };
 

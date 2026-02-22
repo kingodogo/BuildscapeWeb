@@ -303,15 +303,37 @@ CREATE INDEX IF NOT EXISTS idx_connection_codes_uuid ON connection_codes(uuid);
 -- Auto-create profile on signup trigger
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  base_username TEXT;
+  final_username TEXT;
+  counter INTEGER := 0;
 BEGIN
-  INSERT INTO public.profiles (id, username, email, role)
-  VALUES (
-    NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'username', split_part(NEW.email, '@', 1)),
-    NEW.email,
-    'user'
-  )
-  ON CONFLICT (id) DO NOTHING;
+  -- Get base username from metadata or email
+  base_username := COALESCE(NEW.raw_user_meta_data->>'username', split_part(NEW.email, '@', 1));
+  final_username := base_username;
+
+  -- Attempt to insert, appending counter on collision
+  LOOP
+    BEGIN
+      INSERT INTO public.profiles (id, username, email, role)
+      VALUES (NEW.id, final_username, NEW.email, 'user');
+      EXIT; -- Success
+    EXCEPTION WHEN unique_violation THEN
+      counter := counter + 1;
+      final_username := base_username || counter::text;
+      
+      -- If many collisions, use a more unique suffix
+      IF counter > 5 THEN
+        final_username := base_username || '_' || substr(NEW.id::text, 1, 4);
+      END IF;
+      
+      -- Final safety break to avoid infinite loop
+      IF counter > 10 THEN
+        RAISE EXCEPTION 'Could not generate unique username after 10 attempts';
+      END IF;
+    END;
+  END LOOP;
+  
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

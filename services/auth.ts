@@ -121,19 +121,41 @@ export const AuthService = {
             const { data, error } = await supabase.auth.signInWithPassword({ email, password });
             
             if (error) {
-               if (error.message.includes("Invalid login")) {
+               // Handle specific error codes if available, otherwise check message
+               const msg = error.message.toLowerCase();
+               
+               if (msg.includes("invalid login") || msg.includes("invalid credentials")) {
+                    // Check if they are already in profiles (wrong password)
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('id')
+                        .eq('email', email.toLowerCase())
+                        .maybeSingle();
+                    
+                    if (profile) {
+                         throw new AuthError("That username or password is incorrect.", "INVALID_CREDENTIALS");
+                    }
+
+                    // Not in profiles, check legacy
                     const { data: legacy } = await supabase
                         .from('legacy_users')
                         .select('username')
                         .eq('email', email.toLowerCase())
                         .maybeSingle();
 
-                    if (legacy) throw new AuthError('LEGACY_USER', 'LEGACY_USER');
+                    if (legacy) {
+                        console.log("Legacy user detected during failed login:", email);
+                        throw new AuthError('LEGACY_USER', 'LEGACY_USER');
+                    }
 
                     throw new AuthError("That username or password is incorrect.", "INVALID_CREDENTIALS");
                }
-               if (error.message.includes("Email not confirmed")) throw new AuthError(email, "EMAIL_NOT_CONFIRMED");
-               throw new AuthError("Something went wrong. Please try again.", "SERVER_ERROR");
+
+               if (msg.includes("email not confirmed")) {
+                   throw new AuthError(email, "EMAIL_NOT_CONFIRMED");
+               }
+
+               throw new AuthError(error.message || "Something went wrong. Please try again.", "SERVER_ERROR");
             }
             
             if (!data.user) throw new AuthError("Login failed. Please try again.", "SERVER_ERROR");
@@ -143,8 +165,9 @@ export const AuthService = {
             localStorage.setItem(SESSION_KEY, JSON.stringify(user));
             return user;
         } catch (e: any) {
+             console.error("Login service error:", e);
              if (e instanceof AuthError) throw e;
-             throw new AuthError("Something went wrong. Please try again.", "SERVER_ERROR");
+             throw new AuthError(e.message || "Something went wrong. Please try again.", "SERVER_ERROR");
         }
     },
 
@@ -245,8 +268,19 @@ export const AuthService = {
 
 
     resetPassword: async (newPassword: string): Promise<void> => {
-        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        const { error } = await supabase.auth.updateUser({ 
+            password: newPassword,
+            data: { force_password_reset: false }
+        });
         if (error) throw new AuthError(error.message, "SERVER_ERROR");
+        
+        // Update local session to immediate reflect the change
+        const stored = localStorage.getItem(SESSION_KEY);
+        if (stored) {
+            const user = JSON.parse(stored);
+            user.forcePasswordReset = false;
+            localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+        }
     },
 
     // --- Server-side operations via Netlify Functions ---

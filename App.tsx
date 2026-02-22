@@ -1049,7 +1049,9 @@ export default function App() {
             <ResetPassword 
                 isForced={true}
                 onSuccess={() => {
-                   // Refresh user is handled inside ResetPassword or by onAuthStateChange
+                   if (currentUser) {
+                     setCurrentUser({ ...currentUser, forcePasswordReset: false });
+                   }
                 }}
                 onCancel={() => {}} // No cancel for forced
             />
