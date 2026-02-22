@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { BugReport, User, AppConfig, UserRole, AppConfigLinks, AppConfigHero, DatabaseConfig, Suggestion, SocialHandles, IconConfig, Role, ChangelogEntry, KofiTier, KofiRewardItem, ManualReward, RedeemCode, WikiFeature } from "../types";
 import { AuthService } from "../services/auth";
 import { StorageService } from "../services/storage";
-import { Users, Bug as BugIcon, Settings, Trash2, Edit, Save, Plus, X, ShieldCheck, RefreshCw, UserCheck, Lock, ChevronDown, Link as LinkIcon, Type, LogOut, CheckSquare, Square, Filter, ArrowUpDown, UserPlus, CheckCircle, AlertOctagon, Database, Upload, Download, Server, Cloud, CloudOff, RotateCcw, Lightbulb, Ban, Eye, Calendar, Maximize2, Minimize2, Crop, FileText, Bold, Italic, List, Heading1, Heading2, Heading3, Code, Image as ImageIcon, Share2, EyeOff, Globe, AlertCircle, Coffee, Crown, Gift, Gamepad2, GripVertical, ArrowUp, ArrowDown, BookOpen, Sparkles, Clock, History, Search } from "lucide-react";
+import { Users, Bug as BugIcon, Settings, Trash2, Edit, Save, Plus, X, ShieldCheck, RefreshCw, UserCheck, Lock, ChevronDown, Link as LinkIcon, Type, LogOut, CheckSquare, Square, Filter, ArrowUpDown, UserPlus, CheckCircle, AlertOctagon, Database, Upload, Download, Server, Cloud, CloudOff, RotateCcw, Lightbulb, Ban, Eye, Calendar, Maximize2, Minimize2, Crop, FileText, Bold, Italic, List, Heading1, Heading2, Heading3, Code, Image as ImageIcon, Share2, EyeOff, Globe, AlertCircle, Coffee, Crown, Gift, Gamepad2, GripVertical, ArrowUp, ArrowDown, BookOpen, Sparkles, Clock, History, Search, Info } from "lucide-react";
 import { CurseForgeService, CurseForgeError } from "../services/curseforge";
 import { sanitizeHTMLPermissive } from "../utils/sanitize";
 import BugDetailModal from "./BugDetailModal";
@@ -508,7 +508,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   
   const [dbStatus, setDbStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [toast, setToast] = useState<{msg: string, type: 'success' | 'error'} | null>(null);
+  const [toast, setToast] = useState<{msg: string, type: 'success' | 'error' | 'info'} | null>(null);
 
   // Memoize config values to prevent unnecessary re-renders
   const configHero = useMemo(() => config.hero, [config.hero]);
@@ -8046,9 +8046,13 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
       {toast && (
         <div className="fixed bottom-6 right-6 z-[100] toast-enter pointer-events-none">
           <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border text-sm font-medium ${
-            toast.type === 'success' ? 'bg-[#1e1e1e] border-green-900 text-green-400' : 'bg-[#1e1e1e] border-red-900 text-red-400'
+            toast.type === 'success' ? 'bg-[#1e1e1e] border-green-900 text-green-400' : 
+            toast.type === 'info' ? 'bg-[#1e1e1e] border-blue-900 text-blue-400' :
+            'bg-[#1e1e1e] border-red-900 text-red-400'
           }`}>
-            {toast.type === 'success' ? <CheckCircle size={20} /> : <AlertCircle size={20} />}
+            {toast.type === 'success' ? <CheckCircle size={20} /> : 
+             toast.type === 'info' ? <Info size={20} /> : 
+             <AlertCircle size={20} />}
             <span>{toast.msg}</span>
           </div>
         </div>
