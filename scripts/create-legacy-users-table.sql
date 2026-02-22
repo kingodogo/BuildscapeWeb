@@ -19,7 +19,7 @@ CREATE POLICY "Service role full access on legacy_users"
   ON legacy_users FOR ALL TO service_role
   USING (true) WITH CHECK (true);
 
--- Anon/authenticated can read (needed for login check in auth.ts)
-CREATE POLICY "Public read legacy_users"
-  ON legacy_users FOR SELECT TO anon, authenticated
-  USING (true);
+-- Authenticated can read their own record
+CREATE POLICY "Users can read own legacy record"
+  ON legacy_users FOR SELECT TO authenticated
+  USING (LOWER(email) = auth.jwt()->>'email');

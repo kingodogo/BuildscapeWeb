@@ -16,7 +16,7 @@ export const handler = async (event: any, context: any) => {
       // Check profile for subscription
       const { data: user, error } = await supabaseAdmin
           .from('profiles')
-          .select('id, username, role, kofi_subscription, minecraft_username')
+          .select('id, username, role, kofi_subscription, twitch_subscription_data, minecraft_username')
           .eq('minecraft_uuid', normalizedUuid)
           .single();
 
@@ -28,16 +28,29 @@ export const handler = async (event: any, context: any) => {
       }
 
       const sub = user.kofi_subscription;
+      const twitchSub = (user as any).twitch_subscription_data;
       const isAdmin = user.role === 'admin' || user.role === 'owner';
-      const isActive = (sub?.isActive === true) || isAdmin;
+      const isKofiActive = sub?.isActive === true;
+      const isTwitchActive = twitchSub?.isSub === true;
+      const isActive = isKofiActive || isTwitchActive || isAdmin;
+
+      let tierName = null;
+      if (isAdmin) {
+          tierName = 'Admin';
+      } else if (isKofiActive) {
+          tierName = sub?.tierName || 'Supporter';
+      } else if (isTwitchActive) {
+          tierName = `Twitch Tier ${twitchSub?.tier || '1'}`;
+      }
 
       return corsResponse(200, {
           active: isActive,
           isAdmin,
-          tier: isAdmin ? 'Admin' : (sub?.tierName || null),
+          tier: tierName,
           username: user.username,
           minecraft_username: user.minecraft_username,
-          subscription: sub
+          subscription: sub,
+          twitch_subscription: twitchSub
       });
 
   } catch (error: any) {

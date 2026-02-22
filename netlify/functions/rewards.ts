@@ -31,7 +31,7 @@ export const handler = async (event: any, context: any) => {
              .select('*');
              
          if (mUuid) {
-             query.or(`user_id.eq."${userId}",minecraft_uuid.eq."${mUuid}"`);
+             query.or(`user_id.eq.${userId},minecraft_uuid.eq.${mUuid}`);
          } else {
              query.eq('user_id', userId);
          }

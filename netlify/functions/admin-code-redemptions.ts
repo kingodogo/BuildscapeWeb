@@ -83,8 +83,8 @@ export const handler = async (event: any, context: any) => {
          
          // 3. Remove cosmetic rewards if any
          const cosmeticsToRevoke = (redemption.rewards || [])
-             .filter((r: any) => r.type === 'cosmetic' && r.cosmeticData?.itemId)
-             .map((r: any) => r.cosmeticData.itemId);
+             .filter((r: any) => r.type === 'cosmetic' && r.id)
+             .map((r: any) => r.id);
              
          if (cosmeticsToRevoke.length > 0 && redemption.minecraft_uuid) {
              const { data: mcUser } = await supabaseAdmin

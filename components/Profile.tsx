@@ -14,36 +14,6 @@ interface ProfileProps {
 }
 
 export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kofiUrl, onNavigate }: ProfileProps) {
-  // --- OAUTH CONFIG ---
-  // Derive Redirect URI dynamically: match the exact current page URL (sans query/hash)
-  // We use window.location.origin + window.location.pathname to be 100% sure the URI matches Azure
-  const REDIRECT_URI = typeof window !== 'undefined' 
-    ? (window.location.origin + window.location.pathname).replace(/\/$/, '') 
-    : '';
-
-  // --- POPUP CALLBACK HANDLER ---
-  const isPopup = typeof window !== 'undefined' && !!window.opener;
-  const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-  const oauthCodeInUrl = urlParams.get('code');
-  const oauthErrorInUrl = urlParams.get('error');
-
-  useEffect(() => {
-    if (isPopup && (oauthCodeInUrl || oauthErrorInUrl)) {
-      if (oauthCodeInUrl) {
-        window.opener.postMessage({ type: 'MS_OAUTH_CODE', code: oauthCodeInUrl }, "*");
-        window.close();
-      } else if (oauthErrorInUrl) {
-        const errorDesc = urlParams.get('error_description') || oauthErrorInUrl;
-        window.opener.postMessage({ type: 'MS_OAUTH_ERROR', error: errorDesc }, "*");
-        window.close();
-      }
-    }
-  }, [isPopup, oauthCodeInUrl, oauthErrorInUrl]);
-
-  if (isPopup && (oauthCodeInUrl || oauthErrorInUrl)) {
-    return <div className="h-screen bg-[#121212] flex items-center justify-center text-white">Completing Link...</div>;
-  }
-
   const [username, setUsername] = useState(currentUser.username);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -65,9 +35,6 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
   const [streamerMode, setStreamerMode] = useState<boolean>(!!currentUser.streamerMode);
-
-  const maskUsername = (value?: string) => (value && value.length > 0 ? `${value[0]}****` : '****');
-  const maskId = (value?: string) => (value ? 'f734****' : 'f734****');
   
   // Minecraft account linking state
   const [minecraftUsername, setMinecraftUsername] = useState("");
@@ -102,6 +69,39 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
   const [twitchError, setTwitchError] = useState("");
 
   const oauthProcessed = useRef(false);
+
+  // --- OAUTH CONFIG ---
+  // Derive Redirect URI dynamically: match the exact current page URL (sans query/hash)
+  // We use window.location.origin + window.location.pathname to be 100% sure the URI matches Azure
+  const REDIRECT_URI = typeof window !== 'undefined' 
+    ? (window.location.origin + window.location.pathname).replace(/\/$/, '') 
+    : '';
+
+  // --- POPUP CALLBACK HANDLER ---
+  const isPopup = typeof window !== 'undefined' && !!window.opener;
+  const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+  const oauthCodeInUrl = urlParams.get('code');
+  const oauthErrorInUrl = urlParams.get('error');
+
+  useEffect(() => {
+    if (isPopup && (oauthCodeInUrl || oauthErrorInUrl)) {
+      if (oauthCodeInUrl) {
+        window.opener.postMessage({ type: 'MS_OAUTH_CODE', code: oauthCodeInUrl }, "*");
+        window.close();
+      } else if (oauthErrorInUrl) {
+        const errorDesc = urlParams.get('error_description') || oauthErrorInUrl;
+        window.opener.postMessage({ type: 'MS_OAUTH_ERROR', error: errorDesc }, "*");
+        window.close();
+      }
+    }
+  }, [isPopup, oauthCodeInUrl, oauthErrorInUrl]);
+
+  if (isPopup && (oauthCodeInUrl || oauthErrorInUrl)) {
+    return <div className="h-screen bg-[#121212] flex items-center justify-center text-white">Completing Link...</div>;
+  }
+
+  const maskUsername = (value?: string) => (value && value.length > 0 ? `${value[0]}****` : '****');
+  const maskId = (value?: string) => (value ? 'f734****' : 'f734****');
 
   useEffect(() => {
     const checkUsername = async () => {

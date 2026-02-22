@@ -15,15 +15,40 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Helper to escape HTML characters to prevent XSS in emails
+function escapeHtml(str: string): string {
+    if (!str) return '';
+    return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 // Helper to send professional HTML email
 async function sendProfessionalEmail(to: string, subject: string, title: string, message: string, buttonText: string, buttonLink: string, otp?: string) {
+  // Sanitize and escape all user-controlled values
+  const safeTitle = escapeHtml(title);
+  const safeMessage = escapeHtml(message);
+  const safeOtp = otp ? escapeHtml(otp) : '';
+  const safeTo = escapeHtml(to);
+  const safeButtonText = escapeHtml(buttonText);
+  const safeSubject = escapeHtml(subject);
+  
+  // Validate button link protocol (only allow http/https)
+  let safeButtonLink = "";
+  if (buttonLink && (buttonLink.startsWith("http://") || buttonLink.startsWith("https://"))) {
+      safeButtonLink = buttonLink; // We assume the link itself is properly formatted for interpolation
+  }
+
   const html = `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>${subject}</title>
+      <title>${safeSubject}</title>
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
         body { margin: 0; padding: 0; background-color: #0a0a0a; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #e5e7eb; }
@@ -52,28 +77,28 @@ async function sendProfessionalEmail(to: string, subject: string, title: string,
             <h1>Buildscape</h1>
           </div>
           <div class="content">
-            <div class="title">${title}</div>
-            <div class="message">${message}</div>
+            <div class="title">${safeTitle}</div>
+            <div class="message">${safeMessage}</div>
             
-            ${otp ? `
+            ${safeOtp ? `
             <div class="otp-container">
               <div class="otp-label">Direct Verification Code</div>
-              <div class="otp-code">${otp}</div>
+              <div class="otp-code">${safeOtp}</div>
             </div>
             ` : ''}
-
-            ${buttonLink ? `
-              ${otp ? '<div class="divider"><span>OR</span></div>' : ''}
-              <a href="${buttonLink}" class="button">${buttonText}</a>
+ 
+            ${safeButtonLink ? `
+              ${safeOtp ? '<div class="divider"><span>OR</span></div>' : ''}
+              <a href="${safeButtonLink}" class="button">${safeButtonText}</a>
               <div class="link-text">
                 Button not working? Copy this link:<br>
-                <a href="${buttonLink}" style="color: #10b981;">${buttonLink}</a>
+                <a href="${safeButtonLink}" style="color: #10b981;">${safeButtonLink}</a>
               </div>
             ` : ''}
           </div>
           <div class="footer">
             &copy; ${new Date().getFullYear()} Buildscape Tracker. All rights reserved.<br>
-            Sent with &hearts; to ${to}<br>
+            Sent with &hearts; to ${safeTo}<br>
             <p>If you didn't request this email, you can safely ignore it.</p>
           </div>
         </div>
@@ -368,9 +393,20 @@ export const handler = async (event: any, context: any) => {
         if (createErr && !createErr.message.includes('already')) throw createErr;
       }
 
+      // Trigger OTP send server-side so client doesn't need the full email
+      const { error: otpError } = await supabaseAdmin.auth.signInWithOtp({ 
+        email: legacy.email,
+        options: {
+          shouldCreateUser: true,
+          data: { username: legacy.username }
+        }
+      });
+      
+      if (otpError) throw otpError;
+
       const parts = legacy.email.split('@');
       const maskedEmail = parts[0].slice(0, 2) + '***@' + parts[1];
-      return corsResponse(200, { success: true, email: legacy.email, maskedEmail, username: legacy.username });
+      return corsResponse(200, { success: true, maskedEmail, username: legacy.username });
     }
 
     // --- Authenticated Endpoints (Require valid JWT) ---
