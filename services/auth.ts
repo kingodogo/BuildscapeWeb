@@ -22,6 +22,9 @@ function mapProfile(profile: any): User {
         kofiUsername: profile.kofi_username || '',
         profileIcon: profile.profile_icon || '',
         streamerMode: profile.streamer_mode || false,
+        twitchUsername: profile.twitch_username || '',
+        twitchId: profile.twitch_id || '',
+        twitchSubscriptionData: profile.twitch_subscription_data || null,
         kofiSubscription: profile.kofi_subscription || null
     };
 }
@@ -415,5 +418,12 @@ export const AuthService = {
 
         localStorage.setItem(SESSION_KEY, JSON.stringify(data.user));
         return data.user as User;
+    },
+
+    verifyStreamElementsSubscription: async (twitchUsername: string): Promise<any> => {
+        return fetchWithAuth('/.netlify/functions/streamelements?action=verifySubscription', {
+            method: 'POST',
+            body: JSON.stringify({ twitchUsername })
+        });
     },
 };

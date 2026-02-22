@@ -40,9 +40,22 @@ export const handler = async (event: any, context: any) => {
 
          if (error) throw error;
          
-         // Filter expired
          const now = Date.now();
-         const active = (data || []).filter((r: any) => !r.expires_at || r.expires_at > now);
+         const active = (data || [])
+             .filter((r: any) => !r.expires_at || r.expires_at > now)
+             .map((r: any) => ({
+                 id: r.id,
+                 userId: r.user_id,
+                 minecraftUuid: r.minecraft_uuid,
+                 source: r.source,
+                 sourceId: r.source_id,
+                 rewards: r.rewards,
+                 grantedAt: r.granted_at,
+                 expiresAt: r.expires_at,
+                 downloaded: r.downloaded,
+                 downloadUrl: r.download_url,
+                 downloadExpiresAt: r.download_expires_at
+             }));
 
          return corsResponse(200, { rewards: active, total: active.length });
      }

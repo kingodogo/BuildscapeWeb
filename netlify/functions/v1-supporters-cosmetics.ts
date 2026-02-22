@@ -32,6 +32,28 @@ export const handler = async (event: any, context: any) => {
       let unlockedIds = mcUser?.unlocked_cosmetics || [];
       const selected = mcUser?.selected_cosmetics || {};
 
+      // 3. Get active rewards (non-expired)
+      const now = Date.now();
+      const { data: activeRewards } = await supabaseAdmin
+          .from('user_rewards')
+          .select('rewards')
+          .eq('minecraft_uuid', normalizedUuid)
+          .or(`expires_at.gt.${now},expires_at.is.null`);
+
+      if (activeRewards) {
+          activeRewards.forEach((r: any) => {
+              if (Array.isArray(r.rewards)) {
+                  r.rewards.forEach((reward: any) => {
+                      if (reward.type === 'cosmetic' && reward.id) {
+                          if (!unlockedIds.includes(reward.id)) {
+                              unlockedIds.push(reward.id);
+                          }
+                      }
+                  });
+              }
+          });
+      }
+
       // Admin/owner override
       if (isAdmin) {
           const { data: allCosmetics } = await supabaseAdmin.from('cosmetics').select('id');

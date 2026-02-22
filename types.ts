@@ -68,6 +68,14 @@ export interface User {
   minecraftUsername?: string; // Linked Minecraft username
   minecraftUuid?: string; // Linked Minecraft UUID (without dashes, e.g., "550e8400e29b41d4a716446655440000")
   kofiUsername?: string; // Ko-fi username for subscription tracking
+  twitchUsername?: string; // Linked Twitch username
+  twitchId?: string; // Linked Twitch ID
+  twitchSubscriptionData?: {
+    isSub: boolean;
+    tier?: string;
+    avatar?: string;
+    lastModified?: string;
+  };
   kofiSubscription?: {
     isActive: boolean;
     tierName?: string;
@@ -239,7 +247,7 @@ export interface UserReward {
   id: string;
   userId: string;
   minecraftUuid?: string;
-  source: 'code' | 'kofi' | 'manual' | 'membership'; // Source of the reward
+  source: 'code' | 'kofi' | 'manual' | 'membership' | 'streamelements'; // Source of the reward
   sourceId?: string; // ID of the source (code ID, kofi tier ID, etc.)
   rewards: KofiRewardItem[]; // The actual rewards
   grantedAt: number; // When it was granted

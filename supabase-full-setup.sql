@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   kofi_subscription JSONB DEFAULT NULL,
   streamer_mode BOOLEAN DEFAULT false,
   profile_icon TEXT,
+  twitch_id TEXT,
+  twitch_username TEXT,
+  twitch_subscription_data JSONB DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -216,6 +219,7 @@ CREATE TABLE IF NOT EXISTS public.cosmetics (
   is_default BOOLEAN DEFAULT false,
   is_code_based BOOLEAN DEFAULT false,
   is_admin_granted BOOLEAN DEFAULT false,
+  is_subscriber_only BOOLEAN DEFAULT false,
   created_at BIGINT,
   updated_at BIGINT
 );

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { User, UserReward, KofiRewardItem } from "../types";
-import { User as UserIcon, Save, X, CheckCircle, AlertCircle, Lock, UserCircle, Upload, Image as ImageIcon, Crop, Maximize2, Minimize2, Link as LinkIcon, Unlink, Gamepad2, Coffee, Crown, Mail, Settings, ExternalLink, Gift, Download, Package, LogOut } from "lucide-react";
+import { User as UserIcon, Save, X, CheckCircle, AlertCircle, Lock, UserCircle, Upload, Image as ImageIcon, Crop, Maximize2, Minimize2, Link as LinkIcon, Unlink, Gamepad2, Coffee, Crown, Mail, Settings, ExternalLink, Gift, Download, Package, LogOut, Twitch } from "lucide-react";
 import { AuthService } from "../services/auth";
 import { formatUuid } from "../services/minecraft";
 
@@ -95,6 +95,12 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
   const [isUpdatingKofiUsername, setIsUpdatingKofiUsername] = useState(false);
   const [kofiUsernameError, setKofiUsernameError] = useState("");
   const [isOAuthLinking, setIsOAuthLinking] = useState(false);
+  
+  // Twitch/StreamElements state
+  const [twitchUsernameInput, setTwitchUsernameInput] = useState(currentUser.twitchUsername || "");
+  const [isVerifyingTwitch, setIsVerifyingTwitch] = useState(false);
+  const [twitchError, setTwitchError] = useState("");
+
   const oauthProcessed = useRef(false);
 
   useEffect(() => {
@@ -1380,6 +1386,142 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                 </div>
               )}
             </div>
+            
+            {/* Twitch / StreamElements Account Linking */}
+            <div className="border-t border-gray-800 pt-6">
+              <label className="block text-sm font-medium text-gray-300 mb-4 flex items-center gap-2">
+                <Twitch size={16} className="text-[#9146FF]" />
+                Twitch Subscription (StreamElements)
+              </label>
+              
+              <div className="bg-[#121212] rounded-lg p-4 space-y-3">
+                {currentUser.twitchSubscriptionData?.isSub ? (
+                  <>
+                    <div className="bg-purple-900/20 border border-purple-700/50 rounded-lg p-3">
+                      <div className="text-xs text-purple-300 flex items-center gap-2 mb-2">
+                         <div className="w-8 h-8 rounded-full overflow-hidden border border-purple-500/50">
+                            {currentUser.twitchSubscriptionData.avatar ? (
+                                <img src={currentUser.twitchSubscriptionData.avatar} alt="Twitch Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full bg-[#9146FF] flex items-center justify-center">
+                                    <Twitch size={14} className="text-white" />
+                                </div>
+                            )}
+                         </div>
+                        <span className="font-medium">Twitch Subscribed</span>
+                      </div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        Linked Twitch: <span className="font-mono text-gray-300">{streamerMode ? maskUsername(currentUser.twitchUsername) : currentUser.twitchUsername}</span>
+                      </div>
+                      {currentUser.twitchSubscriptionData.tier && (
+                        <div className="text-xs text-purple-400 mt-1 font-medium">
+                          Tier: {currentUser.twitchSubscriptionData.tier === '1000' ? '1' : 
+                                 currentUser.twitchSubscriptionData.tier === '2000' ? '2' : 
+                                 currentUser.twitchSubscriptionData.tier === '3000' ? '3' : currentUser.twitchSubscriptionData.tier}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <button
+                      onClick={async () => {
+                        setIsVerifyingTwitch(true);
+                        setTwitchError("");
+                        try {
+                           const res = await AuthService.verifyStreamElementsSubscription(currentUser.twitchUsername!);
+                           if (res.success) {
+                               onUpdate({ ...currentUser, ...res.userData }); // Assumes backend returns updated user data or we refresh
+                               onNotify("Subscription status refreshed!", "success");
+                               // We should actually just refresh the user profile to be sure
+                               const updatedUser = await AuthService.refreshSession();
+                               if (updatedUser) onUpdate(updatedUser);
+                           } else {
+                               onNotify(res.message || "No active subscription found.", "error");
+                           }
+                        } catch (e: any) {
+                           setTwitchError(e.message || "Failed to refresh status");
+                        } finally {
+                           setIsVerifyingTwitch(false);
+                        }
+                      }}
+                      disabled={isVerifyingTwitch}
+                      className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {isVerifyingTwitch ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <CheckCircle size={16} />
+                      )}
+                      Refresh Status
+                    </button>
+                    <p className="text-[10px] text-gray-500 italic text-center">
+                       Rewards are granted for 31 days and can be refreshed manually.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="bg-[#9146FF]/10 border border-[#9146FF]/30 rounded-lg p-3 mb-3">
+                      <p className="text-xs text-purple-300">
+                        Link your Twitch username to claim exclusive subscriber rewards!
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1.5">Twitch Username</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={twitchUsernameInput}
+                          onChange={(e) => {
+                            setTwitchUsernameInput(e.target.value);
+                            setTwitchError("");
+                          }}
+                          className={`flex-1 bg-[#1a1a1a] border ${
+                            twitchError ? 'border-red-500' : 'border-gray-700'
+                          } rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-colors text-sm`}
+                          placeholder="Twitch Username"
+                          disabled={isVerifyingTwitch}
+                        />
+                        <button
+                          onClick={async () => {
+                            if (!twitchUsernameInput.trim()) return;
+                            setIsVerifyingTwitch(true);
+                            setTwitchError("");
+                            try {
+                              const res = await AuthService.verifyStreamElementsSubscription(twitchUsernameInput.trim());
+                              if (res.success) {
+                                onNotify("Twitch subscription verified!", "success");
+                                // Refresh user session to get updated rewards
+                                const updatedUser = await AuthService.refreshSession();
+                                if (updatedUser) onUpdate(updatedUser);
+                              } else {
+                                setTwitchError(res.message || "Account not subscribed.");
+                                onNotify(res.message || "No subscription found.", "error");
+                              }
+                            } catch (e: any) {
+                              setTwitchError(e.message);
+                              onNotify(e.message, "error");
+                            } finally {
+                              setIsVerifyingTwitch(false);
+                            }
+                          }}
+                          disabled={isVerifyingTwitch || !twitchUsernameInput.trim()}
+                          className="px-4 py-2 bg-[#9146FF] hover:bg-[#772ce8] text-white rounded-lg text-sm font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+                        >
+                          {isVerifyingTwitch && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                          {isVerifyingTwitch ? 'Checking...' : 'Verify Sub'}
+                        </button>
+                      </div>
+                      {twitchError && (
+                        <p className="mt-1.5 text-sm text-red-400 flex items-center gap-1 text-xs">
+                          <AlertCircle size={14} />
+                          {twitchError}
+                        </p>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
 
             {/* Account Info */}
             <div className="border-t border-gray-800 pt-6">
@@ -1447,12 +1589,27 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                                   reward.source === 'code' ? 'bg-blue-900/30 text-blue-400 border border-blue-700' :
                                   reward.source === 'kofi' ? 'bg-[#FF5E5B]/20 text-[#FF5E5B] border border-[#FF5E5B]/50' :
                                   reward.source === 'membership' ? 'bg-purple-900/30 text-purple-400 border border-purple-700' :
+                                  reward.source === 'streamelements' ? 'bg-[#9146FF]/30 text-purple-300 border border-[#9146FF]/50' :
                                   'bg-gray-700/50 text-gray-300 border border-gray-600'
                                 }`}>
                                   {reward.source === 'code' ? 'Code' :
                                    reward.source === 'kofi' ? 'Ko-fi' :
-                                   reward.source === 'membership' ? 'Membership' : 'Manual'}
+                                   reward.source === 'membership' ? 'Membership' :
+                                   reward.source === 'streamelements' ? 'Subscription' : 'Manual'}
                                 </span>
+                                {reward.expiresAt && (
+                                  <span className="px-2 py-1 rounded text-[10px] font-bold bg-amber-900/30 text-amber-400 border border-amber-700/50 flex items-center gap-1">
+                                    <AlertCircle size={10} />
+                                    Expires: {(() => {
+                                      const left = reward.expiresAt - Date.now();
+                                      const days = Math.floor(left / (1000 * 60 * 60 * 24));
+                                      if (days > 0) return `${days}d left`;
+                                      const hours = Math.floor(left / (1000 * 60 * 60));
+                                      if (hours > 0) return `${hours}h left`;
+                                      return "Soon";
+                                    })()}
+                                  </span>
+                                )}
       </div>
                               <div className="space-y-2">
                                 {reward.rewards.map((item, index) => (
