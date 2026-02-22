@@ -21,6 +21,18 @@ interface LegacyState {
   confirmPassword: string;
 }
 
+/**
+ * Render the login UI and handle authentication, email verification, password reset, and legacy account migration flows.
+ *
+ * The component manages local state for credentials, OTPs, loading/error indicators, and an optional legacy migration wizard.
+ * It performs sign-in via AuthService, handles EMAIL_NOT_CONFIRMED and LEGACY_USER error flows (including OTP verification and password setup),
+ * supports resending confirmation emails, and exposes a "Forgot Password" action that triggers a password reset email.
+ *
+ * @param onLogin - Callback invoked with a `User` after a successful login or completed migration.
+ * @param onError - Optional callback invoked with an `AuthError` when a login attempt fails with an authentication error.
+ * @param onNavigateRegister - Callback invoked to navigate to the registration flow.
+ * @returns The React element tree for the login form or the legacy migration wizard.
+ */
 export default function Login({ onLogin, onError, onNavigateRegister }: LoginProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");

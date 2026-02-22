@@ -10,7 +10,12 @@ export class AuthError extends Error {
     }
 }
 
-// Helper: map Supabase profile to User type
+/**
+ * Convert a Supabase profile record into the application's User object.
+ *
+ * @param profile - Supabase profiles row containing keys like `id`, `username`, `email`, `role`, `minecraft_username`, `minecraft_uuid`, `kofi_username`, `profile_icon`, `streamer_mode`, and `kofi_subscription`
+ * @returns A User where missing string fields are replaced with `''`, `streamerMode` defaults to `false`, and `kofiSubscription` defaults to `null`
+ */
 function mapProfile(profile: any): User {
     return {
         id: profile.id,
@@ -26,7 +31,12 @@ function mapProfile(profile: any): User {
     };
 }
 
-// Helper: Get full profile with "Self-Healing" (creates profile if missing but user exists)
+/**
+ * Retrieve a user's profile and, if the profile is missing but the authenticated user exists, create a new profile from auth metadata.
+ *
+ * @returns The user's profile mapped to the `User` shape.
+ * @throws Propagates Supabase query errors or throws an `Error` when the profile cannot be found or self-healed.
+ */
 async function fetchUserProfile(userId: string): Promise<User> {
     const { data, error } = await supabase
         .from('profiles')
@@ -62,7 +72,17 @@ async function fetchUserProfile(userId: string): Promise<User> {
     throw new Error("Profile not found and could not be self-healed.");
 }
 
-// Helper: Call Netlify Function with Auth Header
+/**
+ * Performs a fetch to a Netlify function endpoint using the current Supabase session token.
+ *
+ * Attaches `Authorization: Bearer <token>` and `Content-Type: application/json` to the request headers and returns the parsed JSON response.
+ *
+ * @param url - The endpoint URL to call
+ * @param options - Optional fetch options passed through to fetch; provided headers are merged with the Authorization and Content-Type headers
+ * @returns The parsed JSON response from the endpoint
+ * @throws AuthError with code `INVALID_CREDENTIALS` if there is no active session token
+ * @throws AuthError with code `SERVER_ERROR` when the endpoint responds with a non-OK status (uses the response `error` field as the message when available)
+ */
 async function fetchWithAuth(url: string, options: RequestInit = {}) {
     const { data: { session } } = await supabase.auth.getSession();
     const token = session?.access_token;

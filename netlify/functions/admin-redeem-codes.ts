@@ -1,7 +1,12 @@
 import { corsResponse, requireAdmin } from './lib/supabaseHelpers';
 import { supabaseAdmin } from './lib/supabaseAdmin';
 
-// Helper to map DB row to Frontend type
+/**
+ * Convert a database redeem_codes row into the frontend-facing redeem code shape.
+ *
+ * @param db - A database row from the `redeem_codes` table
+ * @returns An object with frontend fields: `id`, `code`, `rewards` (defaults to `[]`), `description`, `maxUses`, `usedCount` (defaults to `0`), `expiresAt` (number or `undefined`), `requiresMembership`, `createdAt` (number), `createdBy`, and `enabled`
+ */
 function mapFromDb(db: any) {
     return {
         id: db.id,
@@ -18,7 +23,12 @@ function mapFromDb(db: any) {
     };
 }
 
-// Helper to map Frontend data to DB columns
+/**
+ * Convert a frontend redeem-code payload into the shape expected by the database.
+ *
+ * @param data - Frontend object containing redeem-code properties (optional keys: `code`, `description`, `rewards`, `maxUses`, `expiresAt`, `requiresMembership`, `enabled`, `createdBy`, `createdAt`).
+ * @returns An object mapping frontend fields to DB column names (e.g., `max_uses`, `expires_at`, `requires_membership`, `created_by`, `created_at_ts`) and including `rewards`. If `rewards` contains cosmetic items with `cosmeticData.itemId`, a `cosmetic_ids` array is populated (empty array if none found).
+ */
 function mapToDb(data: any) {
     const db: any = {};
     if (data.code !== undefined) db.code = data.code;

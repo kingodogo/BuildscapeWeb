@@ -12,6 +12,17 @@ type Step = 'email' | 'verify' | 'reset';
 
 
 
+/**
+ * Render a password-reset UI that sends a reset link to the provided email and shows a confirmation on success.
+ *
+ * The component validates the entered email, calls AuthService.requestPasswordReset, displays inline errors,
+ * shows a loading state during the request, and renders a success screen when the request completes.
+ *
+ * @param onBack - Callback invoked to navigate back to the login view
+ * @param onSuccess - Optional callback invoked after a successful reset request
+ * @param onError - Optional callback invoked with an `AuthError` when the reset request fails
+ * @returns A React element representing the Forgot Password form and its success confirmation
+ */
 export default function ForgotPassword({ onBack, onSuccess, onError }: ForgotPasswordProps) {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
@@ -133,4 +144,3 @@ export default function ForgotPassword({ onBack, onSuccess, onError }: ForgotPas
     </div>
   );
 }
-

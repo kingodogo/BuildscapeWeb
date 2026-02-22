@@ -15,7 +15,19 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Helper to send professional HTML email
+/**
+ * Send a branded HTML email, preferring the Resend API and falling back to SMTP (Nodemailer).
+ *
+ * @param to - Recipient email address
+ * @param subject - Email subject line
+ * @param title - Headline shown in the email body
+ * @param message - Main message content shown in the email body
+ * @param buttonText - Text for the optional call-to-action button
+ * @param buttonLink - URL for the optional call-to-action button
+ * @param otp - Optional one-time verification code displayed prominently in the email
+ * @returns `true` if the email was sent successfully
+ * @throws Error if delivery ultimately fails or email service is not configured
+ */
 async function sendProfessionalEmail(to: string, subject: string, title: string, message: string, buttonText: string, buttonLink: string, otp?: string) {
   const html = `
     <!DOCTYPE html>
@@ -686,7 +698,15 @@ export const handler = async (event: any, context: any) => {
   }
 };
 
-// Helper to sync rewards to Minecraft UUID
+/**
+ * Adds a Ko-fi subscription tier's cosmetics to a Minecraft account and records a sync reward entry when applicable.
+ *
+ * If the user's Ko-fi subscription is active and the subscribed tier defines cosmetics, this function upserts those cosmetics
+ * into the Minecraft user's unlocked cosmetics list and upserts a corresponding `user_rewards` record describing the sync.
+ *
+ * @param userId - The application's profile ID for the user (profiles.id)
+ * @param mUuid - The Minecraft user's UUID (normalized, typically without dashes)
+ */
 async function syncMinecraftRewards(userId: string, mUuid: string) {
   try {
     const { data: profile } = await supabaseAdmin
@@ -735,7 +755,12 @@ async function syncMinecraftRewards(userId: string, mUuid: string) {
   }
 }
 
-// Helper to map DB profile to frontend User object
+/**
+ * Convert a database profile record into the frontend User shape.
+ *
+ * @param p - A profile row from the database (may be null or undefined)
+ * @returns The mapped User object with fields: `id`, `username`, `email`, `role`, `minecraftUsername`, `minecraftUuid`, `kofiUsername`, `profileIcon`, `streamerMode`, and `kofiSubscription`, or `null` if `p` is falsy.
+ */
 function mapProfileToUser(p: any) {
   if (!p) return null;
   return {

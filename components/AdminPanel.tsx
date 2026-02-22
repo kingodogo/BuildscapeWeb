@@ -24,6 +24,24 @@ interface AdminPanelProps {
   onChangelogEditComplete?: () => void;
 }
 
+/**
+ * Admin interface for managing bug reports, suggestions, users, site configuration, changelogs, Ko-fi tiers/rewards, redeem codes, wiki features, and database backup/restore workflows.
+ *
+ * @param currentUser - The authenticated user viewing the panel (used for role-based access and actions)
+ * @param onLogout - Callback invoked when the user signs out
+ * @param reports - List of bug reports displayed and managed in the panel
+ * @param suggestions - List of suggestions displayed and managed in the panel
+ * @param onUpdateReport - Callback to persist an updated BugReport
+ * @param onDeleteReport - Callback to delete a BugReport by id
+ * @param onUpdateSuggestion - Callback to persist an updated Suggestion
+ * @param onDeleteSuggestion - Callback to delete a Suggestion by id
+ * @param config - Current application configuration (hero, links, social handles, changelogs, kofi tiers, icons, etc.)
+ * @param onUpdateConfig - Callback invoked with an updated AppConfig to persist configuration changes
+ * @param onRestoreData - Callback invoked with restored reports, suggestions, and config when importing a backup
+ * @param initialChangelogToEdit - Optional changelog entry to open immediately in the editor on mount
+ * @param onChangelogEditComplete - Optional callback invoked after the initial changelog edit modal is opened
+ * @returns The AdminPanel React element
+ */
 export default function AdminPanel({ currentUser, onLogout, reports, suggestions, onUpdateReport, onDeleteReport, onUpdateSuggestion, onDeleteSuggestion, config, onUpdateConfig, onRestoreData, initialChangelogToEdit, onChangelogEditComplete }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<'bugs' | 'suggestions' | 'users' | 'config' | 'database' | 'changelogs' | 'kofi' | 'redeem-rewards' | 'wiki'>('bugs');
 

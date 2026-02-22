@@ -77,7 +77,16 @@ export const MediaService = {
 };
 
 /**
- * Internal helper to compress images using a canvas
+ * Compresses and resizes an image File into a JPEG Blob.
+ *
+ * The image is resized proportionally if its width exceeds `maxWidth`, then encoded as a JPEG
+ * with the given `quality`.
+ *
+ * @param file - The source image File to compress
+ * @param maxWidth - Maximum width in pixels; the image is scaled down proportionally if wider
+ * @param quality - JPEG quality between 0 and 1
+ * @returns A `Blob` containing the compressed JPEG image
+ * @throws If reading the file fails or the canvas conversion does not produce a Blob
  */
 async function optimizeImage(file: File, maxWidth: number, quality: number): Promise<Blob> {
   return new Promise((resolve, reject) => {

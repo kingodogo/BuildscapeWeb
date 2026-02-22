@@ -10,6 +10,18 @@ interface RedeemProps {
   onNotify: (msg: string, type?: 'success' | 'error') => void;
 }
 
+/**
+ * Renders the Redeem UI that lets a signed-in user enter a reward code, redeem it, and view redeemed rewards.
+ *
+ * Displays alternate screens prompting sign-in or Minecraft account linking when required, validates input,
+ * triggers the redeem operation, and shows success or error notifications and redeemed reward details.
+ *
+ * @param currentUser - The currently authenticated user object or `null` if not signed in
+ * @param onNavigateLogin - Callback invoked to navigate to the login flow
+ * @param onNavigate - Optional navigation callback that accepts a view name (e.g., `'profile'`) for SPA navigation
+ * @param onNotify - Callback to show notifications; accepts a message and an optional type (`'success'` | `'error'`)
+ * @returns The React element for the redeem screen and its conditional states
+ */
 export default function Redeem({ currentUser, onNavigateLogin, onNavigate, onNotify }: RedeemProps) {
   const [code, setCode] = useState("");
   const [isRedeeming, setIsRedeeming] = useState(false);
@@ -219,4 +231,3 @@ export default function Redeem({ currentUser, onNavigateLogin, onNavigate, onNot
     </div>
   );
 }
-

@@ -62,6 +62,22 @@ const LinkPreviewItem = ({ url }: { url: string }) => {
     );
 };
 
+/**
+ * Displays a detailed modal for a bug report, including description, environment, tags, links, comments, assignment controls, and optional AI analysis with rerun capability.
+ *
+ * @param bug - The bug report to display
+ * @param isOpen - Controls visibility of the modal
+ * @param onClose - Callback invoked to close the modal
+ * @param currentUser - The currently authenticated user, or `null` if unauthenticated
+ * @param isAdmin - Whether the current user has admin privileges (enables admin controls)
+ * @param onToggleStatus - Handler to toggle the bug's status by id
+ * @param onUpdateReport - Optional callback to persist updates to the bug report
+ * @param onAddComment - Callback to add a comment to the bug (bugId, text, optional images)
+ * @param onDeleteComment - Callback to delete a comment from the bug (bugId, commentId)
+ * @param onNavigateLogin - Callback to navigate the user to the login screen
+ * @param onNotify - Callback to show a notification; accepts a message and optional type ('success' | 'error')
+ * @returns The modal element when `isOpen` is true, otherwise `null`
+ */
 export default function BugDetailModal({ 
     bug, isOpen, onClose, currentUser, isAdmin, onToggleStatus, onUpdateReport, onAddComment, onDeleteComment, onNavigateLogin, onNotify 
 }: BugDetailModalProps) {

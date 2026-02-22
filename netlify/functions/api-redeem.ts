@@ -1,4 +1,3 @@
-
 import { corsResponse } from './lib/supabaseHelpers';
 import { supabaseAdmin } from './lib/supabaseAdmin';
 import { verifyMinecraftSession } from './lib/minecraftAuth';
@@ -52,6 +51,14 @@ export const handler = async (event: any, context: any) => {
   }
 };
 
+/**
+ * Processes a redeem code for a Minecraft user, records the redemption, updates usage counts, and grants any associated cosmetics and visible rewards.
+ *
+ * @param redeemCode - The redeem code record (must include `id`, `code`, `rewards`, optional `expires_at`, `max_uses`, `used_count`, and optional `cosmetic_ids`)
+ * @param normalizedUuid - The Minecraft UUID for the redeemer (dashes removed)
+ * @param accessToken - The access token presented by the client (used for session verification context)
+ * @returns A CORS-wrapped HTTP response object. On success contains `{ success: true, message: 'Code redeemed successfully' }`. On failure contains an `error` message and an appropriate HTTP status code describing the failure (e.g., expired code, max uses reached, already redeemed, or internal error).
+ */
 async function handleRedemption(redeemCode: any, normalizedUuid: string, accessToken: string) {
   try {
     const { id, code } = redeemCode;

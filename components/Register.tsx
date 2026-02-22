@@ -9,6 +9,14 @@ interface RegisterProps {
   onNavigateLogin: () => void;
 }
 
+/**
+ * Render a user registration UI that handles signup, optional email confirmation (OTP), verification, and resend flows.
+ *
+ * @param onLogin - Callback invoked with the created `User` after a successful registration (when no confirmation is required).
+ * @param onError - Optional callback invoked with an `AuthError` when registration fails with an auth-specific error.
+ * @param onNavigateLogin - Callback to navigate the user to the login view (used after successful verification or when the user chooses to go back).
+ * @returns The registration UI as a React element.
+ */
 export default function Register({ onLogin, onError, onNavigateLogin }: RegisterProps) {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");

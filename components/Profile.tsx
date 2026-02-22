@@ -13,6 +13,19 @@ interface ProfileProps {
   onNavigate?: (view: string) => void; // Navigation callback
 }
 
+/**
+ * Render the Profile settings UI for editing user details, linking external accounts (Microsoft/Minecraft, Ko-fi), and managing rewards.
+ *
+ * Renders a multi-tab interface (Edit Profile, Link Accounts, Rewards) that handles local form state, image upload/cropping for profile icons, username validation, password/email updates, Microsoft OAuth flows for Minecraft linking (popup + redirect fallback), Ko-fi linking/claiming, reward loading and downloads, and notifies the parent of updates or errors.
+ *
+ * @param currentUser - The current authenticated user object used to populate initial form values and linked-account state
+ * @param onUpdate - Callback invoked with an updated User object after successful profile/account changes
+ * @param onCancel - Callback invoked when the user cancels editing (e.g., close/cancel button)
+ * @param onNotify - Notification callback used to surface success/error messages (message, type)
+ * @param kofiUrl - Optional Ko-fi page URL used for external subscription/manage links
+ * @param onNavigate - Optional navigation callback used to switch views (e.g., navigate to the redeem flow)
+ * @returns The Profile settings React element
+ */
 export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kofiUrl, onNavigate }: ProfileProps) {
   // --- OAUTH CONFIG ---
   // Derive Redirect URI dynamically: match the exact current page URL (sans query/hash)
@@ -1677,4 +1690,3 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
     </div>
   );
 }
-

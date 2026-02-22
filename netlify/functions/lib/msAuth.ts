@@ -1,4 +1,3 @@
-
 /**
  * Microsoft/Xbox/Minecraft OAuth authentication flow handler
  * Based on: https://wiki.vg/Microsoft_Authentication_Scheme
@@ -12,6 +11,14 @@ export interface MinecraftProfile {
   name: string;
 }
 
+/**
+ * Exchange a Microsoft OAuth authorization code for a Minecraft profile (account id and username).
+ *
+ * @param code - Authorization code received from Microsoft's OAuth redirect
+ * @param redirectUri - Redirect URI that was used when exchanging the authorization code
+ * @returns The Minecraft profile containing `id` and `name`
+ * @throws Error if Microsoft OAuth is not configured or any step of the Microsoft/Xbox/Minecraft authentication flow fails
+ */
 export async function getMinecraftProfileFromCode(code: string, redirectUri: string): Promise<MinecraftProfile> {
   if (!MICROSOFT_CLIENT_ID || !MICROSOFT_CLIENT_SECRET || MICROSOFT_CLIENT_ID === 'your-client-id-here') {
     throw new Error('Microsoft OAuth not configured. Please set MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET in Netlify environment variables.');
@@ -157,6 +164,13 @@ export async function getMinecraftProfileFromCode(code: string, redirectUri: str
   };
 }
 
+/**
+ * Constructs the Microsoft OAuth authorization URL to begin a sign-in flow that requests the `XboxLive.signin` scope.
+ *
+ * @param redirectUri - The redirect URI registered for the Microsoft application; Microsoft will send the authorization code to this URL.
+ * @returns The authorization URL to open in the user's browser.
+ * @throws If the server does not have a valid `MICROSOFT_CLIENT_ID` configured.
+ */
 export function getMicrosoftLoginUrl(redirectUri: string): string {
   if (!MICROSOFT_CLIENT_ID || MICROSOFT_CLIENT_ID === 'your-client-id-here') {
     throw new Error('Microsoft OAuth not configured on the server.');

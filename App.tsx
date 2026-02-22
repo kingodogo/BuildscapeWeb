@@ -195,6 +195,11 @@ const getInitialView = (): ViewType => {
   return pathToView[path] || 'home';
 };
 
+/**
+ * Main application component that manages navigation, data loading and syncing, authentication state, and renders all app views and UI chrome.
+ *
+ * @returns The root JSX element that renders the full application (navbar, dynamic views, toasts, banners, and footer).
+ */
 export default function App() {
   const [currentView, setCurrentView] = useState<ViewType>(getInitialView);
   

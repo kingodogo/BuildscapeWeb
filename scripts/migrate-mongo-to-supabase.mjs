@@ -18,17 +18,35 @@ if (!SUPABASE_KEY) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY in .env');
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const logLines = [];
 
+/**
+ * Log a migration message prefixed with "[migrate]" and record it in the in-memory log.
+ * @param {string} msg - The message text to log.
+ */
 function log(msg) {
   const line = `[migrate] ${msg}`;
   console.log(line);
   logLines.push(line);
 }
+/**
+ * Log a warning message to the console and record it in the in-memory migration log.
+ * @param {string} msg - Warning text to emit and append to the migration log buffer.
+ */
 function warn(msg) {
   const line = `[migrate] WARN: ${msg}`;
   console.warn(line);
   logLines.push(line);
 }
 
+/**
+ * Upserts multiple rows into a Supabase table using a specified conflict column.
+ *
+ * If `rows` is empty the function is a no-op. On success it logs the number of rows
+ * inserted/updated; on failure it emits a warning containing the Supabase error message and code.
+ *
+ * @param {string} table - Name of the Supabase table to upsert into.
+ * @param {Array<object>} rows - Array of row objects to upsert.
+ * @param {string} [conflictColumn='id'] - Column name to use for conflict resolution (onConflict).
+ */
 async function upsertBatch(table, rows, conflictColumn = 'id') {
   if (!rows.length) { log(`  (no rows to insert into ${table})`); return; }
   const { error } = await supabase
@@ -41,6 +59,27 @@ async function upsertBatch(table, rows, conflictColumn = 'id') {
   }
 }
 
+/**
+ * Map a MongoDB report document into the shape expected by the reports table.
+ * @param {Object} r - Source MongoDB report document.
+ * @returns {Object} An object with the report fields mapped for upsert:
+ *  - `id`: report identifier
+ *  - `title`: report title
+ *  - `description`: detailed description
+ *  - `steps_to_reproduce`: reproduction steps
+ *  - `versions`: associated versions array
+ *  - `mc_versions`: Minecraft versions array
+ *  - `severity`: severity level
+ *  - `status`: current status
+ *  - `author`: author identifier or name
+ *  - `assigned_to`: assignee identifier or `null`
+ *  - `resolved_by`: resolver identifier or `null`
+ *  - `timestamp`: numeric timestamp (milliseconds)
+ *  - `tags`: array of tags
+ *  - `links`: array of related links
+ *  - `comments`: array of comments
+ *  - `ai_analysis`: AI analysis data or `null`
+ */
 function mapReport(r) {
   return {
     id: r.id || String(r._id),
@@ -62,6 +101,26 @@ function mapReport(r) {
   };
 }
 
+/**
+ * Map a MongoDB suggestion document to the shape expected by the suggestions table.
+ * @param {object} s - Source MongoDB suggestion document.
+ * @returns {object} An object with the following properties for upsert:
+ *  - id: string identifier (uses `s.id` or stringified `_id`).
+ *  - title: suggestion title (defaults to "Untitled").
+ *  - description: detailed text (defaults to empty string).
+ *  - category: category name (defaults to "Other").
+ *  - priority: priority label (defaults to "Low").
+ *  - status: workflow status (defaults to "Open").
+ *  - author: author identifier or name (defaults to "unknown").
+ *  - timestamp: numeric epoch milliseconds (uses `s.timestamp` or Date.now()).
+ *  - tags: array of tag strings (defaults to []).
+ *  - links: array of related links (defaults to []).
+ *  - comments: array of comment objects (defaults to []).
+ *  - upvotes: numeric upvote count (defaults to 0).
+ *  - mc_versions: array of Minecraft version strings (defaults to []).
+ *  - mod_versions: array of mod version strings (defaults to []).
+ *  - rejection_reason: reason for rejection or null.
+ */
 function mapSuggestion(s) {
   return {
     id: s.id || String(s._id),
@@ -82,6 +141,12 @@ function mapSuggestion(s) {
   };
 }
 
+/**
+ * Map a MongoDB changelog document into the flattened shape expected by the changelogs table.
+ *
+ * @param {Object} c - Changelog document from MongoDB; may include fields like `_id`, `id`, `title`, `type`, `modVersion`, `fileName`, `mcVersions`, `changelog`, `changelogType`, `fileDate`, `downloadUrl`, `isLatest`, `linkedBugReports`, and `visibility`.
+ * @returns {Object} The mapped changelog row with keys: `id`, `title`, `type`, `mod_version`, `file_name`, `mc_versions`, `changelog`, `changelog_type`, `file_date`, `download_url`, `is_latest`, `linked_bug_reports`, and `visibility`.
+ */
 function mapChangelog(c) {
   return {
     id: c.id || String(c._id),
@@ -100,6 +165,24 @@ function mapChangelog(c) {
   };
 }
 
+/**
+ * Map a MongoDB `wiki_feature` document to the shape expected by the `wiki_features` Supabase table.
+ * @param {Object} w - Source MongoDB document (a `wiki_feature`) containing fields such as `_id`, `id`, `title`, `mcVersions`, `modVersions`, `categories`, `subcategories`, `description`, `descriptionType`, `media`, `details`, `createdAt`, `updatedAt`, and `createdBy`.
+ * @returns {Object} An object with the target columns:
+ *  - `id` (string) — `w.id` or stringified `_id`.
+ *  - `title` (string) — `w.title` or `'Untitled'`.
+ *  - `mc_versions` (Array) — `w.mcVersions` or `[]`.
+ *  - `mod_versions` (Array) — `w.modVersions` or `[]`.
+ *  - `categories` (Array) — `w.categories` or `[]`.
+ *  - `subcategories` (Array) — `w.subcategories` or `[]`.
+ *  - `description` (string) — `w.description` or `''`.
+ *  - `description_type` (string) — `w.descriptionType` or `'markdown'`.
+ *  - `media` (any|null) — `w.media` or `null`.
+ *  - `details` (Array) — `w.details` or `[]`.
+ *  - `created_at` (string) — ISO timestamp from `w.createdAt` or current time if missing.
+ *  - `updated_at` (string) — ISO timestamp from `w.updatedAt` or current time if missing.
+ *  - `created_by` (any|null) — `w.createdBy` or `null`.
+ */
 function mapWikiFeature(w) {
   return {
     id: w.id || String(w._id),
@@ -118,20 +201,44 @@ function mapWikiFeature(w) {
   };
 }
 
-// Convert any date value to ISO string for Supabase timestamptz columns
+/**
+ * Produce an ISO 8601 timestamp string from a date-like value for use in timestamptz columns.
+ * @param {*} v - A date-like value (Date, numeric epoch, or date string). Falsy values (null/undefined/empty) are accepted.
+ * @returns {string|null} `ISO 8601` timestamp string if `v` is provided, `null` otherwise.
+ */
 function toIso(v) {
   if (!v) return null;
   if (typeof v === 'number') return new Date(v).toISOString();
   return new Date(v).toISOString();
 }
 
-// Convert any date value to Unix ms for Supabase bigint columns
+/**
+ * Convert a date-like value into Unix milliseconds for bigint timestamp columns.
+ * @param {*} v - A date-like value (Date, ISO/string, or numeric timestamp). Falsy values are treated as absent.
+ * @returns {number|null} The timestamp in milliseconds since the Unix epoch, or `null` if `v` is falsy.
+ */
 function toTs(v) {
   if (!v) return null;
   if (typeof v === 'number') return v;
   return new Date(v).getTime();
 }
 
+/**
+ * Map a MongoDB redeem_code document to the shape expected by the redeem_codes Supabase table.
+ * @param {Object} c - MongoDB redeem_code document.
+ * @returns {Object} Mapped redeem code row with the following properties:
+ *  - id: string identifier.
+ *  - code: redemption code string.
+ *  - rewards: array of reward entries.
+ *  - description: string or `null`.
+ *  - max_uses: number or `null`.
+ *  - used_count: number.
+ *  - expires_at: number (milliseconds since epoch) or `null`.
+ *  - requires_membership: boolean or `null`.
+ *  - created_at: number (milliseconds since epoch).
+ *  - created_by: string.
+ *  - enabled: boolean.
+ */
 function mapRedeemCode(c) {
   return {
     id: c.id || String(c._id),
@@ -148,6 +255,19 @@ function mapRedeemCode(c) {
   };
 }
 
+/**
+ * Map a MongoDB code_redemption document into a row suitable for the code_redemptions table.
+ *
+ * @param {Object} r - MongoDB code_redemption document.
+ * @returns {Object} Mapped row with the following properties:
+ *  - {string} id - Primary identifier; uses `r.id` if present, otherwise stringified `r._id`.
+ *  - {string|null} code_id - Associated redeem code id or `null`.
+ *  - {string} code - Redeem code string.
+ *  - {string} user_id - ID of the user who redeemed the code.
+ *  - {string|null} minecraft_uuid - Minecraft UUID if available, otherwise `null`.
+ *  - {Array} rewards - Array of reward entries (defaults to an empty array).
+ *  - {number} redeemed_at - Redemption timestamp in milliseconds since epoch (uses the document timestamp if available, otherwise current time).
+ */
 function mapCodeRedemption(r) {
   return {
     id: r.id || String(r._id),
@@ -160,6 +280,23 @@ function mapCodeRedemption(r) {
   };
 }
 
+/**
+ * Map a MongoDB user_reward document to the shape expected by the user_rewards table.
+ *
+ * @param {Object} r - The source MongoDB document for a user reward.
+ * @returns {Object} An object with keys:
+ *  - `id`: record id (uses `r.id` or stringified `_id`),
+ *  - `user_id`: target user identifier,
+ *  - `minecraft_uuid`: Minecraft UUID or `null`,
+ *  - `source`: origin of the reward (defaults to `'manual'`),
+ *  - `source_id`: optional identifier from the source system or `null`,
+ *  - `rewards`: array of reward items (defaults to empty array),
+ *  - `granted_at`: Unix milliseconds timestamp when granted (falls back to current time),
+ *  - `expires_at`: Unix milliseconds timestamp when the reward expires or `null`,
+ *  - `downloaded`: boolean flag whether reward was downloaded,
+ *  - `download_url`: URL to download any reward assets or `null`,
+ *  - `download_expires_at`: Unix milliseconds timestamp when the download link expires or `null`.
+ */
 function mapUserReward(r) {
   return {
     id: r.id || String(r._id),
@@ -176,6 +313,20 @@ function mapUserReward(r) {
   };
 }
 
+/**
+ * Map a MongoDB kofi_manual_reward document to a row suitable for the kofi_manual_rewards table.
+ * @param {Object} r - Source manual reward document (MongoDB). Expected properties: `_id`, `id`, `userId`, `minecraftUuid`, `rewards`, `reason`, `grantedBy`, `grantedAt`, `expiresAt`, `granted`.
+ * @returns {Object} An object with properties:
+ *  - `id`: string identifier (uses `id` or `_id`),
+ *  - `user_id`: user identifier,
+ *  - `minecraft_uuid`: Minecraft UUID or `null`,
+ *  - `rewards`: array of reward entries (defaults to []),
+ *  - `reason`: reason string (defaults to "migrated"),
+ *  - `granted_by`: grantor identifier (defaults to "migrated"),
+ *  - `granted_at`: ISO timestamp string for when the reward was granted,
+ *  - `expires_at`: ISO timestamp string for expiration or `null`,
+ *  - `granted`: `true` if granted (defaults to `true` unless explicitly `false`).
+ */
 function mapManualReward(r) {
   return {
     id: r.id || String(r._id),
@@ -190,6 +341,15 @@ function mapManualReward(r) {
   };
 }
 
+/**
+ * Migrate data from the MongoDB "buildscape_tracker" database into Supabase tables and write migration artifacts.
+ *
+ * Connects to MongoDB, enumerates collections, exports user records to a local JSON file and seeds the
+ * `legacy_users` table, and upserts transformed documents for reports, suggestions, config, changelogs,
+ * wiki features, redeem codes, code redemptions, user rewards, and manual Ko-fi rewards into their
+ * corresponding Supabase tables. Counts Ko-fi payments and links for reporting. Closes the MongoDB client
+ * when finished and writes a consolidated migration log to disk.
+ */
 async function main() {
   log('Connecting to MongoDB...');
   const client = new MongoClient(MONGO_URI, { serverSelectionTimeoutMS: 10000 });

@@ -20,6 +20,22 @@ const TRUSTED_DOMAINS = [
     'curseforge.com', 'modrinth.com', 'discord.com', 'discordapp.com'
 ];
 
+/**
+ * Render a bug submission form with optional AI-assisted analysis, version and link management, and a confirmation modal.
+ *
+ * The form collects title, description, steps, expected/actual behavior, reporter, tags, versions, and external links.
+ * It can run an AI quality/severity analysis on demand or automatically when submitting, and includes client-side
+ * validation for selected versions and trusted external links. On confirmation it constructs a BugReport payload and
+ * passes it to `onSubmit`.
+ *
+ * @param onSubmit - Callback invoked with the constructed BugReport when the user confirms submission
+ * @param onCancel - Callback invoked when the user cancels the form
+ * @param mcVersions - Available Minecraft versions to choose from
+ * @param modVersions - Available mod versions to choose from
+ * @param onNotify - Notification callback used to surface validation and service errors; receives (message, type)
+ * @param currentUser - Optional current user used as the default report author
+ * @returns A React element containing the complete bug report submission UI
+ */
 export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, onNotify, currentUser }: BugFormProps) {
   const [formData, setFormData] = useState({
     title: "",
