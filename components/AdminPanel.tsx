@@ -2682,9 +2682,11 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           </div>
                         )}
                       </div>
+                    </div>
+                  )}
 
 
-                      {userSubTab === 'legacy' && (
+                  {(userSubTab as string) === 'legacy' && (
                         <div className="animate-fadeIn w-full min-w-0">
                           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
                             <h2 className="text-xl sm:text-2xl font-bold text-white">Legacy Accounts</h2>
@@ -2948,10 +2950,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
-              </div>
-            )}
+                  </div>
+                )}
 
             {activeTab === 'changelogs' && (
               <div className="flex flex-col h-full min-h-0 w-full min-w-0">
@@ -3788,7 +3788,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                               {twitchSubscribedUsers.map((user) => (
                                 <tr key={user.id} className="border-b border-gray-800 hover:bg-gray-800/30">
                                   <td className="p-3 text-sm text-white">{user.username}</td>
-                                  <td className="p-3 text-sm text-purple-400 font-mono">{user.twitchSubscriptionData?.displayName || 'N/A'}</td>
+                                  <td className="p-3 text-sm text-purple-400 font-mono">{(user.twitchSubscriptionData as any)?.displayName || 'N/A'}</td>
                                   <td className="p-3 text-sm text-amber-400">
                                     {user.twitchSubscriptionData?.tier === '1000' ? 'Tier 1' :
                                       user.twitchSubscriptionData?.tier === '2000' ? 'Tier 2' :
@@ -3815,8 +3815,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     )}
                                   </td>
                                   <td className="p-3 text-sm text-gray-400">
-                                    {user.twitchSubscriptionData?.lastChecked
-                                      ? new Date(user.twitchSubscriptionData.lastChecked).toLocaleDateString()
+                                    {(user.twitchSubscriptionData as any)?.lastChecked
+                                      ? new Date((user.twitchSubscriptionData as any).lastChecked).toLocaleDateString()
                                       : 'N/A'}
                                   </td>
                                 </tr>

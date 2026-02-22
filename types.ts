@@ -74,6 +74,8 @@ export interface User {
     isSub: boolean;
     tier?: string;
     avatar?: string;
+    displayName?: string;
+    lastChecked?: string;
     lastModified?: string;
   };
   kofiSubscription?: {
