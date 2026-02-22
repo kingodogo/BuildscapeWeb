@@ -996,7 +996,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
   const saveManualReward = async (reward: ManualReward) => {
       try {
-          const data = await AuthService.fetchWithAuth('/api/kofi-rewards', {
+          await AuthService.fetchWithAuth('/api/kofi-rewards', {
               method: 'POST',
               body: JSON.stringify({ reward })
           });
@@ -1004,6 +1004,31 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
           console.error('Failed to save manual reward:', error);
           setToast({ msg: 'Failed to save manual reward', type: 'error' });
       }
+  };
+
+  const deleteManualReward = async (id: string) => {
+    try {
+        await AuthService.fetchWithAuth(`/api/kofi-rewards?id=${id}`, {
+            method: 'DELETE'
+        });
+        setToast({ msg: 'Manual reward deleted', type: 'info' });
+    } catch (error: any) {
+        console.error('Failed to delete manual reward:', error);
+        setToast({ msg: 'Failed to delete manual reward', type: 'error' });
+    }
+  };
+
+  const updateManualReward = async (id: string, updates: any) => {
+    try {
+        await AuthService.fetchWithAuth('/api/kofi-rewards', {
+            method: 'PATCH',
+            body: JSON.stringify({ id, updates })
+        });
+        setToast({ msg: 'Manual reward updated', type: 'success' });
+    } catch (error: any) {
+        console.error('Failed to update manual reward:', error);
+        setToast({ msg: 'Failed to update manual reward', type: 'error' });
+    }
   };
 
   const loadManualRewards = async () => {
@@ -3139,20 +3164,36 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     )}
                                   </div>
                                   <p className="text-sm text-gray-400 mb-2">
-                                    User: <span className="font-mono text-gray-300">{reward.userId}</span>
+                                    User: <span className="text-gray-300 font-medium">{users.find(u => u.id === reward.userId)?.username || reward.userId}</span>
+                                    {users.find(u => u.id === reward.userId)?.minecraftUsername && (
+                                      <span className="text-gray-500 text-xs ml-2">({users.find(u => u.id === reward.userId)?.minecraftUsername})</span>
+                                    )}
                                   </p>
                                   <p className="text-sm text-gray-400 mb-2">
                                     Reason: <span className="text-gray-300">{reward.reason}</span>
                                   </p>
-                                  <p className="text-sm text-gray-400 mb-2">
-                                    Granted by: <span className="text-gray-300">{reward.grantedBy}</span>
-                                  </p>
+                                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                    <p className="text-[11px] text-gray-500">
+                                      Granted by: <span className="text-gray-400">{reward.grantedBy || 'Unknown'}</span>
+                                    </p>
+                                    <p className="text-[11px] text-gray-500">
+                                      Date: <span className="text-gray-400">{new Date(reward.grantedAt).toLocaleString()}</span>
+                                    </p>
+                                  </div>
                                   <div className="mt-3">
                                     <p className="text-xs text-gray-500 uppercase font-bold mb-2">Rewards ({reward.rewards.length})</p>
                                     <div className="space-y-1">
-                                      {reward.rewards.map((r, idx) => (
-                                        <div key={idx} className="text-sm text-gray-300 bg-gray-900/50 rounded p-2">
-                                          {r.displayName}
+                                      {reward.rewards.map((r: any, idx) => (
+                                        <div key={idx} className="text-sm text-gray-300 bg-gray-900/50 rounded-lg p-2.5 border border-gray-800 flex items-center gap-2">
+                                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                                          <div className="flex-1">
+                                            <div className="font-medium">{r.displayName}</div>
+                                            <div className="text-[10px] text-gray-500 uppercase flex gap-2">
+                                              <span>Type: {r.type}</span>
+                                              {r.type === 'item' && r.itemId && <span>ID: {r.itemId}</span>}
+                                              {r.type === 'item' && r.itemCount && <span>Count: {r.itemCount}</span>}
+                                            </div>
+                                          </div>
                                         </div>
                                       ))}
                                     </div>
@@ -3162,7 +3203,9 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   {!reward.granted && (
                                     <button
                                       onClick={async () => {
-                                        // Mark as granted logic here
+                                        if (!confirm('Mark this reward as granted?')) return;
+                                        setManualRewards(prev => prev.map(r => r.id === reward.id ? { ...r, granted: true } : r));
+                                        await updateManualReward(reward.id, { granted: true });
                                       }}
                                       className="p-2 bg-green-700 hover:bg-green-600 text-white rounded transition-colors"
                                       title="Mark as Granted"
@@ -3172,9 +3215,9 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   )}
                                   <button
                                     onClick={async () => {
-                                      if (!confirm('Delete this manual reward?')) return;
-                                      const updated = manualRewards.filter(r => r.id !== reward.id);
-                                      setManualRewards(updated);
+                                      if (!confirm('Delete this manual reward? This cannot be undone.')) return;
+                                      setManualRewards(prev => prev.filter(r => r.id !== reward.id));
+                                      await deleteManualReward(reward.id);
                                     }}
                                     className="p-2 bg-red-700 hover:bg-red-600 text-white rounded transition-colors"
                                     title="Delete"

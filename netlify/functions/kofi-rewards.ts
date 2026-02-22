@@ -20,7 +20,6 @@ export const handler = async (event: any, context: any) => {
     // Let's assume it's ADMIN ONLY for creation.
     
     if (event.httpMethod === 'GET') {
-        // If strictly admin:
         const { authorized, response } = await requireAdmin(event);
         if (!authorized) return response;
 
@@ -33,7 +32,20 @@ export const handler = async (event: any, context: any) => {
         
         const { data, error } = await query;
         if (error) throw error;
-        return corsResponse(200, { rewards: data });
+
+        // Map snake_case to camelCase for the frontend
+        const rewards = (data || []).map(r => ({
+            id: r.id,
+            userId: r.user_id,
+            minecraftUuid: r.minecraft_uuid,
+            rewards: r.rewards,
+            reason: r.reason,
+            grantedBy: r.granted_by,
+            grantedAt: r.granted_at,
+            granted: r.granted
+        }));
+
+        return corsResponse(200, { rewards });
     }
 
     if (event.httpMethod === 'POST') {
@@ -52,7 +64,7 @@ export const handler = async (event: any, context: any) => {
             minecraft_uuid: reward.minecraftUuid,
             rewards: reward.rewards || [],
             reason: reward.reason,
-            granted_by: 'admin',
+            granted_by: reward.grantedBy || 'admin',
             granted_at: Date.now(),
             granted: reward.granted || false
         };
@@ -75,10 +87,30 @@ export const handler = async (event: any, context: any) => {
 
         const mappedUpdates: any = {};
         if (updates.granted !== undefined) mappedUpdates.granted = updates.granted;
-        // Add other fields if needed
+        if (updates.rewards !== undefined) mappedUpdates.rewards = updates.rewards;
+        if (updates.reason !== undefined) mappedUpdates.reason = updates.reason;
 
         const { error } = await supabaseAdmin.from('kofi_manual_rewards').update(mappedUpdates).eq('id', id);
         if (error) throw error;
+
+        return corsResponse(200, { success: true });
+    }
+
+    if (event.httpMethod === 'DELETE') {
+        const { authorized, response } = await requireAdmin(event);
+        if (!authorized) return response;
+
+        const { id } = event.queryStringParameters || {};
+        if (!id) {
+            let body: any = {};
+            try { body = JSON.parse(event.body || '{}'); } catch(e) {}
+            if (!body.id) return corsResponse(400, { error: 'ID required' });
+            const { error } = await supabaseAdmin.from('kofi_manual_rewards').delete().eq('id', body.id);
+            if (error) throw error;
+        } else {
+            const { error } = await supabaseAdmin.from('kofi_manual_rewards').delete().eq('id', id);
+            if (error) throw error;
+        }
 
         return corsResponse(200, { success: true });
     }
