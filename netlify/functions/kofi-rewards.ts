@@ -72,6 +72,19 @@ export const handler = async (event: any, context: any) => {
         const { error } = await supabaseAdmin.from('kofi_manual_rewards').insert(newReward);
         if (error) throw error;
 
+        // Sync to user_rewards if created as granted
+        if (newReward.granted) {
+            await supabaseAdmin.from('user_rewards').upsert({
+                id: `manual-${newReward.id}`,
+                user_id: newReward.user_id,
+                minecraft_uuid: newReward.minecraft_uuid,
+                source: 'manual',
+                source_id: newReward.id,
+                rewards: newReward.rewards,
+                granted_at: newReward.granted_at
+            });
+        }
+
         return corsResponse(200, { success: true, reward: newReward });
     }
 
@@ -85,6 +98,9 @@ export const handler = async (event: any, context: any) => {
         const { id, updates } = body;
         if (!id) return corsResponse(400, { error: 'ID required' });
 
+        // Get existing to check transitions
+        const { data: existing } = await supabaseAdmin.from('kofi_manual_rewards').select('*').eq('id', id).single();
+
         const mappedUpdates: any = {};
         if (updates.granted !== undefined) mappedUpdates.granted = updates.granted;
         if (updates.rewards !== undefined) mappedUpdates.rewards = updates.rewards;
@@ -93,6 +109,24 @@ export const handler = async (event: any, context: any) => {
         const { error } = await supabaseAdmin.from('kofi_manual_rewards').update(mappedUpdates).eq('id', id);
         if (error) throw error;
 
+        // Sync to user_rewards if granting
+        if (updates.granted === true) {
+            const finalRewards = updates.rewards || existing?.rewards || [];
+            const rId = `manual-${id}`;
+            await supabaseAdmin.from('user_rewards').upsert({
+                id: rId,
+                user_id: existing?.user_id,
+                minecraft_uuid: existing?.minecraft_uuid,
+                source: 'manual',
+                source_id: id,
+                rewards: finalRewards,
+                granted_at: Date.now()
+            });
+        } else if (updates.granted === false && existing?.granted === true) {
+            // Revoke
+            await supabaseAdmin.from('user_rewards').delete().eq('id', `manual-${id}`);
+        }
+
         return corsResponse(200, { success: true });
     }
 
@@ -100,17 +134,23 @@ export const handler = async (event: any, context: any) => {
         const { authorized, response } = await requireAdmin(event);
         if (!authorized) return response;
 
-        const { id } = event.queryStringParameters || {};
-        if (!id) {
+        const { id: queryId } = event.queryStringParameters || {};
+        let targetId = queryId;
+
+        if (!targetId) {
             let body: any = {};
             try { body = JSON.parse(event.body || '{}'); } catch(e) {}
-            if (!body.id) return corsResponse(400, { error: 'ID required' });
-            const { error } = await supabaseAdmin.from('kofi_manual_rewards').delete().eq('id', body.id);
-            if (error) throw error;
-        } else {
-            const { error } = await supabaseAdmin.from('kofi_manual_rewards').delete().eq('id', id);
-            if (error) throw error;
+            targetId = body.id;
         }
+
+        if (!targetId) return corsResponse(400, { error: 'ID required' });
+
+        // 1. Delete from kofi_manual_rewards
+        const { error } = await supabaseAdmin.from('kofi_manual_rewards').delete().eq('id', targetId);
+        if (error) throw error;
+
+        // 2. Also delete from user_rewards if it was granted
+        await supabaseAdmin.from('user_rewards').delete().eq('id', `manual-${targetId}`);
 
         return corsResponse(200, { success: true });
     }

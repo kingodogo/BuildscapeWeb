@@ -1738,11 +1738,13 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                                   reward.source === 'kofi' ? 'bg-[#FF5E5B]/20 text-[#FF5E5B] border border-[#FF5E5B]/50' :
                                   reward.source === 'membership' ? 'bg-purple-900/30 text-purple-400 border border-purple-700' :
                                   reward.source === 'streamelements' ? 'bg-[#9146FF]/30 text-purple-300 border border-[#9146FF]/50' :
+                                  reward.source === 'manual' ? 'bg-green-900/30 text-green-400 border border-green-700' :
                                   'bg-gray-700/50 text-gray-300 border border-gray-600'
                                 }`}>
                                   {reward.source === 'code' ? 'Code' :
                                    reward.source === 'kofi' ? 'Ko-fi' :
                                    reward.source === 'membership' ? 'Membership' :
+                                   reward.source === 'manual' ? 'Manual' :
                                    reward.source === 'streamelements' ? 'Subscription' : 'Manual'}
                                 </span>
                                 {reward.expiresAt && reward.source !== 'code' ? (

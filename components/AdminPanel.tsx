@@ -7872,7 +7872,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           reason: manualRewardReason,
                           grantedBy: currentUser.username,
                           grantedAt: Date.now(),
-                          granted: false
+                          granted: true
                         };
                         const updated = [...manualRewards, newReward];
                         setManualRewards(updated);
