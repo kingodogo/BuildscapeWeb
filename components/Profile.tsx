@@ -44,9 +44,25 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
   
   // Tab state
   const [activeTab, setActiveTab] = useState<'edit' | 'accounts' | 'rewards'>(() => {
+    if (typeof window === 'undefined') return 'edit';
     const params = new URLSearchParams(window.location.search);
+    if (params.has('edit')) return 'edit';
+    if (params.has('link') || params.has('accounts')) return 'accounts';
+    if (params.has('rewards')) return 'rewards';
     return params.has('code') ? 'accounts' : 'edit';
   });
+
+  // Sync tab with URL
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      ['edit', 'link', 'accounts', 'rewards'].forEach(p => url.searchParams.delete(p));
+      const paramName = activeTab === 'accounts' ? 'link' : activeTab;
+      url.searchParams.set(paramName, '');
+      const newUrl = url.toString().replace(/=$/, '');
+      window.history.replaceState(null, '', newUrl);
+    }
+  }, [activeTab]);
   
   // Rewards state
   const [rewards, setRewards] = useState<UserReward[]>([]);

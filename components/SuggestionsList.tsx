@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Suggestion, User } from "../types";
 import { Lightbulb, CheckCircle, Clock, Sparkles, Box, Search, MessageSquare, Tag, Link as LinkIcon, ThumbsUp, ExternalLink, AlertCircle, X } from "lucide-react";
 import BugDetailModal from "./BugDetailModal";
@@ -28,7 +28,23 @@ export default function SuggestionsList({
   onNavigateLogin, 
   onNotify
 }: SuggestionsListProps) {
-  const [activeTab, setActiveTab] = useState<'active' | 'closed'>('active');
+  const [activeTab, setActiveTab] = useState<'active' | 'closed'>(() => {
+    if (typeof window === 'undefined') return 'active';
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('closed')) return 'closed';
+    return params.has('active') ? 'active' : 'active';
+  });
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('active');
+      url.searchParams.delete('closed');
+      url.searchParams.set(activeTab, '');
+      window.history.replaceState(null, '', url.toString().replace(/=$/, ''));
+    }
+  }, [activeTab]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All");

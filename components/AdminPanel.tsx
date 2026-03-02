@@ -25,7 +25,25 @@ interface AdminPanelProps {
 }
 
 export default function AdminPanel({ currentUser, onLogout, reports, suggestions, onUpdateReport, onDeleteReport, onUpdateSuggestion, onDeleteSuggestion, config, onUpdateConfig, onRestoreData, initialChangelogToEdit, onChangelogEditComplete }: AdminPanelProps) {
-  const [activeTab, setActiveTab] = useState<'bugs' | 'suggestions' | 'users' | 'config' | 'database' | 'changelogs' | 'kofi' | 'twitch' | 'redeem-rewards' | 'wiki'>('bugs');
+  const [activeTab, setActiveTab] = useState<'bugs' | 'suggestions' | 'users' | 'config' | 'database' | 'changelogs' | 'kofi' | 'twitch' | 'redeem-rewards' | 'wiki'>(() => {
+    if (typeof window === 'undefined') return 'bugs';
+    const params = new URLSearchParams(window.location.search);
+    const validTabs = ['bugs', 'suggestions', 'users', 'config', 'database', 'changelogs', 'kofi', 'twitch', 'redeem-rewards', 'wiki'];
+    for (const validTab of validTabs) {
+      if (params.has(validTab)) return validTab as any;
+    }
+    return 'bugs';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      const validTabs = ['bugs', 'suggestions', 'users', 'config', 'database', 'changelogs', 'kofi', 'twitch', 'redeem-rewards', 'wiki'];
+      validTabs.forEach(p => url.searchParams.delete(p));
+      url.searchParams.set(activeTab, '');
+      window.history.replaceState(null, '', url.toString().replace(/=$/, ''));
+    }
+  }, [activeTab]);
 
   const [bugSubTab, setBugSubTab] = useState<'active' | 'resolved'>('active');
   const [editingBug, setEditingBug] = useState<BugReport | null>(null);

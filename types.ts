@@ -88,6 +88,8 @@ export interface User {
     kofiTransactionId?: string;
   };
   forcePasswordReset?: boolean;
+  likedFeatures?: string[];
+  favoriteFeatures?: string[];
 }
 
 export interface AppConfigLinks {
@@ -296,6 +298,7 @@ export interface WikiFeature {
   createdAt?: number;
   updatedAt?: number;
   createdBy?: string;
+  likes?: number;
 }
 
 export interface AppConfig {

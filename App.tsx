@@ -1019,7 +1019,11 @@ export default function App() {
 
         {currentView === 'wiki' && (
           <div className="h-full overflow-y-auto custom-scrollbar fade-in">
-            <Wiki config={config} />
+            <Wiki 
+              config={config} 
+              currentUser={currentUser} 
+              onUpdateAppUser={(user) => setCurrentUser(user)} 
+            />
           </div>
         )}
 

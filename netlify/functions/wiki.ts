@@ -27,18 +27,69 @@ export const handler = async (event: any, context: any) => {
     // Supports older format migration if needed (though Supabase usually implies strict schema, 
     // the request might send old structure. We map it.)
     if (event.httpMethod === 'POST') {
-      const { authorized, response } = await requireAdmin(event);
-      if (!authorized) return response;
-
       let body: any = {};
       try { body = JSON.parse(event.body || '{}'); } catch(e) {}
       
+      const { action, featureId } = body;
+
+      // User Actions (Require Auth but not Admin)
+      if (action === 'like' || action === 'favorite') {
+        const { user } = await verifyAuthToken(event);
+        if (!user) return corsResponse(401, { error: "Unauthorized" });
+
+        const userId = user.id;
+
+        // Fetch current user profile
+        const { data: profile, error: profileErr } = await supabaseAdmin
+          .from('profiles')
+          .select('liked_features, favorite_features')
+          .eq('id', userId)
+          .single();
+          
+        if (profileErr) throw profileErr;
+
+        let liked = profile.liked_features || [];
+        let favs = profile.favorite_features || [];
+
+        if (action === 'like') {
+          const alreadyLiked = liked.includes(featureId);
+          if (alreadyLiked) {
+            liked = liked.filter((id: string) => id !== featureId);
+          } else {
+            liked.push(featureId);
+          }
+          
+          // Update user's liked
+          await supabaseAdmin.from('profiles').update({ liked_features: liked }).eq('id', userId);
+          
+          // Update feature's like count
+          const { data: featureData } = await supabaseAdmin.from('wiki_features').select('likes').eq('id', featureId).single();
+          const currentLikes = featureData?.likes || 0;
+          await supabaseAdmin.from('wiki_features').update({ likes: alreadyLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1 }).eq('id', featureId);
+          
+          return corsResponse(200, { success: true, liked: !alreadyLiked });
+        }
+
+        if (action === 'favorite') {
+          const alreadyFav = favs.includes(featureId);
+          if (alreadyFav) {
+            favs = favs.filter((id: string) => id !== featureId);
+          } else {
+            favs.push(featureId);
+          }
+          await supabaseAdmin.from('profiles').update({ favorite_features: favs }).eq('id', userId);
+          return corsResponse(200, { success: true, favorited: !alreadyFav });
+        }
+      }
+
+      // Admin Actions
+      const { authorized, response } = await requireAdmin(event);
+      if (!authorized) return response;
+
       const { feature } = body;
       if (!feature || !feature.title) {
          return corsResponse(400, { error: "Feature title required" });
       }
-
-      // Mapping logic for old fields (from api/wiki.ts)
       const mappedFeature = {
         id: feature.id || crypto.randomUUID(),
         title: feature.title,

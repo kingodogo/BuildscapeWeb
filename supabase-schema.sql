@@ -2,7 +2,7 @@
 -- This SQL should be executed in the Supabase SQL Editor
 
 -- profiles: extends auth.users with app-specific fields
-CREATE TABLE public.profiles (
+CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   username TEXT UNIQUE NOT NULL,
   email TEXT,
@@ -13,6 +13,8 @@ CREATE TABLE public.profiles (
   kofi_subscription JSONB DEFAULT NULL,
   streamer_mode BOOLEAN DEFAULT false,
   profile_icon TEXT,
+  liked_features TEXT[] DEFAULT '{}',
+  favorite_features TEXT[] DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -55,12 +57,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- reports (bug reports) - comments stored as JSONB array to match existing shape
-CREATE TABLE public.reports (
+CREATE TABLE IF NOT EXISTS public.reports (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
   description TEXT NOT NULL,
@@ -81,11 +84,11 @@ CREATE TABLE public.reports (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE INDEX idx_reports_timestamp ON reports(timestamp DESC);
-CREATE INDEX idx_reports_author_id ON reports(author_id);
+CREATE INDEX IF NOT EXISTS idx_reports_timestamp ON reports(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_reports_author_id ON reports(author_id);
 
 -- suggestions
-CREATE TABLE public.suggestions (
+CREATE TABLE IF NOT EXISTS public.suggestions (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
   description TEXT NOT NULL,
@@ -105,17 +108,17 @@ CREATE TABLE public.suggestions (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE INDEX idx_suggestions_timestamp ON suggestions(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_suggestions_timestamp ON suggestions(timestamp DESC);
 
 -- config (single row)
-CREATE TABLE public.config (
+CREATE TABLE IF NOT EXISTS public.config (
   id TEXT PRIMARY KEY DEFAULT 'main_config',
   data JSONB NOT NULL DEFAULT '{}',
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- changelogs
-CREATE TABLE public.changelogs (
+CREATE TABLE IF NOT EXISTS public.changelogs (
   id TEXT PRIMARY KEY,
   title TEXT,
   type TEXT,
@@ -131,10 +134,10 @@ CREATE TABLE public.changelogs (
   visibility TEXT DEFAULT 'public',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE INDEX idx_changelogs_file_date ON changelogs(file_date DESC);
+CREATE INDEX IF NOT EXISTS idx_changelogs_file_date ON changelogs(file_date DESC);
 
 -- wiki_features
-CREATE TABLE public.wiki_features (
+CREATE TABLE IF NOT EXISTS public.wiki_features (
   id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
   mc_versions TEXT[] DEFAULT '{}',
@@ -146,12 +149,13 @@ CREATE TABLE public.wiki_features (
   media TEXT,
   details TEXT[] DEFAULT '{}',
   created_by TEXT,
+  likes INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Ko-fi tables
-CREATE TABLE public.kofi_payments (
+CREATE TABLE IF NOT EXISTS public.kofi_payments (
   id TEXT PRIMARY KEY,
   user_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
   kofi_username TEXT,
@@ -168,9 +172,9 @@ CREATE TABLE public.kofi_payments (
   timestamp BIGINT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE INDEX idx_kofi_payments_user_id ON kofi_payments(user_id);
+CREATE INDEX IF NOT EXISTS idx_kofi_payments_user_id ON kofi_payments(user_id);
 
-CREATE TABLE public.kofi_manual_rewards (
+CREATE TABLE IF NOT EXISTS public.kofi_manual_rewards (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
   minecraft_uuid TEXT,
@@ -182,10 +186,10 @@ CREATE TABLE public.kofi_manual_rewards (
   granted BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE INDEX idx_kofi_manual_rewards_user_id ON kofi_manual_rewards(user_id);
+CREATE INDEX IF NOT EXISTS idx_kofi_manual_rewards_user_id ON kofi_manual_rewards(user_id);
 
 -- Redeem code tables
-CREATE TABLE public.redeem_codes (
+CREATE TABLE IF NOT EXISTS public.redeem_codes (
   id TEXT PRIMARY KEY,
   code TEXT UNIQUE NOT NULL,
   rewards JSONB DEFAULT '[]',
@@ -202,9 +206,9 @@ CREATE TABLE public.redeem_codes (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE INDEX idx_redeem_codes_code ON redeem_codes(code);
+CREATE INDEX IF NOT EXISTS idx_redeem_codes_code ON redeem_codes(code);
 
-CREATE TABLE public.code_redemptions (
+CREATE TABLE IF NOT EXISTS public.code_redemptions (
   id TEXT PRIMARY KEY,
   code_id TEXT NOT NULL REFERENCES redeem_codes(id) ON DELETE CASCADE,
   code TEXT NOT NULL,
@@ -214,10 +218,10 @@ CREATE TABLE public.code_redemptions (
   redeemed_at BIGINT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE INDEX idx_code_redemptions_user_id ON code_redemptions(user_id);
-CREATE INDEX idx_code_redemptions_code_id ON code_redemptions(code_id);
+CREATE INDEX IF NOT EXISTS idx_code_redemptions_user_id ON code_redemptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_code_redemptions_code_id ON code_redemptions(code_id);
 
-CREATE TABLE public.user_rewards (
+CREATE TABLE IF NOT EXISTS public.user_rewards (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
   minecraft_uuid TEXT,
@@ -231,10 +235,10 @@ CREATE TABLE public.user_rewards (
   download_expires_at BIGINT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
-CREATE INDEX idx_user_rewards_user_id ON user_rewards(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_rewards_user_id ON user_rewards(user_id);
 
 -- Minecraft/Supporter tables
-CREATE TABLE public.minecraft_users (
+CREATE TABLE IF NOT EXISTS public.minecraft_users (
   uuid TEXT PRIMARY KEY,
   unlocked_cosmetics TEXT[] DEFAULT '{}',
   selected_cosmetics JSONB DEFAULT '{}',
@@ -243,7 +247,7 @@ CREATE TABLE public.minecraft_users (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE public.cosmetics (
+CREATE TABLE IF NOT EXISTS public.cosmetics (
   id TEXT PRIMARY KEY,
   type TEXT NOT NULL,
   display_name TEXT NOT NULL,
@@ -254,9 +258,9 @@ CREATE TABLE public.cosmetics (
   created_at BIGINT,
   updated_at BIGINT
 );
-CREATE INDEX idx_cosmetics_is_default ON cosmetics(is_default) WHERE is_default = true;
+CREATE INDEX IF NOT EXISTS idx_cosmetics_is_default ON cosmetics(is_default) WHERE is_default = true;
 
-CREATE TABLE public.supporters (
+CREATE TABLE IF NOT EXISTS public.supporters (
   uuid TEXT PRIMARY KEY,
   website_username TEXT,
   minecraft_username TEXT,
@@ -267,7 +271,7 @@ CREATE TABLE public.supporters (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE public.connection_codes (
+CREATE TABLE IF NOT EXISTS public.connection_codes (
   id TEXT PRIMARY KEY,
   uuid TEXT NOT NULL,
   code TEXT NOT NULL,
@@ -275,9 +279,9 @@ CREATE TABLE public.connection_codes (
   expires_at TIMESTAMPTZ NOT NULL,
   used BOOLEAN DEFAULT false
 );
-CREATE INDEX idx_connection_codes_uuid ON connection_codes(uuid);
+CREATE INDEX IF NOT EXISTS idx_connection_codes_uuid ON connection_codes(uuid);
 
-CREATE TABLE public.support_tiers (
+CREATE TABLE IF NOT EXISTS public.support_tiers (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   level INTEGER DEFAULT 0,
@@ -321,52 +325,84 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER STABLE;
 
 -- PROFILES
+DROP POLICY IF EXISTS "profiles_select" ON profiles;
 CREATE POLICY "profiles_select" ON profiles FOR SELECT USING (true);
+DROP POLICY IF EXISTS "profiles_update_own" ON profiles;
 CREATE POLICY "profiles_update_own" ON profiles FOR UPDATE USING (auth.uid() = id);
+DROP POLICY IF EXISTS "profiles_admin_update" ON profiles;
 CREATE POLICY "profiles_admin_update" ON profiles FOR UPDATE USING (is_admin_or_owner());
+DROP POLICY IF EXISTS "profiles_admin_delete" ON profiles;
 CREATE POLICY "profiles_admin_delete" ON profiles FOR DELETE USING (is_admin_or_owner());
 
 -- PUBLIC READ tables (reports, suggestions, changelogs, wiki, config, cosmetics, support_tiers)
+DROP POLICY IF EXISTS "reports_select" ON reports;
 CREATE POLICY "reports_select" ON reports FOR SELECT USING (true);
+DROP POLICY IF EXISTS "reports_insert" ON reports;
 CREATE POLICY "reports_insert" ON reports FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "reports_update" ON reports;
 CREATE POLICY "reports_update" ON reports FOR UPDATE USING (author_id = auth.uid() OR is_admin_or_owner());
+DROP POLICY IF EXISTS "reports_delete" ON reports;
 CREATE POLICY "reports_delete" ON reports FOR DELETE USING (author_id = auth.uid() OR is_admin_or_owner());
 
+DROP POLICY IF EXISTS "suggestions_select" ON suggestions;
 CREATE POLICY "suggestions_select" ON suggestions FOR SELECT USING (true);
+DROP POLICY IF EXISTS "suggestions_insert" ON suggestions;
 CREATE POLICY "suggestions_insert" ON suggestions FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+DROP POLICY IF EXISTS "suggestions_update" ON suggestions;
 CREATE POLICY "suggestions_update" ON suggestions FOR UPDATE USING (author_id = auth.uid() OR is_admin_or_owner());
+DROP POLICY IF EXISTS "suggestions_delete" ON suggestions;
 CREATE POLICY "suggestions_delete" ON suggestions FOR DELETE USING (author_id = auth.uid() OR is_admin_or_owner());
 
+DROP POLICY IF EXISTS "config_select" ON config;
 CREATE POLICY "config_select" ON config FOR SELECT USING (true);
+DROP POLICY IF EXISTS "config_all_admin" ON config;
 CREATE POLICY "config_all_admin" ON config FOR ALL USING (is_admin_or_owner());
 
+DROP POLICY IF EXISTS "changelogs_select" ON changelogs;
 CREATE POLICY "changelogs_select" ON changelogs FOR SELECT USING (true);
+DROP POLICY IF EXISTS "changelogs_all_admin" ON changelogs;
 CREATE POLICY "changelogs_all_admin" ON changelogs FOR ALL USING (is_admin_or_owner());
 
+DROP POLICY IF EXISTS "wiki_select" ON wiki_features;
 CREATE POLICY "wiki_select" ON wiki_features FOR SELECT USING (true);
+DROP POLICY IF EXISTS "wiki_all_admin" ON wiki_features;
 CREATE POLICY "wiki_all_admin" ON wiki_features FOR ALL USING (is_admin_or_owner());
 
+DROP POLICY IF EXISTS "cosmetics_select" ON cosmetics;
 CREATE POLICY "cosmetics_select" ON cosmetics FOR SELECT USING (true);
+DROP POLICY IF EXISTS "cosmetics_all_admin" ON cosmetics;
 CREATE POLICY "cosmetics_all_admin" ON cosmetics FOR ALL USING (is_admin_or_owner());
 
+DROP POLICY IF EXISTS "support_tiers_select" ON support_tiers;
 CREATE POLICY "support_tiers_select" ON support_tiers FOR SELECT USING (true);
+DROP POLICY IF EXISTS "support_tiers_all_admin" ON support_tiers;
 CREATE POLICY "support_tiers_all_admin" ON support_tiers FOR ALL USING (is_admin_or_owner());
 
 -- ADMIN-ONLY tables
+DROP POLICY IF EXISTS "redeem_codes_admin" ON redeem_codes;
 CREATE POLICY "redeem_codes_admin" ON redeem_codes FOR ALL USING (is_admin_or_owner());
+DROP POLICY IF EXISTS "code_redemptions_own" ON code_redemptions;
 CREATE POLICY "code_redemptions_own" ON code_redemptions FOR SELECT USING (true);
+DROP POLICY IF EXISTS "code_redemptions_admin" ON code_redemptions;
 CREATE POLICY "code_redemptions_admin" ON code_redemptions FOR ALL USING (is_admin_or_owner());
 
 -- USER-SCOPED tables
+DROP POLICY IF EXISTS "user_rewards_select" ON user_rewards;
 CREATE POLICY "user_rewards_select" ON user_rewards FOR SELECT USING (true);
+DROP POLICY IF EXISTS "kofi_payments_select" ON kofi_payments;
 CREATE POLICY "kofi_payments_select" ON kofi_payments FOR SELECT USING (true);
+DROP POLICY IF EXISTS "kofi_manual_rewards_select" ON kofi_manual_rewards;
 CREATE POLICY "kofi_manual_rewards_select" ON kofi_manual_rewards FOR SELECT USING (true);
+DROP POLICY IF EXISTS "kofi_manual_rewards_admin" ON kofi_manual_rewards;
 CREATE POLICY "kofi_manual_rewards_admin" ON kofi_manual_rewards FOR ALL USING (is_admin_or_owner());
 
 -- SERVICE-ROLE-ONLY tables (Minecraft mod endpoints bypass RLS via service_role)
 -- No anon/authenticated policies needed - server functions use supabaseAdmin
+DROP POLICY IF EXISTS "minecraft_users_service" ON minecraft_users;
 CREATE POLICY "minecraft_users_service" ON minecraft_users FOR ALL USING (false);
+DROP POLICY IF EXISTS "supporters_service" ON supporters;
 CREATE POLICY "supporters_service" ON supporters FOR ALL USING (false);
+DROP POLICY IF EXISTS "connection_codes_service" ON connection_codes;
 CREATE POLICY "connection_codes_service" ON connection_codes FOR ALL USING (false);
 
 -- Comments for documentation

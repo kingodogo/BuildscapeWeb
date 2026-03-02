@@ -60,22 +60,29 @@ export const handler = async (event: any, context: any) => {
 
       // Single Report or Suggestion submission: Allow any authenticated user
       if ((report || suggestion) && !reports && !suggestions && !config && !changelogs) {
-          const { user, error } = await verifyAuthToken(event);
+          const { user, profile, error } = await verifyAuthToken(event);
           if (error || !user) {
               return corsResponse(401, { error: error || 'Authentication required to submit reports' });
           }
+          
+          const isAdmin = profile && (profile.role?.toLowerCase() === 'admin' || profile.role?.toLowerCase() === 'owner');
           
           if (report) {
               const snakeReport = mapToSnakeCase(report);
               // Ensure user owns the report if updating
               if (snakeReport.id) {
                  const { data: existing } = await supabaseAdmin.from('reports').select('author_id').eq('id', snakeReport.id).maybeSingle();
-                 if (existing && existing.author_id !== user.id) {
+                 if (existing && existing.author_id !== user.id && !isAdmin) {
                      return corsResponse(403, { error: "You do not have permission to update this report" });
                  }
+                 if (existing) {
+                     snakeReport.author_id = existing.author_id;
+                 } else {
+                     snakeReport.author_id = user.id;
+                 }
+              } else {
+                 snakeReport.author_id = user.id;
               }
-              // Force author_id to current user
-              snakeReport.author_id = user.id;
               const { error: upsertError } = await supabaseAdmin.from('reports').upsert(snakeReport);
               if (upsertError) throw upsertError;
           }
@@ -85,12 +92,17 @@ export const handler = async (event: any, context: any) => {
               // Ensure user owns the suggestion if updating
               if (snakeSuggestion.id) {
                  const { data: existing } = await supabaseAdmin.from('suggestions').select('author_id').eq('id', snakeSuggestion.id).maybeSingle();
-                 if (existing && existing.author_id !== user.id) {
+                 if (existing && existing.author_id !== user.id && !isAdmin) {
                      return corsResponse(403, { error: "You do not have permission to update this suggestion" });
                  }
+                 if (existing) {
+                     snakeSuggestion.author_id = existing.author_id;
+                 } else {
+                     snakeSuggestion.author_id = user.id;
+                 }
+              } else {
+                 snakeSuggestion.author_id = user.id;
               }
-              // Force author_id to current user
-              snakeSuggestion.author_id = user.id;
               const { error: upsertError } = await supabaseAdmin.from('suggestions').upsert(snakeSuggestion);
               if (upsertError) throw upsertError;
           }

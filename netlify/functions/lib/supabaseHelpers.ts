@@ -36,7 +36,7 @@ export const verifyAuthToken = async (event: any) => {
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
     
   return { user, profile, error: null };
 };
@@ -48,7 +48,7 @@ export const requireAdmin = async (event: any) => {
     return { authorized: false, response: corsResponse(401, { error: error || 'Unauthorized' }) };
   }
   
-  if (!profile || (profile.role !== 'admin' && profile.role !== 'owner')) {
+  if (!profile || (profile.role?.toLowerCase() !== 'admin' && profile.role?.toLowerCase() !== 'owner')) {
     return { authorized: false, response: corsResponse(403, { error: 'Forbidden: Admin access required' }) };
   }
   

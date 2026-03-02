@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   twitch_id TEXT,
   twitch_username TEXT,
   twitch_subscription_data JSONB DEFAULT NULL,
+  liked_features TEXT[] DEFAULT '{}',
+  favorite_features TEXT[] DEFAULT '{}',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -119,6 +121,7 @@ CREATE TABLE IF NOT EXISTS public.wiki_features (
   media TEXT,
   details TEXT[] DEFAULT '{}',
   created_by TEXT,
+  likes INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -275,6 +278,19 @@ BEGIN
     UPDATE public.code_redemptions 
     SET author_id = user_id::UUID 
     WHERE user_id ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+  END IF;
+
+  -- Add liked_features/favorite_features if missing
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='liked_features') THEN
+    ALTER TABLE public.profiles ADD COLUMN liked_features TEXT[] DEFAULT '{}';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='profiles' AND column_name='favorite_features') THEN
+    ALTER TABLE public.profiles ADD COLUMN favorite_features TEXT[] DEFAULT '{}';
+  END IF;
+
+  -- Add likes missing in wiki_features
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='wiki_features' AND column_name='likes') THEN
+    ALTER TABLE public.wiki_features ADD COLUMN likes INTEGER DEFAULT 0;
   END IF;
 
   -- Add any other columns that were added in later scripts here...

@@ -1,12 +1,15 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Info, BookOpen, Cog, Hammer, Zap, Shield, Users, Wrench, Globe, Package, Sparkles, Settings, Monitor, Box, Layers, Palette, FileText, Eye, Gauge, Lock, DollarSign, Server, Skull, Heart, Pickaxe, Gamepad2, TrendingUp, Mountain, MapPin, CircuitBoard, SquareStack, Sliders, Ghost, Rabbit, Map, Search, X } from "lucide-react";
-import { WikiFeature } from "../types";
+import { Info, BookOpen, Cog, Hammer, Zap, Shield, Users, Wrench, Globe, Package, Sparkles, Settings, Monitor, Box, Layers, Palette, FileText, Eye, Gauge, Lock, DollarSign, Server, Skull, Heart, Pickaxe, Gamepad2, TrendingUp, Mountain, MapPin, CircuitBoard, SquareStack, Sliders, Ghost, Rabbit, Map, Search, X, Share2, ThumbsUp } from "lucide-react";
+import { WikiFeature, User } from "../types";
 import { AppConfig } from "../types";
 import { sanitizeHTMLPermissive } from "../utils/sanitize";
+import { supabase } from "../lib/supabase";
 
 interface WikiProps {
   config?: AppConfig;
+  currentUser?: User | null;
+  onUpdateAppUser?: (user: User) => void;
 }
 
 // No predefined features - all features are loaded from the database
@@ -84,7 +87,7 @@ const MINECRAFT_VERSIONS = [
   "1.16.5"
 ];
 
-export default function Wiki({ config }: WikiProps = {}) {
+export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps = {}) {
   const [features, setFeatures] = useState<WikiFeature[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string | "all">("all");
@@ -154,6 +157,18 @@ export default function Wiki({ config }: WikiProps = {}) {
           const data = await response.json();
           if (data.features && data.features.length > 0) {
             setFeatures(data.features);
+            
+            // Handle deep link
+            if (typeof window !== 'undefined') {
+              const params = new URLSearchParams(window.location.search);
+              const featureIdFromUrl = params.get('feature');
+              if (featureIdFromUrl) {
+                const found = data.features.find((f: WikiFeature) => f.id === featureIdFromUrl);
+                if (found) {
+                  setSelectedFeature(found);
+                }
+              }
+            }
           }
         }
         } catch (error) {
@@ -164,6 +179,111 @@ export default function Wiki({ config }: WikiProps = {}) {
     };
     loadFeatures();
   }, []);
+
+  // Sync selected feature with URL
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (selectedFeature) {
+        url.searchParams.set('feature', selectedFeature.id);
+      } else {
+        url.searchParams.delete('feature');
+      }
+      window.history.replaceState(null, '', url.toString().replace(/=$/, ''));
+    }
+  }, [selectedFeature]);
+
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [copiedFeature, setCopiedFeature] = useState<string | null>(null);
+
+  const handleShare = (featureId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const url = new URL(window.location.href);
+    url.searchParams.set('feature', featureId);
+    navigator.clipboard.writeText(url.toString());
+    setCopiedFeature(featureId);
+    setTimeout(() => setCopiedFeature(null), 2000);
+  };
+
+  const handleLike = async (featureId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Optimistic UI update
+    const isCurrentlyLiked = currentUser?.likedFeatures?.includes(featureId);
+    if (!currentUser) return;
+
+    // Optimistically update likes in local state immediately
+    const updatedFeatures = features.map(f => {
+      if (f.id === featureId) {
+        return {
+          ...f,
+          likes: !isCurrentlyLiked ? (f.likes || 0) + 1 : Math.max(0, (f.likes || 1) - 1)
+        };
+      }
+      return f;
+    });
+    setFeatures(updatedFeatures);
+    
+    // Also update selectedFeature if it's the one being liked
+    if (selectedFeature?.id === featureId) {
+      setSelectedFeature(updatedFeatures.find(f => f.id === featureId) || null);
+    }
+
+    if (onUpdateAppUser) {
+      const likedFeatures = currentUser.likedFeatures || [];
+      const newLiked = !isCurrentlyLiked ? [...likedFeatures, featureId] : likedFeatures.filter(id => id !== featureId);
+      onUpdateAppUser({ ...currentUser, likedFeatures: newLiked });
+    }
+
+    setActionLoading(`like-${featureId}`);
+    try {
+      await fetch('/.netlify/functions/wiki', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        },
+        body: JSON.stringify({ action: 'like', featureId })
+      });
+    } catch (err) {
+      console.error('Failed to like feature:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleFavorite = async (featureId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!currentUser) return;
+    
+    // Optimistic UI update
+    const isCurrentlyFav = currentUser?.favoriteFeatures?.includes(featureId);
+
+    if (onUpdateAppUser) {
+      const favFeatures = currentUser.favoriteFeatures || [];
+      const newFavs = !isCurrentlyFav ? [...favFeatures, featureId] : favFeatures.filter(id => id !== featureId);
+      onUpdateAppUser({ ...currentUser, favoriteFeatures: newFavs });
+    }
+
+    setActionLoading(`fav-${featureId}`);
+    try {
+      await fetch('/.netlify/functions/wiki', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+        },
+        body: JSON.stringify({ action: 'favorite', featureId })
+      });
+    } catch (err) {
+      console.error('Failed to fav feature:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   useEffect(() => {
     const checkFit = () => {
@@ -329,7 +449,9 @@ export default function Wiki({ config }: WikiProps = {}) {
       const featureModVersions = feature.modVersions || (oldFeature.modVersion ? [oldFeature.modVersion] : []);
       
       // Category filter (single selection)
-      const categoryMatch = selectedCategory === "all" || featureCategories.includes(selectedCategory);
+      const isFavorite = currentUser?.favoriteFeatures?.includes(feature.id);
+      const categoryMatch = selectedCategory === "all" || 
+                           (selectedCategory === "favorites" ? isFavorite : featureCategories.includes(selectedCategory));
       
       // Subcategory filter
       const subcategoryMatch = selectedSubcategories.size === 0 || 
@@ -588,6 +710,40 @@ export default function Wiki({ config }: WikiProps = {}) {
                 </button>
               );
             })}
+            
+            {/* Favorites Tab - Only shown if logged in */}
+            {currentUser && (
+              <button
+                onClick={() => {
+                  setSelectedCategory(selectedCategory === "favorites" ? "all" : "favorites");
+                  setSelectedSubcategories(new Set());
+                  setSubcategoryPage(0);
+                }}
+                className={`flex items-center justify-center gap-1.5 rounded-lg text-sm font-medium transition-all ${
+                  showIconsOnly 
+                    ? "p-2 min-w-[40px] max-w-[40px] flex-shrink-0" 
+                    : "px-3 py-2 flex-shrink-0 whitespace-nowrap"
+                } ${
+                  selectedCategory === "favorites"
+                    ? "bg-red-900/40 text-red-100 border-2 border-red-500/50"
+                    : "bg-[#1e1e1e] text-gray-300 hover:bg-red-900/20 hover:text-white border-2 border-transparent"
+                }`}
+                title={`Favorites (${currentUser.favoriteFeatures?.length || 0})`}
+                style={{
+                  flexShrink: 0,
+                  minWidth: showIconsOnly ? '40px' : 'auto',
+                  maxWidth: showIconsOnly ? '40px' : 'none'
+                }}
+              >
+                <Heart size={showIconsOnly ? 18 : 16} className={`flex-shrink-0 ${selectedCategory === "favorites" ? "fill-red-500 text-red-500" : ""}`} />
+                {!showIconsOnly && (
+                  <>
+                    <span className="whitespace-nowrap">Favorites</span>
+                    <span className="text-xs text-gray-500 whitespace-nowrap">({currentUser.favoriteFeatures?.length || 0})</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
 
           {/* Search Bar */}
@@ -1086,6 +1242,53 @@ export default function Wiki({ config }: WikiProps = {}) {
                         )}
                       </ul>
                     )}
+                    
+                    {/* Action Bar */}
+                    <div className="mt-4 pt-4 border-t border-gray-800/50 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={(e) => handleLike(feature.id, e)}
+                          disabled={actionLoading === `like-${feature.id}`}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                            currentUser?.likedFeatures?.includes(feature.id)
+                              ? 'bg-blue-900/40 text-blue-400 border border-blue-800/50 hover:bg-blue-900/60'
+                              : 'bg-gray-800/50 text-gray-400 border border-transparent hover:bg-gray-700 hover:text-white'
+                          }`}
+                          title={currentUser ? "Like this feature" : "Login to like this feature"}
+                        >
+                          <ThumbsUp size={14} className={currentUser?.likedFeatures?.includes(feature.id) ? "fill-blue-400" : ""} />
+                          <span>{feature.likes || 0}</span>
+                        </button>
+                        
+                        <button
+                          onClick={(e) => handleFavorite(feature.id, e)}
+                          disabled={actionLoading === `fav-${feature.id}` || !currentUser}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                            !currentUser ? 'opacity-50 cursor-not-allowed bg-gray-800/50 text-gray-500' :
+                            currentUser?.favoriteFeatures?.includes(feature.id)
+                              ? 'bg-red-900/40 text-red-400 border border-red-800/50 hover:bg-red-900/60'
+                              : 'bg-gray-800/50 text-gray-400 border border-transparent hover:bg-gray-700 hover:text-white'
+                          }`}
+                          title={currentUser ? (currentUser?.favoriteFeatures?.includes(feature.id) ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
+                        >
+                          <Heart size={14} className={currentUser?.favoriteFeatures?.includes(feature.id) ? "fill-red-400" : ""} />
+                          <span className="hidden sm:inline">Favorites</span>
+                        </button>
+                      </div>
+                      
+                      <button
+                        onClick={(e) => handleShare(feature.id, e)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors border border-transparent ${
+                          copiedFeature === feature.id
+                            ? 'bg-green-900/40 text-green-400 border-green-800/50'
+                            : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700 hover:text-white'
+                        }`}
+                        title="Copy link to feature"
+                      >
+                        <Share2 size={14} />
+                        <span className="hidden sm:inline">{copiedFeature === feature.id ? "Copied!" : "Share"}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1317,6 +1520,52 @@ export default function Wiki({ config }: WikiProps = {}) {
                     </ul>
                   </div>
                 )}
+                {/* Action Bar */}
+                <div className="mt-6 pt-4 border-t border-gray-800/50 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={(e) => handleLike(selectedFeature.id, e)}
+                      disabled={actionLoading === `like-${selectedFeature.id}`}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                        currentUser?.likedFeatures?.includes(selectedFeature.id)
+                          ? 'bg-blue-900/40 text-blue-400 border border-blue-800/50 hover:bg-blue-900/60'
+                          : 'bg-gray-800/50 text-gray-400 border border-transparent hover:bg-gray-700 hover:text-white'
+                      }`}
+                      title={currentUser ? "Like this feature" : "Login to like this feature"}
+                    >
+                      <ThumbsUp size={14} className={currentUser?.likedFeatures?.includes(selectedFeature.id) ? "fill-blue-400" : ""} />
+                      <span>{selectedFeature.likes || 0}</span>
+                    </button>
+                    
+                    <button
+                      onClick={(e) => handleFavorite(selectedFeature.id, e)}
+                      disabled={actionLoading === `fav-${selectedFeature.id}` || !currentUser}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                        !currentUser ? 'opacity-50 cursor-not-allowed bg-gray-800/50 text-gray-500' :
+                        currentUser?.favoriteFeatures?.includes(selectedFeature.id)
+                          ? 'bg-red-900/40 text-red-400 border border-red-800/50 hover:bg-red-900/60'
+                          : 'bg-gray-800/50 text-gray-400 border border-transparent hover:bg-gray-700 hover:text-white'
+                      }`}
+                      title={currentUser ? (currentUser?.favoriteFeatures?.includes(selectedFeature.id) ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
+                    >
+                      <Heart size={14} className={currentUser?.favoriteFeatures?.includes(selectedFeature.id) ? "fill-red-400" : ""} />
+                      <span className="hidden sm:inline">Favorites</span>
+                    </button>
+                  </div>
+                  
+                  <button
+                    onClick={(e) => handleShare(selectedFeature.id, e)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors border border-transparent ${
+                      copiedFeature === selectedFeature.id
+                        ? 'bg-green-900/40 text-green-400 border-green-800/50'
+                        : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700 hover:text-white'
+                    }`}
+                    title="Copy link to feature"
+                  >
+                    <Share2 size={14} />
+                    <span className="hidden sm:inline">{copiedFeature === selectedFeature.id ? "Copied!" : "Share"}</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>

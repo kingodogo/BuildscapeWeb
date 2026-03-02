@@ -25,7 +25,22 @@ const getLinkIcon = (url: string) => {
 };
 
 export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdmin, mcVersions, modVersions, currentUser, onAddComment, onDeleteComment, onNavigateLogin, onNotify }: BugListProps) {
-  const [activeTab, setActiveTab] = useState<'active' | 'resolved'>('active');
+  const [activeTab, setActiveTab] = useState<'active' | 'resolved'>(() => {
+    if (typeof window === 'undefined') return 'active';
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('resolved')) return 'resolved';
+    return params.has('active') ? 'active' : 'active';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('active');
+      url.searchParams.delete('resolved');
+      url.searchParams.set(activeTab, '');
+      window.history.replaceState(null, '', url.toString().replace(/=$/, ''));
+    }
+  }, [activeTab]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [severityFilter, setSeverityFilter] = useState("All");
