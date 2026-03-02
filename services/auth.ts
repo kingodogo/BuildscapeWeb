@@ -25,7 +25,9 @@ function mapProfile(profile: any): User {
         twitchUsername: profile.twitch_username || '',
         twitchId: profile.twitch_id || '',
         twitchSubscriptionData: profile.twitch_subscription_data || null,
-        kofiSubscription: profile.kofi_subscription || null
+        kofiSubscription: profile.kofi_subscription || null,
+        likedFeatures: profile.liked_features || [],
+        favoriteFeatures: profile.favorite_features || []
     };
 }
 

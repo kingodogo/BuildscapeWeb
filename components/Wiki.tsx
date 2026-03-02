@@ -182,7 +182,7 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
 
   // Sync selected feature with URL
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && !loading) {
       const url = new URL(window.location.href);
       if (selectedFeature) {
         url.searchParams.set('feature', selectedFeature.id);
@@ -191,7 +191,7 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
       }
       window.history.replaceState(null, '', url.toString().replace(/=$/, ''));
     }
-  }, [selectedFeature]);
+  }, [selectedFeature, loading]);
 
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [copiedFeature, setCopiedFeature] = useState<string | null>(null);
