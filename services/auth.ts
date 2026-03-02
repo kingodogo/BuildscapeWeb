@@ -311,15 +311,15 @@ export const AuthService = {
         });
     },
 
-    sendResetLink: async (userId: string): Promise<void> => {
-        await fetchWithAuth('/.netlify/functions/auth', {
+    sendResetLink: async (userId: string): Promise<{ success: boolean; emailSent: boolean; recoveryLink?: string; emailError?: string }> => {
+        return fetchWithAuth('/.netlify/functions/auth', {
             method: 'POST',
             body: JSON.stringify({ action: 'sendResetLink', id: userId })
         });
     },
 
-    forceResetPassword: async (userId: string): Promise<void> => {
-        await fetchWithAuth('/.netlify/functions/auth', {
+    forceResetPassword: async (userId: string): Promise<{ success: boolean; emailSent: boolean; dummyPassword?: string; emailError?: string }> => {
+        return fetchWithAuth('/.netlify/functions/auth', {
             method: 'POST',
             body: JSON.stringify({ action: 'forceResetPassword', id: userId })
         });

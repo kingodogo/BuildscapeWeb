@@ -797,16 +797,29 @@ export const handler = async (event: any, context: any) => {
 
       if (error) throw error;
 
-      await sendProfessionalEmail(
-        targetProfile.email,
-        "Reset Your Password - Buildscape",
-        "Password Reset Requested",
-        `Hi ${targetProfile.username}, an administrator has initiated a password reset for your account. Please use the link below to set a new password.`,
-        "Reset Password",
-        data.properties.action_link
-      );
+      let emailSent = false;
+      let emailError = null;
+      try {
+        await sendProfessionalEmail(
+          targetProfile.email,
+          "Reset Your Password - Buildscape",
+          "Password Reset Requested",
+          `Hi ${targetProfile.username}, an administrator has initiated a password reset for your account. Please use the link below to set a new password.`,
+          "Reset Password",
+          data.properties.action_link
+        );
+        emailSent = true;
+      } catch (e: any) {
+        console.error("Failed to send reset link email:", e);
+        emailError = e.message;
+      }
 
-      return corsResponse(200, { success: true });
+      return corsResponse(200, { 
+        success: true, 
+        emailSent, 
+        emailError,
+        recoveryLink: data.properties.action_link 
+      });
     }
 
     // Force Reset Password with Dummy (Admin)
@@ -830,17 +843,31 @@ export const handler = async (event: any, context: any) => {
 
       if (error) throw error;
 
-      await sendProfessionalEmail(
-        targetProfile.email,
-        "Temporary Password Assigned - Buildscape",
-        "New Temporary Password",
-        `Hi ${targetProfile.username}, your password has been reset by an administrator. \n\nYour temporary password is: **${dummyPassword}**\n\nPlease log in and change your password immediately.`,
-        "Login Now",
-        process.env.URL || 'http://localhost:8888',
-        dummyPassword
-      );
+      let emailSent = false;
+      let emailError = null;
 
-      return corsResponse(200, { success: true });
+      try {
+        await sendProfessionalEmail(
+          targetProfile.email,
+          "Temporary Password Assigned - Buildscape",
+          "New Temporary Password",
+          `Hi ${targetProfile.username}, your password has been reset by an administrator. \n\nYour temporary password is: **${dummyPassword}**\n\nPlease log in and change your password immediately.`,
+          "Login Now",
+          process.env.URL || 'http://localhost:8888',
+          dummyPassword
+        );
+        emailSent = true;
+      } catch (e: any) {
+        console.error("Failed to send force reset email:", e);
+        emailError = e.message;
+      }
+
+      return corsResponse(200, { 
+        success: true, 
+        emailSent, 
+        emailError,
+        dummyPassword // Only returned because this is restricted to Admin/Owner
+      });
     }
 
     // Update User Role (Admin) - But Owner role is protected

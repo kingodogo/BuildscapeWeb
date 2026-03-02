@@ -670,8 +670,14 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   const handleSendResetLink = async (userId: string) => {
     if (!confirm('Send password reset link to user?')) return;
     try {
-      await AuthService.sendResetLink(userId);
-      setToast({ msg: 'Reset link sent!', type: 'success' });
+      const data = await AuthService.sendResetLink(userId);
+      if (data.emailSent) {
+        setToast({ msg: 'Reset link sent!', type: 'success' });
+      } else {
+        // Email failed, show link directly
+        alert(`Request successful, but EMAIL FAILED.\n\nRecovery Link: ${data.recoveryLink}\n\nPlease copy this and send it manually to the user.`);
+        setToast({ msg: 'Reset link created (Email Failed)', type: 'info' });
+      }
     } catch (e: any) {
       setToast({ msg: `Failed to send reset link: ${e.message}`, type: 'error' });
     }
@@ -680,8 +686,14 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   const handleForceResetPassword = async (userId: string) => {
     if (!confirm('Force reset password and assign temporary dummy? User will be forced to change it on next login.')) return;
     try {
-      await AuthService.forceResetPassword(userId);
-      setToast({ msg: 'Temporary password sent to user!', type: 'success' });
+      const data = await AuthService.forceResetPassword(userId);
+      if (data.emailSent) {
+        setToast({ msg: `Temporary password assigned and emailed to user!`, type: 'success' });
+      } else {
+        // Email failed, show password directly to admin
+        alert(`Password reset successful, but EMAIL FAILED.\n\nTemporary Password: ${data.dummyPassword}\n\nPlease copy this and send it manually to the user.`);
+        setToast({ msg: 'Password reset (Email Failed)', type: 'info' });
+      }
     } catch (e: any) {
       setToast({ msg: `Failed to force reset: ${e.message}`, type: 'error' });
     }
