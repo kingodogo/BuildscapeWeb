@@ -21,6 +21,7 @@ import { StorageService, StorageError } from "./services/storage";
 import { CurseForgeService, CurseForgeError } from "./services/curseforge";
 import { supabase } from "./lib/supabase";
 import { AlertCircle, CheckCircle, Cloud, Database, WifiOff, Lightbulb } from "lucide-react";
+import { logger } from "./utils/logger";
 
 const sortVersions = (versions: string[]) => {
   return [...versions].sort((a, b) => {
@@ -475,7 +476,7 @@ export default function App() {
         const currentId = session?.user?.id;
         if (lastAuthStateLog.current.userId !== currentId || lastAuthStateLog.current.event !== event) {
           if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
-             console.log(`Auth event: ${event}`, session?.user?.email);
+             logger.info(`Auth event: ${event}`);
              lastAuthStateLog.current = { userId: currentId, event };
           }
         }
@@ -826,7 +827,7 @@ export default function App() {
       {isLoading && (
           <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
               <div className="bg-[#1e1e1e] border border-gray-700 rounded-xl p-6 flex flex-col items-center gap-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-500"></div>
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#00FFFF]"></div>
                   <p className="text-gray-300">Loading data from server...</p>
               </div>
           </div>

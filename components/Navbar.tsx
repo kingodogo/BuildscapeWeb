@@ -37,7 +37,7 @@ export default function Navbar({ onNavigate, currentUser, onLogout, links, navba
                   className="shadow-lg"
                 />
               ) : (
-                <div className="bg-gradient-to-br from-minecraft-grass to-green-800 p-1.5 rounded-lg text-white shadow-lg">
+                <div className="bg-gradient-to-br from-[#00FFFF] to-[#00fbff]/60 p-1.5 rounded-lg text-black shadow-lg shadow-[#00FFFF]/20">
                   <Hammer size={20} />
                 </div>
               )}
@@ -168,7 +168,7 @@ export default function Navbar({ onNavigate, currentUser, onLogout, links, navba
                     </button>
                     <button 
                         onClick={() => onNavigate('register')}
-                        className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-green-900/30 border border-green-800 text-green-400 hover:bg-green-900/50 hover:text-green-300 transition-all flex-shrink-0"
+                        className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-[#00FFFF]/10 border border-[#00FFFF]/30 text-[#00FFFF] hover:bg-[#00FFFF]/20 hover:text-[#00fbff] transition-all flex-shrink-0"
                         title="Sign Up"
                     >
                         <UserPlus size={12} />

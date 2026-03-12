@@ -87,9 +87,22 @@ const MINECRAFT_VERSIONS = [
   "1.16.5"
 ];
 
+const CACHE_KEY_WIKI = 'buildscape_cache_wiki';
+
 export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps = {}) {
-  const [features, setFeatures] = useState<WikiFeature[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [features, setFeatures] = useState<WikiFeature[]>(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const cached = localStorage.getItem(CACHE_KEY_WIKI);
+        if (cached) return JSON.parse(cached);
+      }
+    } catch (e) {}
+    return [];
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem(CACHE_KEY_WIKI)) return false;
+    return true;
+  });
   const [selectedCategory, setSelectedCategory] = useState<string | "all">("all");
   const [selectedSubcategories, setSelectedSubcategories] = useState<Set<string>>(new Set());
   const [selectedMcVersions, setSelectedMcVersions] = useState<Set<string>>(new Set());
@@ -157,6 +170,9 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
           const data = await response.json();
           if (data.features && data.features.length > 0) {
             setFeatures(data.features);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(CACHE_KEY_WIKI, JSON.stringify(data.features));
+            }
             
             // Handle deep link
             if (typeof window !== 'undefined') {
@@ -172,12 +188,26 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
           }
         }
         } catch (error) {
-          console.error('Failed to load wiki features:', error);
+          // Silent in production unless critical
         } finally {
         setLoading(false);
       }
     };
     loadFeatures();
+
+    const handleNeedsRefresh = () => {
+       loadFeatures();
+    };
+
+    if (typeof window !== 'undefined') {
+       window.addEventListener('buildscape-wiki-needs-refresh', handleNeedsRefresh);
+    }
+
+    return () => {
+       if (typeof window !== 'undefined') {
+           window.removeEventListener('buildscape-wiki-needs-refresh', handleNeedsRefresh);
+       }
+    };
   }, []);
 
   // Sync selected feature with URL
@@ -195,6 +225,28 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
 
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [copiedFeature, setCopiedFeature] = useState<string | null>(null);
+  const [anonLikedFeatures, setAnonLikedFeatures] = useState<string[]>([]);
+  const [recentlyAnimated, setRecentlyAnimated] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('anonLikedFeatures');
+        if (stored) {
+          setAnonLikedFeatures(JSON.parse(stored));
+        }
+      } catch (e) {
+        console.error('Failed to load anonLikedFeatures from localStorage', e);
+      }
+    }
+  }, []);
+
+  const isFeatureLiked = (featureId: string) => {
+    if (currentUser) {
+      return !!currentUser.likedFeatures?.includes(featureId);
+    }
+    return anonLikedFeatures.includes(featureId);
+  };
 
   const handleShare = (featureId: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -211,9 +263,8 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
     e.stopPropagation();
     
     // Optimistic UI update
-    const isCurrentlyLiked = currentUser?.likedFeatures?.includes(featureId);
-    if (!currentUser) return;
-
+    const isCurrentlyLiked = isFeatureLiked(featureId);
+    
     // Optimistically update likes in local state immediately
     const updatedFeatures = features.map(f => {
       if (f.id === featureId) {
@@ -231,21 +282,42 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
       setSelectedFeature(updatedFeatures.find(f => f.id === featureId) || null);
     }
 
-    if (onUpdateAppUser) {
+    if (currentUser && onUpdateAppUser) {
       const likedFeatures = currentUser.likedFeatures || [];
       const newLiked = !isCurrentlyLiked ? [...likedFeatures, featureId] : likedFeatures.filter(id => id !== featureId);
       onUpdateAppUser({ ...currentUser, likedFeatures: newLiked });
+    } else if (!currentUser) {
+      const newLiked = !isCurrentlyLiked 
+        ? [...anonLikedFeatures, featureId] 
+        : anonLikedFeatures.filter(id => id !== featureId);
+        
+      setAnonLikedFeatures(newLiked);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('anonLikedFeatures', JSON.stringify(newLiked));
+      }
     }
+    
+    // Trigger animation
+    setRecentlyAnimated(`like-${featureId}`);
+    setTimeout(() => setRecentlyAnimated(null), 350);
 
     setActionLoading(`like-${featureId}`);
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (currentUser) {
+        const session = await supabase.auth.getSession();
+        if (session.data.session?.access_token) {
+          headers['Authorization'] = `Bearer ${session.data.session.access_token}`;
+        }
+      }
+
       await fetch('/.netlify/functions/wiki', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-        },
-        body: JSON.stringify({ action: 'like', featureId })
+        headers,
+        body: JSON.stringify({ action: 'like', featureId, isLiking: !isCurrentlyLiked })
       });
     } catch (err) {
       console.error('Failed to like feature:', err);
@@ -267,6 +339,10 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
       const newFavs = !isCurrentlyFav ? [...favFeatures, featureId] : favFeatures.filter(id => id !== featureId);
       onUpdateAppUser({ ...currentUser, favoriteFeatures: newFavs });
     }
+
+    // Trigger animation
+    setRecentlyAnimated(`fav-${featureId}`);
+    setTimeout(() => setRecentlyAnimated(null), 350);
 
     setActionLoading(`fav-${featureId}`);
     try {
@@ -516,7 +592,7 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
     const regex = new RegExp(`(${escapedTerm})`, 'gi');
     
     // Replace matches with highlighted version, preserving HTML tags
-    return content.replace(regex, '<mark class="bg-yellow-500/30 text-yellow-200 px-0.5 rounded">$1</mark>');
+    return content.replace(regex, '<mark class="bg-[#00FFFF]/20 text-[#00FFFF] px-0.5 rounded">$1</mark>');
   };
 
   // Function to truncate content to fit in one line (approximately)
@@ -595,7 +671,7 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
               <ul key={`ul-${idx}`} className="list-none pl-0 my-2 space-y-1">
                 {React.Children.toArray((existingUl.props as { children?: React.ReactNode }).children)}
                 <li key={idx} className="flex items-start gap-2 text-gray-300">
-                  <span className="text-green-500 mt-1 flex-shrink-0">•</span>
+                  <span className="text-[#00FFFF] mt-1 flex-shrink-0">•</span>
                   <span className="flex-1">{highlightSearch && searchTerm ? highlightText(content, searchTerm) : content}</span>
                 </li>
               </ul>
@@ -604,7 +680,7 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
             elements[lastUl] = (
               <ul key={`ul-${idx}`} className="list-none pl-0 my-2 space-y-1">
                 <li key={idx} className="flex items-start gap-2 text-gray-300">
-                  <span className="text-green-500 mt-1 flex-shrink-0">•</span>
+                  <span className="text-[#00FFFF] mt-1 flex-shrink-0">•</span>
                   <span className="flex-1">{highlightSearch && searchTerm ? highlightText(content, searchTerm) : content}</span>
                 </li>
               </ul>
@@ -650,7 +726,7 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
                   : "px-3 py-2 flex-shrink-0 whitespace-nowrap"
               } ${
                 selectedCategory === "all"
-                  ? "bg-gray-800 text-white border-2 border-green-500/50"
+                  ? "bg-gray-800 text-white border-2 border-[#00FFFF]/50 shadow-[0_0_15px_rgba(0,255,255,0.1)]"
                   : "bg-[#1e1e1e] text-gray-300 hover:bg-gray-800 hover:text-white border-2 border-transparent"
               }`}
               title={`All (${features.length})`}
@@ -690,7 +766,7 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
                       : "px-3 py-2 flex-shrink-0 whitespace-nowrap"
                   } ${
                     isSelected
-                      ? "bg-gray-800 text-white border-2 border-green-500/50"
+                      ? "bg-gray-800 text-white border-2 border-[#00FFFF]/50 shadow-[0_0_15px_rgba(0,255,255,0.1)]"
                       : "bg-[#1e1e1e] text-gray-300 hover:bg-gray-800 hover:text-white border-2 border-transparent"
                   }`}
                   title={`${category.label} (${count})`}
@@ -755,7 +831,7 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search features..."
-                className="w-full pl-10 pr-4 py-2.5 bg-[#1e1e1e] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors"
+                className="w-full pl-10 pr-4 py-2.5 bg-[#1e1e1e] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors"
               />
             </div>
           </div>
@@ -913,7 +989,7 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
                                     }}
                                     className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex-shrink-0 whitespace-nowrap ${
                                       isSelected
-                                        ? 'bg-green-600 text-white border-2 border-green-500'
+                                        ? 'bg-[#00FFFF]/80 text-black border-2 border-[#00FFFF] shadow-[0_0_15px_rgba(0,255,255,0.2)]'
                                         : 'bg-[#1e1e1e] text-gray-300 hover:bg-gray-800 border-2 border-transparent'
                                     }`}
                                   >
@@ -1053,7 +1129,7 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
                   e.stopPropagation();
                   setSelectedFeature(feature);
                 }}
-                className="bg-[#1e1e1e] border border-gray-800 rounded-xl p-6 hover:border-gray-700 transition-all hover:shadow-lg hover:shadow-green-500/10 cursor-pointer relative"
+                className="bg-[#1e1e1e] border border-gray-800 rounded-xl p-6 hover:border-[#00FFFF]/30 transition-all hover:shadow-lg hover:shadow-[#00FFFF]/10 cursor-pointer relative hover-lift"
               >
                 <div className="flex flex-col lg:flex-row gap-6">
                   {/* Media (Image/Video) */}
@@ -1181,7 +1257,7 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
                             const oldFeature = feature as any;
                             const cats = feature.categories || (oldFeature.category ? [oldFeature.category] : []);
                             return cats.map((cat: string) => (
-                              <span key={cat} className="inline-block px-2 py-1 bg-green-900/30 border border-green-700/50 rounded text-xs text-green-400 font-medium">
+                              <span key={cat} className="inline-block px-2 py-1 bg-[#00FFFF]/10 border border-[#00FFFF]/30 rounded text-xs text-[#00FFFF] font-medium">
                                 {PRIMARY_CATEGORIES.find(c => c.id === cat)?.label || cat}
                         </span>
                             ));
@@ -1203,7 +1279,7 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
                             const oldFeature = feature as any;
                             const versions = feature.mcVersions || (oldFeature.version ? [oldFeature.version] : []);
                             return versions.map((v: string) => (
-                              <span key={v} className="inline-block px-2 py-1 bg-green-900/30 border border-green-700/50 rounded text-xs text-green-400 font-medium">
+                              <span key={v} className="inline-block px-2 py-1 bg-[#00FFFF]/10 border border-[#00FFFF]/30 rounded text-xs text-[#00FFFF] font-medium">
                                 MC {v}
                               </span>
                             ));
@@ -1230,7 +1306,7 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
                       <ul className="space-y-2 relative">
                         {truncatedDetails.map((detail, index) => (
                           <li key={index} className="text-gray-400 text-sm flex items-start gap-2">
-                            <span className="text-green-500 flex-shrink-0" style={{ marginTop: '0.125rem' }}>•</span>
+                            <span className="text-[#00FFFF] flex-shrink-0" style={{ marginTop: '0.125rem' }}>•</span>
                             <span className="flex-1">{searchTerm ? highlightText(detail, searchTerm) : detail}</span>
                           </li>
                         ))}
@@ -1249,26 +1325,28 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
                         <button
                           onClick={(e) => handleLike(feature.id, e)}
                           disabled={actionLoading === `like-${feature.id}`}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                            currentUser?.likedFeatures?.includes(feature.id)
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
+                            isFeatureLiked(feature.id)
                               ? 'bg-blue-900/40 text-blue-400 border border-blue-800/50 hover:bg-blue-900/60'
                               : 'bg-gray-800/50 text-gray-400 border border-transparent hover:bg-gray-700 hover:text-white'
-                          }`}
-                          title={currentUser ? "Like this feature" : "Login to like this feature"}
+                          } ${recentlyAnimated === `like-${feature.id}` ? 'animate-btn-pop' : ''} btn-hover-glow`}
+                          style={{ '--glow-color': 'rgba(96, 165, 250, 0.4)' } as any}
+                          title="Like this feature"
                         >
-                          <ThumbsUp size={14} className={currentUser?.likedFeatures?.includes(feature.id) ? "fill-blue-400" : ""} />
+                          <ThumbsUp size={14} className={isFeatureLiked(feature.id) ? "fill-blue-400" : ""} />
                           <span>{feature.likes || 0}</span>
                         </button>
                         
                         <button
                           onClick={(e) => handleFavorite(feature.id, e)}
                           disabled={actionLoading === `fav-${feature.id}` || !currentUser}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                             !currentUser ? 'opacity-50 cursor-not-allowed bg-gray-800/50 text-gray-500' :
                             currentUser?.favoriteFeatures?.includes(feature.id)
                               ? 'bg-red-900/40 text-red-400 border border-red-800/50 hover:bg-red-900/60'
                               : 'bg-gray-800/50 text-gray-400 border border-transparent hover:bg-gray-700 hover:text-white'
-                          }`}
+                          } ${recentlyAnimated === `fav-${feature.id}` ? 'animate-btn-pop' : ''} btn-hover-glow`}
+                          style={{ '--glow-color': 'rgba(248, 113, 113, 0.4)' } as any}
                           title={currentUser ? (currentUser?.favoriteFeatures?.includes(feature.id) ? "Remove from favorites" : "Add to favorites") : "Login to favorite"}
                         >
                           <Heart size={14} className={currentUser?.favoriteFeatures?.includes(feature.id) ? "fill-red-400" : ""} />
@@ -1280,7 +1358,7 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
                         onClick={(e) => handleShare(feature.id, e)}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors border border-transparent ${
                           copiedFeature === feature.id
-                            ? 'bg-green-900/40 text-green-400 border-green-800/50'
+                            ? 'bg-[#00FFFF]/20 text-[#00FFFF] border-[#00FFFF]/30'
                             : 'bg-gray-800/50 text-gray-400 hover:bg-gray-700 hover:text-white'
                         }`}
                         title="Copy link to feature"
@@ -1464,7 +1542,7 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
                     const oldFeature = selectedFeature as any;
                     const cats = selectedFeature.categories || (oldFeature.category ? [oldFeature.category] : []);
                     return cats.map((cat: string) => (
-                      <span key={cat} className="inline-block px-2 py-1 bg-green-900/30 border border-green-700/50 rounded text-xs text-green-400 font-medium">
+                      <span key={cat} className="inline-block px-2 py-1 bg-[#00FFFF]/10 border border-[#00FFFF]/30 rounded text-xs text-[#00FFFF] font-medium">
                         {PRIMARY_CATEGORIES.find(c => c.id === cat)?.label || cat}
                       </span>
                     ));
@@ -1486,7 +1564,7 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
                     const oldFeature = selectedFeature as any;
                     const versions = selectedFeature.mcVersions || (oldFeature.version ? [oldFeature.version] : []);
                     return versions.map((v: string) => (
-                      <span key={v} className="inline-block px-2 py-1 bg-green-900/30 border border-green-700/50 rounded text-xs text-green-400 font-medium">
+                      <span key={v} className="inline-block px-2 py-1 bg-[#00FFFF]/10 border border-[#00FFFF]/30 rounded text-xs text-[#00FFFF] font-medium">
                         MC {v}
                       </span>
                     ));
@@ -1513,7 +1591,7 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
                     <ul className="space-y-2">
                       {selectedFeature.details.map((detail, index) => (
                         <li key={index} className="text-gray-400 text-sm flex items-start gap-2">
-                          <span className="text-green-500 flex-shrink-0" style={{ marginTop: '0.125rem' }}>•</span>
+                          <span className="text-[#00FFFF] flex-shrink-0" style={{ marginTop: '0.125rem' }}>•</span>
                           <span className="flex-1">{searchTerm ? highlightText(detail, searchTerm) : detail}</span>
                         </li>
                       ))}
@@ -1527,13 +1605,13 @@ export default function Wiki({ config, currentUser, onUpdateAppUser }: WikiProps
                       onClick={(e) => handleLike(selectedFeature.id, e)}
                       disabled={actionLoading === `like-${selectedFeature.id}`}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                        currentUser?.likedFeatures?.includes(selectedFeature.id)
+                        isFeatureLiked(selectedFeature.id)
                           ? 'bg-blue-900/40 text-blue-400 border border-blue-800/50 hover:bg-blue-900/60'
                           : 'bg-gray-800/50 text-gray-400 border border-transparent hover:bg-gray-700 hover:text-white'
                       }`}
-                      title={currentUser ? "Like this feature" : "Login to like this feature"}
+                      title="Like this feature"
                     >
-                      <ThumbsUp size={14} className={currentUser?.likedFeatures?.includes(selectedFeature.id) ? "fill-blue-400" : ""} />
+                      <ThumbsUp size={14} className={isFeatureLiked(selectedFeature.id) ? "fill-blue-400" : ""} />
                       <span>{selectedFeature.likes || 0}</span>
                     </button>
                     

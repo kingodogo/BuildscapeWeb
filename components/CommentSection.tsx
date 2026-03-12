@@ -102,7 +102,7 @@ function RichTextRenderer({ text }: { text: string }) {
           return <em key={index} className="italic text-gray-400">{part.slice(1, -1)}</em>;
         }
         if (part.startsWith('==') && part.endsWith('==') && part.length > 4) {
-          return <mark key={index} className="bg-yellow-500/20 text-yellow-200 px-1 rounded border border-yellow-500/30">{part.slice(2, -2)}</mark>;
+          return <mark key={index} className="bg-[#00FFFF]/20 text-[#00FFFF] px-1 rounded border border-[#00FFFF]/30">{part.slice(2, -2)}</mark>;
         }
         if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
           return <code key={index} className="bg-black/30 text-red-300 font-mono text-xs px-1.5 py-0.5 rounded border border-red-900/30">{part.slice(1, -1)}</code>;
@@ -322,7 +322,7 @@ export default function CommentSection({ comments, currentUser, onAddComment, on
                     <button 
                         type="submit"
                         disabled={!newComment.trim() && attachedImages.length === 0}
-                        className="bg-green-700 hover:bg-green-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
+                        className="bg-[#00FFFF] hover:bg-[#00fbff] text-black px-4 py-1.5 rounded-lg text-xs font-bold disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all shadow-md hover:shadow-lg btn-shine"
                     >
                         Post Comment <Send size={12} />
                     </button>

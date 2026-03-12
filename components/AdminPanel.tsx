@@ -279,7 +279,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
               setShowJarDropdown(false);
             }
           } catch (error) {
-            console.log('Auto-fetch jar files failed:', error);
+            console.error('Auto-fetch jar files failed:', error);
             setMatchingJarFiles([]);
             setShowJarDropdown(false);
           }
@@ -393,7 +393,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
             }
           } catch (error) {
             // Silently fail for auto-fetch - user can manually fetch if needed
-            console.log('Auto-fetch download URL failed:', error);
+            console.error('Auto-fetch download URL failed:', error);
           } finally {
             setFetchingDownloadUrl(false);
           }
@@ -600,7 +600,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
       setUsers(fetchedUsers);
     } catch (e: any) {
       console.error("Failed to load users", e);
-      alert(`Failed to load users: ${e.message || 'Unknown error'}`);
+      setToast({ msg: `Failed to load users: ${e.message || 'Unknown error'}`, type: "error" });
 
       if (currentUser) {
         setUsers([currentUser]);
@@ -646,7 +646,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
   const handleAddLegacyUser = async () => {
     if (!newLegacyUser.email || !newLegacyUser.username) {
-      alert("Email and Username are required");
+      setToast({ msg: "Email and Username are required", type: "error" });
       return;
     }
     try {
@@ -675,7 +675,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
         setToast({ msg: 'Reset link sent!', type: 'success' });
       } else {
         // Email failed, show link directly
-        alert(`Request successful, but EMAIL FAILED.\n\nRecovery Link: ${data.recoveryLink}\n\nPlease copy this and send it manually to the user.`);
+        setToast({ msg: `Request successful, but EMAIL FAILED.\n\nRecovery Link: ${data.recoveryLink}\n\nPlease copy this and send it manually to the user.`, type: "info" });
         setToast({ msg: 'Reset link created (Email Failed)', type: 'info' });
       }
     } catch (e: any) {
@@ -691,7 +691,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
         setToast({ msg: `Temporary password assigned and emailed to user!`, type: 'success' });
       } else {
         // Email failed, show password directly to admin
-        alert(`Password reset successful, but EMAIL FAILED.\n\nTemporary Password: ${data.dummyPassword}\n\nPlease copy this and send it manually to the user.`);
+        setToast({ msg: `Password reset successful, but EMAIL FAILED.\n\nTemporary Password: ${data.dummyPassword}\n\nPlease copy this and send it manually to the user.`, type: "info" });
         setToast({ msg: 'Password reset (Email Failed)', type: 'info' });
       }
     } catch (e: any) {
@@ -735,12 +735,12 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
     try {
       await AuthService.updateUserRole(userId, newRole);
       loadUsers();
-    } catch (e: any) { alert(e.message); }
+    } catch (e: any) { setToast({ msg: e.message, type: "error" }); }
   };
 
   const handleDeleteUser = async (id: string) => {
     if (confirm("Are you sure you want to delete this user? This action cannot be undone.")) {
-      try { await AuthService.deleteUser(id); loadUsers(); } catch (e: any) { alert(e.message); }
+      try { await AuthService.deleteUser(id); loadUsers(); } catch (e: any) { setToast({ msg: e.message, type: "error" }); }
     }
   };
 
@@ -790,23 +790,23 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
       const dateStr = formatDate(report.timestamp);
 
       const statusColors = {
-        'Open': 'bg-gray-700/50 text-gray-300',
-        'In Progress': 'bg-blue-700/50 text-blue-300',
-        'Resolved': 'bg-green-700/50 text-green-300'
+        'Resolved': 'bg-[#00FFFF]/10 border-[#00FFFF]/30 text-[#00FFFF]',
+        'In Progress': 'bg-[#00fbff]/10 border-[#00fbff]/30 text-[#00fbff]',
+        'Open': 'bg-gray-800/50 text-gray-300'
       };
 
       const severityColors = {
         'Critical': 'bg-red-700/50 text-red-300',
         'High': 'bg-orange-700/50 text-orange-300',
-        'Medium': 'bg-yellow-700/50 text-yellow-300',
-        'Low': 'bg-green-700/50 text-green-300'
+        'Medium': 'bg-amber-700/50 text-amber-300',
+        'Low': 'bg-[#00FFFF]/10 border-[#00FFFF]/30 text-[#00FFFF]'
       };
 
       const severityTagColors = {
         'Critical': 'bg-red-900/30 text-red-600 border-red-700',
         'High': 'bg-orange-900/30 text-orange-600 border-orange-700',
-        'Medium': 'bg-yellow-900/30 text-yellow-600 border-yellow-700',
-        'Low': 'bg-green-900/30 text-green-600 border-green-700'
+        'Medium': 'bg-amber-900/30 text-amber-500 border-amber-700',
+        'Low': 'bg-[#00FFFF]/10 text-[#00FFFF] border-[#00FFFF]/30'
       };
 
       const escapeHtml = (str: string) => {
@@ -839,7 +839,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
         >
           <div class="flex items-center gap-2 mb-1">
             <span class="px-2 py-0.5 rounded text-xs font-semibold border ${severityTagClass}">${escapedSeverity.toUpperCase()}</span>
-            <span class="font-medium text-green-400">${escapedTitle}</span>
+            <span class="font-medium text-[#00FFFF]">${escapedTitle}</span>
           </div>
           ${escapedDescription ? `<div class="text-gray-400 text-sm mb-2">${escapedDescription}</div>` : ''}
           <div class="flex flex-wrap items-center gap-y-1 text-xs">
@@ -921,7 +921,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
           processedLine = processedLine.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
           processedLine = processedLine.replace(/\*(.+?)\*/g, '<em>$1</em>');
           processedLine = processedLine.replace(/`(.+?)`/g, '<code class="bg-gray-800 px-1 py-0.5 rounded text-xs">$1</code>');
-          processedLine = processedLine.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" class="text-green-400 hover:underline">$1</a>');
+          processedLine = processedLine.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" class="text-[#00FFFF] hover:underline">$1</a>');
           const sanitized = sanitizeHTMLPermissive(processedLine);
           return <p key={idx} className="text-gray-300" dangerouslySetInnerHTML={{ __html: sanitized }} />;
         })}
@@ -986,7 +986,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
           processedLine = processedLine.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
           processedLine = processedLine.replace(/\*(.+?)\*/g, '<em>$1</em>');
           processedLine = processedLine.replace(/`(.+?)`/g, '<code class="bg-gray-800 px-1 py-0.5 rounded">$1</code>');
-          processedLine = processedLine.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" class="text-green-400 hover:underline">$1</a>');
+          processedLine = processedLine.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" class="text-[#00FFFF] hover:underline">$1</a>');
           processedLine = processedLine.replace(/!\[(.+?)\]\((.+?)\)/g, '<img src="$2" alt="$1" class="max-w-full rounded" />');
           const sanitized = sanitizeHTMLPermissive(processedLine);
           return <p key={idx} className="text-gray-300" dangerouslySetInnerHTML={{ __html: sanitized }} />;
@@ -1176,7 +1176,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
   // Load ALL admin data when component first mounts
   useEffect(() => {
-    console.log('AdminPanel mounted - loading all initial data');
+    // Initial data loading
     // Always load redeem codes on mount (needed for all redeem-rewards tabs)
     loadRedeemCodes();
   }, []); // Empty dependency array = run only on mount
@@ -1218,7 +1218,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
     try {
       const data = await AuthService.fetchWithAuth('/api/admin/redeem-codes');
       setRedeemCodes(data.codes || []);
-      console.log('Set redeem codes:', data.codes?.length || 0);
+      // codes loaded
     } catch (error: any) {
       console.error('Failed to load redeem codes - exception:', error);
       setToast({ msg: `Failed to load redeem codes: ${error.message || 'Network error'}`, type: 'error' });
@@ -1610,10 +1610,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
     onUpdateConfig(updatedConfig);
     try {
       await StorageService.saveAll(reports, suggestions, updatedConfig);
-      alert("Configuration Saved!");
+      setToast({ msg: "Configuration Saved!", type: "success" });
     } catch (error) {
       console.error('Failed to save configuration:', error);
-      alert('Failed to save configuration to database');
+      setToast({ msg: 'Failed to save configuration to database', type: "error" });
     }
   };
 
@@ -1641,13 +1641,13 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
       setHeroConfig(updatedConfig.hero);
       onUpdateConfig(updatedConfig);
-      alert(`Successfully synced from CurseForge!\n\nLatest Mod Version: ${syncedData.latestModVersion}\nLatest MC Versions: ${syncedData.latestMcVersions}\nMinecraft Versions: ${syncedData.mcVersions.length} versions loaded\nMod Versions: ${syncedData.modVersions.length} versions loaded`);
+      setToast({ msg: `Successfully synced from CurseForge!\n\nLatest Mod Version: ${syncedData.latestModVersion}\nLatest MC Versions: ${syncedData.latestMcVersions}\nMinecraft Versions: ${syncedData.mcVersions.length} versions loaded\nMod Versions: ${syncedData.modVersions.length} versions loaded`, type: "success" });
     } catch (error: any) {
       console.error('Failed to sync from CurseForge:', error);
       if (error instanceof CurseForgeError) {
-        alert(`Failed to sync from CurseForge: ${error.message}`);
+        setToast({ msg: `Failed to sync from CurseForge: ${error.message}`, type: "error" });
       } else {
-        alert(`Failed to sync from CurseForge: ${error.message || 'Unknown error'}`);
+        setToast({ msg: `Failed to sync from CurseForge: ${error.message || 'Unknown error'}`, type: "error" });
       }
     } finally {
       setIsSyncingCurseForge(false);
@@ -1686,7 +1686,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   const toggleSelect = (id: string) => { const newSet = new Set(selectedIds); if (newSet.has(id)) newSet.delete(id); else newSet.add(id); setSelectedIds(newSet); };
   const handleBulkResolve = () => { if (!confirm(`Mark ${selectedIds.size} reports as Resolved?`)) return; reports.forEach(bug => { if (selectedIds.has(bug.id)) onUpdateReport({ ...bug, status: 'Resolved', resolvedBy: currentUser.username }); }); setSelectedIds(new Set()); };
   const handleBulkDelete = () => { if (!confirm(`Permanently delete ${selectedIds.size} reports?`)) return; reports.forEach(bug => { if (selectedIds.has(bug.id)) onDeleteReport(bug.id); }); setSelectedIds(new Set()); };
-  const handleBulkAssign = () => { if (!bulkAssignUser) return alert("Select user."); if (!confirm(`Assign ${selectedIds.size} reports?`)) return; reports.forEach(bug => { if (selectedIds.has(bug.id)) onUpdateReport({ ...bug, assignedTo: bulkAssignUser }); }); setSelectedIds(new Set()); setBulkAssignUser(""); };
+  const handleBulkAssign = () => { if (!bulkAssignUser) return setToast({ msg: "Select user.", type: "error" }); if (!confirm(`Assign ${selectedIds.size} reports?`)) return; reports.forEach(bug => { if (selectedIds.has(bug.id)) onUpdateReport({ ...bug, assignedTo: bulkAssignUser }); }); setSelectedIds(new Set()); setBulkAssignUser(""); };
 
   const handleEditBug = (bug: BugReport) => {
     setEditingBug(bug);
@@ -1859,7 +1859,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
   const handleSyncToCloud = async (cloudService: string) => {
     if (dbStatus !== 'connected') {
-      alert("Database not connected. Please check your MongoDB configuration.");
+      setToast({ msg: "Database not connected. Please check your MongoDB configuration.", type: "error" });
       return;
     }
 
@@ -1886,17 +1886,17 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
         case 'MongoDB Atlas':
 
           downloadBackupFile(blob, fileName);
-          alert(`Data is already synced to MongoDB Atlas!\n\nBackup file "${fileName}" has been downloaded as an additional safety copy.`);
+          setToast({ msg: `Data is already synced to MongoDB Atlas!\n\nBackup file "${fileName}" has been downloaded as an additional safety copy.`, type: "success" });
           break;
         default:
 
           downloadBackupFile(blob, fileName);
-          alert(`Backup file "${fileName}" has been downloaded. Please upload it manually to ${cloudService}.`);
+          setToast({ msg: `Backup file "${fileName}" has been downloaded. Please upload it manually to ${cloudService}.`, type: "info" });
       }
 
       setShowCloudSyncModal(false);
     } catch (err: any) {
-      alert(`Failed to upload backup: ${err.message || 'Unknown error'}`);
+      setToast({ msg: `Failed to upload backup: ${err.message || 'Unknown error'}`, type: "error" });
     }
   };
 
@@ -1920,11 +1920,11 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
         (window as any).Dropbox.save({
           files: [file],
           success: () => {
-            alert(`Successfully uploaded "${fileName}" to Dropbox!`);
+            setToast({ msg: `Successfully uploaded "${fileName}" to Dropbox!`, type: "success" });
             resolve();
           },
           progress: (progress: number) => {
-            console.log(`Upload progress: ${progress}%`);
+            // Upload progress tracking
           },
           cancel: () => {
             reject(new Error('Upload cancelled'));
@@ -1937,7 +1937,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
         downloadBackupFile(blob, fileName);
         window.open('https://www.dropbox.com/home', '_blank');
-        alert(`Backup file "${fileName}" has been downloaded.\n\nDropbox upload interface has been opened. Please drag and drop the file to upload.`);
+        setToast({ msg: `Backup file "${fileName}" has been downloaded.\n\nDropbox upload interface has been opened. Please drag and drop the file to upload.`, type: "info" });
         resolve();
       }
     });
@@ -1947,7 +1947,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
     downloadBackupFile(blob, fileName);
     window.open('https://onedrive.live.com/?id=root&cid=root&qt=sharedby', '_blank');
-    alert(`Backup file "${fileName}" has been downloaded.\n\nOneDrive upload interface has been opened. Please upload the file.`);
+    setToast({ msg: `Backup file "${fileName}" has been downloaded.\n\nOneDrive upload interface has been opened. Please upload the file.`, type: "info" });
   };
 
   const openCloudUploadInterface = async (cloudService: string, blob: Blob, fileName: string) => {
@@ -1963,9 +1963,9 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
     const url = urls[cloudService];
     if (url) {
       window.open(url, '_blank');
-      alert(`Backup file "${fileName}" has been downloaded.\n\n${cloudService} console has been opened. Please upload the file to your storage.`);
+      setToast({ msg: `Backup file "${fileName}" has been downloaded.\n\n${cloudService} console has been opened. Please upload the file to your storage.`, type: "info" });
     } else {
-      alert(`Backup file "${fileName}" has been downloaded.\n\nPlease upload it manually to ${cloudService}.`);
+      setToast({ msg: `Backup file "${fileName}" has been downloaded.\n\nPlease upload it manually to ${cloudService}.`, type: "info" });
     }
   };
 
@@ -2004,9 +2004,9 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
         }
 
         await loadUsers();
-        alert("Data restored successfully!");
+        setToast({ msg: "Data restored successfully!", type: "success" });
       } catch (err: any) {
-        alert("Failed to restore: " + err.message);
+        setToast({ msg: "Failed to restore: " + err.message, type: "error" });
       } finally {
         if (fileInputRef.current) fileInputRef.current.value = "";
       }
@@ -2024,7 +2024,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
           <div className="bg-[#1e1e1e] rounded-xl border border-gray-800 p-3 md:p-5 sticky top-24 shadow-lg md:h-[calc(100vh-8rem)] md:overflow-y-auto md:max-h-[calc(100vh-8rem)] w-full md:w-64">
 
             <div className="hidden md:flex items-center gap-3 mb-8 px-2">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-inner overflow-hidden ${currentUser.role === 'owner' ? 'bg-amber-600' : 'bg-blue-600'}`}>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-inner overflow-hidden ${currentUser.role === 'owner' ? 'bg-amber-600' : 'bg-[#00FFFF] text-black'}`}>
                 {currentUser.profileIcon && currentUser.profileIcon.trim() && currentUser.profileIcon !== 'null' ? (
                   <img
                     src={currentUser.profileIcon}
@@ -2083,7 +2083,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setBugSubTab('active')}
                     className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${bugSubTab === 'active'
-                      ? 'text-white border-green-500'
+                      ? 'text-white border-[#00FFFF]'
                       : 'text-gray-400 border-transparent hover:text-gray-300'
                       }`}
                     title="Active Issues"
@@ -2096,7 +2096,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setBugSubTab('resolved')}
                     className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${bugSubTab === 'resolved'
-                      ? 'text-white border-green-500'
+                      ? 'text-white border-[#00fbff]'
                       : 'text-gray-400 border-transparent hover:text-gray-300'
                       }`}
                     title="Resolved Issues"
@@ -2111,28 +2111,28 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
                 <div className="bg-[#1e1e1e] border border-gray-800 rounded-xl p-4 shadow-sm space-y-4 flex-shrink-0 mb-2">
                   <div className="flex flex-col md:flex-row gap-4 justify-between">
-                    <input className="w-full md:w-auto flex-1 bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-white focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors hover:border-gray-600" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                    <input className="w-full md:w-auto flex-1 bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-white focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors hover:border-gray-600" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                     <div className="flex gap-2 flex-wrap">
-                      <select className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8" value={filters.mcVersion} onChange={e => setFilters({ ...filters, mcVersion: e.target.value })}>
+                      <select className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8" value={filters.mcVersion} onChange={e => setFilters({ ...filters, mcVersion: e.target.value })}>
                         <option value="All">All MC Ver</option>
                         {config.mcVersions.map(v => <option key={v} value={v}>MC {v}</option>)}
                       </select>
-                      <select className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8" value={filters.modVersion} onChange={e => setFilters({ ...filters, modVersion: e.target.value })}>
+                      <select className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8" value={filters.modVersion} onChange={e => setFilters({ ...filters, modVersion: e.target.value })}>
                         <option value="All">All Mod Ver</option>
                         {config.modVersions.map(v => <option key={v} value={v}>v{v}</option>)}
                       </select>
-                      <select className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8" value={filters.severity} onChange={e => setFilters({ ...filters, severity: e.target.value })}><option value="All">Severity</option><option value="Critical">Critical</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select>
+                      <select className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8" value={filters.severity} onChange={e => setFilters({ ...filters, severity: e.target.value })}><option value="All">Severity</option><option value="Critical">Critical</option><option value="High">High</option><option value="Medium">Medium</option><option value="Low">Low</option></select>
                       <button onClick={() => setSortBy(sortBy === 'newest' ? 'oldest' : 'newest')} className="bg-gray-800 hover:bg-gray-700 px-3 py-2.5 h-10 rounded-lg text-sm text-gray-300 transition-colors flex items-center justify-center"><ArrowUpDown size={14} /></button>
                     </div>
                   </div>
-                  {selectedIds.size > 0 && <div className="flex items-center justify-between bg-blue-900/20 p-2 rounded"><span className="text-sm text-blue-200">{selectedIds.size} selected</span><div className="flex gap-2"><button onClick={handleBulkResolve} className="bg-green-700 text-white px-3 py-1 text-xs rounded">Resolve</button><button onClick={handleBulkDelete} className="bg-red-700 text-white px-3 py-1 text-xs rounded">Delete</button></div></div>}
+                  {selectedIds.size > 0 && <div className="flex items-center justify-between bg-[#00FFFF]/10 p-2 rounded border border-[#00FFFF]/20"><span className="text-sm text-[#00fbff]">{selectedIds.size} selected</span><div className="flex gap-2"><button onClick={handleBulkResolve} className="bg-[#00FFFF] text-black hover:bg-[#00fbff] px-3 py-1 text-xs rounded font-bold transition-all btn-hover-glow">Resolve</button><button onClick={handleBulkDelete} className="bg-red-700/20 text-red-400 border border-red-900/50 hover:bg-red-700 hover:text-white px-3 py-1 text-xs rounded transition-all">Delete</button></div></div>}
                 </div>
 
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
                   <div className="space-y-2 w-full max-w-full">
                     {filteredReports.map(bug => (
-                      <div key={bug.id} className="flex items-center gap-4 bg-[#1e1e1e] border border-gray-800 p-4 rounded-lg">
+                      <div key={bug.id} className="flex items-center gap-4 bg-[#1e1e1e] border border-gray-800 p-4 rounded-lg hover:border-[#00FFFF]/30 transition-all hover-lift">
                         <button onClick={() => toggleSelect(bug.id)}>
                           {selectedIds.has(bug.id) ? <CheckSquare className="text-blue-500" size={18} /> : <Square size={18} className="text-gray-600" />}
                         </button>
@@ -2141,23 +2141,23 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           <div className="text-xs text-gray-500 mt-1">
                             <div className="flex flex-wrap items-center gap-y-1">
                               <span className="mr-2">•</span>
-                              <span className={`px-2 py-0.5 rounded ${bug.status === 'Resolved' ? 'bg-green-900/20 text-green-400' : bug.status === 'In Progress' ? 'bg-blue-900/20 text-blue-400' : 'bg-gray-800 text-gray-300'}`}>{bug.status}</span>
+                              <span className={`px-2 py-0.5 rounded ${bug.status === 'Resolved' ? 'bg-[#00FFFF]/10 text-[#00FFFF] border border-[#00FFFF]/20' : bug.status === 'In Progress' ? 'bg-[#00fbff]/10 text-[#00fbff] border border-[#00fbff]/20' : 'bg-gray-800 text-gray-300'}`}>{bug.status}</span>
                               <span className="mx-2">•</span>
                               <span className={`px-2 py-0.5 rounded ${bug.severity === 'Critical' ? 'bg-red-900/20 text-red-400' :
                                 bug.severity === 'High' ? 'bg-orange-900/20 text-orange-400' :
-                                  bug.severity === 'Medium' ? 'bg-yellow-900/20 text-yellow-400' :
-                                    'bg-green-900/20 text-green-400'
+                                  bug.severity === 'Medium' ? 'bg-amber-900/20 text-amber-400' :
+                                    'bg-[#00FFFF]/10 text-[#00FFFF] border border-[#00FFFF]/20'
                                 }`}>{bug.severity}</span>
                               {bug.assignedTo && (
                                 <>
                                   <span className="mx-2">•</span>
-                                  <span className="text-blue-400">Assigned: {bug.assignedTo}</span>
+                                  <span className="text-[#00fbff]">Assigned: {bug.assignedTo}</span>
                                 </>
                               )}
                               {bug.status === 'Resolved' && bug.resolvedBy && (
                                 <>
                                   <span className="mx-2">•</span>
-                                  <span className="text-green-400">Resolved by: {bug.resolvedBy}</span>
+                                  <span className="text-[#00FFFF]">Resolved by: {bug.resolvedBy}</span>
                                 </>
                               )}
                             </div>
@@ -2182,7 +2182,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           {bug.status !== 'Resolved' && (
                             <button
                               onClick={() => handleQuickAction(bug, 'resolve')}
-                              className="p-1.5 text-green-400 hover:text-green-300 hover:bg-green-900/20 rounded transition-colors"
+                              className="p-1.5 text-[#00FFFF] hover:text-[#00fbff] hover:bg-[#00FFFF]/10 rounded transition-colors btn-hover-glow"
                               title="Mark as Resolved"
                             >
                               <CheckCircle size={16} />
@@ -2233,7 +2233,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setSuggestionSubTab('active')}
                     className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${suggestionSubTab === 'active'
-                      ? 'text-white border-blue-500'
+                      ? 'text-white border-[#00FFFF]'
                       : 'text-gray-400 border-transparent hover:text-gray-300'
                       }`}
                     title="Active Suggestions"
@@ -2246,7 +2246,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setSuggestionSubTab('closed')}
                     className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${suggestionSubTab === 'closed'
-                      ? 'text-white border-green-500'
+                      ? 'text-white border-[#00fbff]'
                       : 'text-gray-400 border-transparent hover:text-gray-300'
                       }`}
                     title="Approved/Closed"
@@ -2262,21 +2262,21 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                 <div className="bg-[#1e1e1e] border border-gray-800 rounded-xl p-4 shadow-sm space-y-4 flex-shrink-0 mb-2">
                   <div className="flex flex-col md:flex-row gap-4 justify-between">
                     <input
-                      className="w-full md:w-auto flex-1 bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600"
+                      className="w-full md:w-auto flex-1 bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-white focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors hover:border-gray-600"
                       placeholder="Search suggestions..."
                       value={suggestionSearchTerm}
                       onChange={e => setSuggestionSearchTerm(e.target.value)}
                     />
                     <div className="flex gap-2 flex-wrap">
-                      <select value={suggestionFilters.mcVersion} onChange={e => setSuggestionFilters({ ...suggestionFilters, mcVersion: e.target.value })} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
+                      <select value={suggestionFilters.mcVersion} onChange={e => setSuggestionFilters({ ...suggestionFilters, mcVersion: e.target.value })} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
                         <option value="All">All MC Ver</option>
                         {config.mcVersions.map(v => <option key={v} value={v}>MC {v}</option>)}
                       </select>
-                      <select value={suggestionFilters.modVersion} onChange={e => setSuggestionFilters({ ...suggestionFilters, modVersion: e.target.value })} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
+                      <select value={suggestionFilters.modVersion} onChange={e => setSuggestionFilters({ ...suggestionFilters, modVersion: e.target.value })} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
                         <option value="All">All Mod Ver</option>
                         {config.modVersions.map(v => <option key={v} value={v}>v{v}</option>)}
                       </select>
-                      <select value={suggestionFilters.category} onChange={e => setSuggestionFilters({ ...suggestionFilters, category: e.target.value })} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
+                      <select value={suggestionFilters.category} onChange={e => setSuggestionFilters({ ...suggestionFilters, category: e.target.value })} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
                         <option value="All">All Categories</option>
                         <option value="Feature">Feature</option>
                         <option value="Enhancement">Enhancement</option>
@@ -2284,13 +2284,13 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         <option value="Item">Item</option>
                         <option value="Other">Other</option>
                       </select>
-                      <select value={suggestionFilters.priority} onChange={e => setSuggestionFilters({ ...suggestionFilters, priority: e.target.value })} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
+                      <select value={suggestionFilters.priority} onChange={e => setSuggestionFilters({ ...suggestionFilters, priority: e.target.value })} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
                         <option value="All">All Priority</option>
                         <option value="High">High</option>
                         <option value="Medium">Medium</option>
                         <option value="Low">Low</option>
                       </select>
-                      <select value={suggestionSortBy} onChange={e => setSuggestionSortBy(e.target.value as 'newest' | 'oldest' | 'priority')} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
+                      <select value={suggestionSortBy} onChange={e => setSuggestionSortBy(e.target.value as 'newest' | 'oldest' | 'priority')} className="bg-[#1a1a1a] border border-gray-700 rounded-lg px-3 py-2.5 h-10 text-sm text-gray-300 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8">
                         <option value="newest">Newest</option>
                         <option value="oldest">Oldest</option>
                         <option value="priority">Priority</option>
@@ -2298,11 +2298,11 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     </div>
                   </div>
                   {selectedSuggestionIds.size > 0 && (
-                    <div className="flex items-center justify-between bg-blue-900/20 p-2 rounded">
-                      <span className="text-sm text-blue-200">{selectedSuggestionIds.size} selected</span>
+                    <div className="flex items-center justify-between bg-[#00FFFF]/10 p-2 rounded border border-[#00FFFF]/20">
+                      <span className="text-sm text-[#00fbff]">{selectedSuggestionIds.size} selected</span>
                       <div className="flex gap-2">
-                        <button onClick={handleBulkImplement} className="bg-green-700 text-white px-3 py-1 text-xs rounded">Mark Implemented</button>
-                        <button onClick={handleBulkDeleteSuggestions} className="bg-red-700 text-white px-3 py-1 text-xs rounded">Delete</button>
+                        <button onClick={handleBulkImplement} className="bg-[#00FFFF] text-black hover:bg-[#00fbff] px-3 py-1 text-xs rounded font-bold transition-all btn-hover-glow">Mark Implemented</button>
+                        <button onClick={handleBulkDeleteSuggestions} className="bg-red-700/20 text-red-400 border border-red-900/50 hover:bg-red-700 hover:text-white px-3 py-1 text-xs rounded transition-all">Delete</button>
                       </div>
                     </div>
                   )}
@@ -2319,7 +2319,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         <div className="flex-1 min-w-0">
                           <div className="text-white text-sm font-medium truncate">{suggestion.title}</div>
                           <div className="text-xs text-gray-500 mt-1">
-                            <span className={`px-2 py-0.5 rounded ${suggestion.status === 'Implemented' ? 'bg-green-900/20 text-green-400' :
+                            <span className={`px-2 py-0.5 rounded ${suggestion.status === 'Implemented' ? 'bg-[#00FFFF]/10 text-[#00FFFF]' :
                               suggestion.status === 'Rejected' ? 'bg-red-900/20 text-red-400' :
                                 suggestion.status === 'Planned' ? 'bg-blue-900/20 text-blue-400' :
                                   suggestion.status === 'Under Review' ? 'bg-yellow-900/20 text-yellow-400' :
@@ -2328,14 +2328,14 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             <span className="mx-2">•</span>
                             <span className={`px-2 py-0.5 rounded ${suggestion.category === 'Feature' ? 'bg-purple-900/20 text-purple-300' :
                               suggestion.category === 'Enhancement' ? 'bg-blue-900/20 text-blue-300' :
-                                suggestion.category === 'Block' ? 'bg-green-900/20 text-green-300' :
+                                suggestion.category === 'Block' ? 'bg-[#00FFFF]/10 text-[#00FFFF]' :
                                   suggestion.category === 'Item' ? 'bg-yellow-900/20 text-yellow-300' :
                                     'bg-gray-800 text-gray-300'
                               }`}>{suggestion.category}</span>
                             <span className="mx-2">•</span>
                             <span className={`px-2 py-0.5 rounded ${suggestion.priority === 'High' ? 'bg-red-900/20 text-red-400' :
                               suggestion.priority === 'Medium' ? 'bg-yellow-900/20 text-yellow-400' :
-                                'bg-green-900/20 text-green-400'
+                                'bg-[#00FFFF]/10 text-[#00FFFF]'
                               }`}>{suggestion.priority}</span>
                             {suggestion.mcVersions && suggestion.mcVersions.length > 0 && <><span className="mx-2">•</span><span>MC {suggestion.mcVersions.join(', ')}</span></>}
                             {suggestion.modVersions && suggestion.modVersions.length > 0 && <><span className="mx-2">•</span><span>v{suggestion.modVersions.join(', ')}</span></>}
@@ -2352,7 +2352,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           {suggestion.status !== 'Implemented' && suggestion.status !== 'Rejected' && (
                             <button
                               onClick={() => handleQuickSuggestionAction(suggestion, 'implement')}
-                              className="p-1.5 text-green-400 hover:text-green-300 hover:bg-green-900/20 rounded transition-colors"
+                              className="p-1.5 text-[#00FFFF] hover:text-[#00fbff] hover:bg-[#00FFFF]/10 rounded transition-colors btn-hover-glow"
                               title="Mark as Implemented"
                             >
                               <CheckCircle size={16} />
@@ -2412,7 +2412,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setUserSubTab('staff')}
                     className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${userSubTab === 'staff'
-                      ? 'text-white border-blue-500'
+                      ? 'text-white border-[#00FFFF]'
                       : 'text-gray-400 border-transparent hover:text-gray-300'
                       }`}
                     title="Staff"
@@ -2425,7 +2425,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setUserSubTab('users')}
                     className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${userSubTab === 'users'
-                      ? 'text-white border-blue-500'
+                      ? 'text-white border-[#00FFFF]'
                       : 'text-gray-400 border-transparent hover:text-gray-300'
                       }`}
                     title="Users"
@@ -2438,7 +2438,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setUserSubTab('roles')}
                     className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${userSubTab === 'roles'
-                      ? 'text-white border-blue-500'
+                      ? 'text-white border-[#00FFFF]'
                       : 'text-gray-400 border-transparent hover:text-gray-300'
                       }`}
                     title="Roles"
@@ -2451,7 +2451,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setUserSubTab('legacy')}
                     className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${userSubTab === 'legacy'
-                      ? 'text-white border-blue-500'
+                      ? 'text-white border-[#00FFFF]'
                       : 'text-gray-400 border-transparent hover:text-gray-300'
                       }`}
                     title="Legacy Accounts"
@@ -2517,7 +2517,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     value={u.role}
                                     onChange={(e) => handleRoleChange(u.id, e.target.value as UserRole)}
                                     disabled={u.id === currentUser.id} // Cannot demote self easily
-                                    className="bg-[#1a1a1a] border border-gray-700 rounded-lg text-xs px-3 py-2 text-gray-300 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 hover:border-gray-600 transition-colors cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.5rem_center] bg-no-repeat pr-8"
+                                    className="bg-[#1a1a1a] border border-gray-700 rounded-lg text-xs px-3 py-2 text-gray-300 outline-none focus:border-[#00FFFF] focus:ring-2 focus:ring-[#00FFFF]/20 hover:border-gray-600 transition-colors cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.5rem_center] bg-no-repeat pr-8"
                                   >
                                     <option value="user">User</option>
                                     <option value="admin">Admin</option>
@@ -2652,11 +2652,11 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                               id: crypto.randomUUID(),
                               name: '',
                               permissions: {},
-                              color: '#6366f1'
+                              color: '#00FFFF'
                             };
                             setEditingRole(newRole);
                           }}
-                          className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-xs sm:text-sm w-full sm:w-auto justify-center"
+                          className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all text-xs sm:text-sm w-full sm:w-auto justify-center btn-hover-glow"
                         >
                           <Plus size={14} className="sm:w-4 sm:h-4" />
                           <span className="hidden sm:inline">Create Role</span>
@@ -2671,7 +2671,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                               <div className="flex items-center gap-3">
                                 <div
                                   className="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-white"
-                                  style={{ backgroundColor: role.color || '#6366f1' }}
+                                  style={{ backgroundColor: role.color || '#00FFFF' }}
                                 >
                                   {role.name.charAt(0).toUpperCase()}
                                 </div>
@@ -2723,7 +2723,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             <div className="flex gap-2">
                               <button
                                 onClick={() => setShowAddLegacyModal(true)}
-                                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-xs sm:text-sm"
+                                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all text-xs sm:text-sm btn-hover-glow"
                               >
                                 <UserPlus size={14} />
                                 <span>Create Legacy Account</span>
@@ -2808,7 +2808,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                         type="email"
                                         value={newLegacyUser.email}
                                         onChange={(e) => setNewLegacyUser({ ...newLegacyUser, email: e.target.value })}
-                                        className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-blue-500 focus:outline-none"
+                                        className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-[#00FFFF] focus:outline-none"
                                         placeholder="user@example.com"
                                       />
                                     </div>
@@ -2818,7 +2818,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                         type="text"
                                         value={newLegacyUser.username}
                                         onChange={(e) => setNewLegacyUser({ ...newLegacyUser, username: e.target.value })}
-                                        className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-blue-500 focus:outline-none"
+                                        className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-[#00FFFF] focus:outline-none"
                                         placeholder="Legacy Username"
                                       />
                                     </div>
@@ -2827,7 +2827,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                       <select
                                         value={newLegacyUser.role}
                                         onChange={(e) => setNewLegacyUser({ ...newLegacyUser, role: e.target.value })}
-                                        className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-blue-500 focus:outline-none"
+                                        className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-[#00FFFF] focus:outline-none"
                                       >
                                         <option value="user">User</option>
                                         <option value="admin">Admin</option>
@@ -2841,7 +2841,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                           type="text"
                                           value={newLegacyUser.minecraftUsername}
                                           onChange={(e) => setNewLegacyUser({ ...newLegacyUser, minecraftUsername: e.target.value })}
-                                          className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-blue-500 focus:outline-none"
+                                          className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-[#00FFFF] focus:outline-none"
                                         />
                                       </div>
                                       <div>
@@ -2850,7 +2850,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                           type="text"
                                           value={newLegacyUser.minecraftUuid}
                                           onChange={(e) => setNewLegacyUser({ ...newLegacyUser, minecraftUuid: e.target.value })}
-                                          className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-blue-500 focus:outline-none"
+                                          className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white text-sm focus:border-[#00FFFF] focus:outline-none"
                                         />
                                       </div>
                                     </div>
@@ -2858,7 +2858,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
                                   <div className="flex gap-3 justify-end mt-8">
                                     <button onClick={() => setShowAddLegacyModal(false)} className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm">Cancel</button>
-                                    <button onClick={handleAddLegacyUser} className="px-6 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm">Create Entry</button>
+                                    <button onClick={handleAddLegacyUser} className="px-6 py-2 rounded-lg bg-[#00FFFF] text-black hover:bg-[#00fbff] font-bold transition-all btn-hover-glow text-sm">Create Entry</button>
                                   </div>
                                 </div>
                               </div>
@@ -2894,7 +2894,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     value={editingRole.name}
                                     onChange={(e) => setEditingRole({ ...editingRole, name: e.target.value })}
                                     placeholder="e.g., Moderator, Developer"
-                                    className="w-full bg-black/30 border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                                    className="w-full bg-black/30 border border-gray-700 rounded-lg px-4 py-2.5 text-white text-sm focus:ring-2 focus:ring-[#00FFFF] focus:border-transparent outline-none"
                                   />
                                 </div>
 
@@ -2902,7 +2902,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   <label className="block text-sm font-medium text-gray-300 mb-2">Role Color</label>
                                   <input
                                     type="color"
-                                    value={editingRole.color || '#6366f1'}
+                                    value={editingRole.color || '#00FFFF'}
                                     onChange={(e) => setEditingRole({ ...editingRole, color: e.target.value })}
                                     className="w-full h-12 rounded-lg cursor-pointer"
                                   />
@@ -2933,7 +2933,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                               [perm.key]: e.target.checked
                                             }
                                           })}
-                                          className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 rounded focus:ring-blue-500"
+                                          className="w-4 h-4 text-[#00FFFF] bg-gray-700 border-gray-600 rounded focus:ring-[#00FFFF]"
                                         />
                                         <span className="text-sm text-gray-300">{perm.label}</span>
                                       </label>
@@ -2953,7 +2953,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   <button
                                     onClick={() => {
                                       if (!editingRole.name.trim()) {
-                                        alert('Please enter a role name');
+                                        setToast({ msg: 'Please enter a role name', type: 'error' });
                                         return;
                                       }
                                       const existingIndex = roles.findIndex(r => r.id === editingRole.id);
@@ -2968,7 +2968,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                       onUpdateConfig({ ...config, roles: updatedRoles });
                                       setEditingRole(null);
                                     }}
-                                    className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                                    className="flex-1 px-4 py-2.5 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow flex items-center justify-center gap-2"
                                   >
                                     <Save size={16} />
                                     Save Role
@@ -3006,7 +3006,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       setAllowPatch(false);
                       setShowChangelogModal(true);
                     }}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow"
                   >
                     <Plus size={18} />
                     Add Changelog
@@ -3038,7 +3038,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           setAllowPatch(false);
                           setShowChangelogModal(true);
                         }}
-                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                        className="px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow"
                       >
                         Create Changelog
                       </button>
@@ -3068,7 +3068,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     {changelog.isLatest ? 'Latest Version' : `Version ${changelog.modVersion}`}
                                   </h3>
                                   {changelog.isLatest && (
-                                    <span className="px-2 py-1 bg-green-600/20 text-green-400 text-xs font-semibold rounded">Latest</span>
+                                    <span className="px-2 py-1 bg-[#00FFFF]/10 text-[#00FFFF] text-xs font-semibold rounded">Latest</span>
                                   )}
                                 </div>
                                 <div className="text-sm text-gray-400 space-y-1">
@@ -3132,7 +3132,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     setAllowPatch((changelog.linkedBugReports || []).length > 0);
                                     setShowChangelogModal(true);
                                   }}
-                                  className="p-2 text-blue-400 hover:bg-blue-900/20 rounded-lg transition-colors"
+                                  className="p-2 text-[#00FFFF] hover:bg-[#00FFFF]/10 rounded-lg transition-all"
                                   title="Edit"
                                 >
                                   <Edit size={18} />
@@ -3171,7 +3171,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
                 <div className="flex gap-2 border-b border-gray-800 flex-shrink-0 pb-2 mb-4 w-full">
                   <button
-                    className="px-4 py-2 font-semibold text-sm transition-all border-b-2 text-white border-blue-500 flex-shrink-0"
+                    className="px-4 py-2 font-semibold text-sm transition-all border-b-2 text-white border-[#00FFFF] flex-shrink-0"
                     title="Database & Backups"
                   >
                     <div className="flex items-center gap-2 whitespace-nowrap">
@@ -3189,7 +3189,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <div className="animate-fadeIn space-y-8 w-full min-w-0">
                     <div className="bg-[#1e1e1e] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full">
                       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                        <button onClick={() => setShowCloudSyncModal(true)} disabled={dbStatus !== 'connected'} className="bg-blue-600 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:bg-blue-700 w-full sm:w-auto"><Upload size={16} /> Sync Data</button>
+                        <button onClick={() => setShowCloudSyncModal(true)} disabled={dbStatus !== 'connected'} className="bg-[#00FFFF] text-black hover:bg-[#00fbff] px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed transition-all btn-hover-glow w-full sm:w-auto"><Upload size={16} /> Sync Data</button>
                         <button onClick={handleExportData} className="bg-gray-800 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-sm sm:text-base transition-colors hover:bg-gray-700 w-full sm:w-auto"><Download size={16} /> Download backup</button>
                         <div className="relative w-full sm:w-auto">
                           <input type="file" ref={fileInputRef} onChange={handleImportData} className="hidden" accept=".json" />
@@ -3216,7 +3216,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setKofiSubTab('tiers')}
                     className={`px-3 sm:px-4 py-2 font-semibold text-sm transition-all border-b-2 ${kofiSubTab === 'tiers'
-                      ? 'text-white border-blue-500'
+                      ? 'text-white border-[#00FFFF]'
                       : 'text-gray-400 border-transparent hover:text-gray-300'
                       }`}
                     title="Tiers"
@@ -3229,7 +3229,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setKofiSubTab('subscribers')}
                     className={`px-3 sm:px-4 py-2 font-semibold text-sm transition-all border-b-2 ${kofiSubTab === 'subscribers'
-                      ? 'text-white border-blue-500'
+                      ? 'text-white border-[#00FFFF]'
                       : 'text-gray-400 border-transparent hover:text-gray-300'
                       }`}
                     title="Subscribers"
@@ -3242,7 +3242,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setKofiSubTab('manual-rewards')}
                     className={`px-3 sm:px-4 py-2 font-semibold text-sm transition-all border-b-2 ${kofiSubTab === 'manual-rewards'
-                      ? 'text-white border-blue-500'
+                      ? 'text-white border-[#00FFFF]'
                       : 'text-gray-400 border-transparent hover:text-gray-300'
                       }`}
                     title="Manual Rewards"
@@ -3286,7 +3286,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             });
                             setShowTierModal(true);
                           }}
-                          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm sm:text-base"
+                          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all text-sm sm:text-base btn-hover-glow"
                         >
                           <Plus size={16} className="sm:w-[18px] sm:h-[18px]" />
                           <span className="hidden sm:inline">Add Tier</span>
@@ -3315,7 +3315,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                               });
                               setShowTierModal(true);
                             }}
-                            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm sm:text-base"
+                            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all text-sm sm:text-base btn-hover-glow"
                           >
                             <span className="hidden sm:inline">Create First Tier</span>
                             <span className="sm:hidden">Create Tier</span>
@@ -3334,12 +3334,12 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                       {!tier.enabled && (
                                         <span className="px-2 py-1 bg-gray-700 text-gray-400 text-xs font-semibold rounded">Disabled</span>
                                       )}
-                                      <span className="px-2 py-1 bg-blue-600/20 text-blue-400 text-xs font-semibold rounded">
+                                      <span className="px-2 py-1 bg-[#00FFFF]/10 text-[#00FFFF] text-xs font-semibold rounded">
                                         Priority: {tier.priority}
                                       </span>
                                       <span className={`px-2 py-1 text-xs font-semibold rounded ${tier.durationType === 'permanent'
-                                        ? 'bg-green-600/20 text-green-400'
-                                        : 'bg-yellow-600/20 text-yellow-400'
+                                        ? 'bg-[#00FFFF]/10 text-[#00FFFF] border border-[#00FFFF]/20'
+                                        : 'bg-yellow-600/20 text-yellow-400 border border-yellow-900/30'
                                         }`}>
                                         {tier.durationType === 'permanent' ? 'Permanent' : 'With Subscription'}
                                       </span>
@@ -3417,7 +3417,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         <button
                           onClick={loadSubscribedUsers}
                           disabled={loadingKofiUsers}
-                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                          className="flex items-center gap-2 px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all disabled:opacity-50 btn-hover-glow"
                         >
                           <RefreshCw size={18} className={loadingKofiUsers ? 'animate-spin' : ''} />
                           Refresh
@@ -3464,7 +3464,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   </td>
                                   <td className="p-3 text-sm">
                                     {user.kofiSubscription?.isActive ? (
-                                      <span className="px-2 py-1 bg-green-600/20 text-green-400 text-xs font-semibold rounded">Active</span>
+                                      <span className="px-2 py-1 bg-[#00FFFF]/10 text-[#00FFFF] border border-[#00FFFF]/20 text-xs font-semibold rounded">Active</span>
                                     ) : (
                                       <span className="px-2 py-1 bg-gray-700 text-gray-400 text-xs font-semibold rounded">Inactive</span>
                                     )}
@@ -3492,7 +3492,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           onClick={() => {
                             setShowRewardModal(true);
                           }}
-                          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm sm:text-base"
+                          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all text-sm sm:text-base btn-hover-glow"
                         >
                           <Plus size={16} className="sm:w-[18px] sm:h-[18px]" />
                           <span className="hidden sm:inline">Grant Reward</span>
@@ -3507,7 +3507,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           <p className="text-gray-500 text-sm mb-4">Grant rewards to players even without subscriptions</p>
                           <button
                             onClick={() => setShowRewardModal(true)}
-                            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-sm sm:text-base"
+                            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all text-sm sm:text-base btn-hover-glow"
                           >
                             <span className="hidden sm:inline">Grant First Reward</span>
                             <span className="sm:hidden">Grant Reward</span>
@@ -3522,7 +3522,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   <div className="flex items-center gap-3 mb-2">
                                     <h3 className="text-lg font-bold text-white">Manual Reward</h3>
                                     {reward.granted ? (
-                                      <span className="px-2 py-1 bg-green-600/20 text-green-400 text-xs font-semibold rounded">Granted</span>
+                                      <span className="px-2 py-1 bg-[#00FFFF]/10 text-[#00FFFF] text-xs font-semibold rounded">Granted</span>
                                     ) : (
                                       <span className="px-2 py-1 bg-yellow-600/20 text-yellow-400 text-xs font-semibold rounded">Pending</span>
                                     )}
@@ -3571,7 +3571,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                         setManualRewards(prev => prev.map(r => r.id === reward.id ? { ...r, granted: true } : r));
                                         await updateManualReward(reward.id, { granted: true });
                                       }}
-                                      className="p-2 bg-green-700 hover:bg-green-600 text-white rounded transition-colors"
+                                      className="p-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded transition-all btn-hover-glow"
                                       title="Mark as Granted"
                                     >
                                       <CheckCircle size={16} />
@@ -3614,7 +3614,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setTwitchSubTab('tiers')}
                     className={`px-3 sm:px-4 py-2 font-semibold text-sm transition-all border-b-2 ${twitchSubTab === 'tiers'
-                      ? 'text-white border-blue-500'
+                      ? 'text-white border-[#00FFFF]'
                       : 'text-gray-400 border-transparent hover:text-gray-300'
                       }`}
                     title="Tiers"
@@ -3627,7 +3627,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setTwitchSubTab('subscribers')}
                     className={`px-3 sm:px-4 py-2 font-semibold text-sm transition-all border-b-2 ${twitchSubTab === 'subscribers'
-                      ? 'text-white border-blue-500'
+                      ? 'text-white border-[#00FFFF]'
                       : 'text-gray-400 border-transparent hover:text-gray-300'
                       }`}
                     title="Subscribers"
@@ -3788,7 +3788,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         <button
                           onClick={loadTwitchSubscribedUsers}
                           disabled={loadingTwitchUsers}
-                          className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                          className="flex items-center gap-2 px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all disabled:opacity-50 btn-hover-glow"
                         >
                           <RefreshCw size={18} className={loadingTwitchUsers ? 'animate-spin' : ''} />
                           Refresh
@@ -3839,7 +3839,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   </td>
                                   <td className="p-3 text-sm">
                                     {user.twitchSubscriptionData?.isSub ? (
-                                      <span className="px-2 py-1 bg-green-600/20 text-green-400 text-xs font-semibold rounded">Active</span>
+                                      <span className="px-2 py-1 bg-[#00FFFF]/10 text-[#00FFFF] border border-[#00FFFF]/20 text-xs font-semibold rounded">Active</span>
                                     ) : (
                                       <span className="px-2 py-1 bg-gray-700 text-gray-400 text-xs font-semibold rounded">Inactive</span>
                                     )}
@@ -3882,7 +3882,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       });
                       setShowRedeemCodeModal(true);
                     }}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow"
                   >
                     <Plus size={18} />
                     Create Code
@@ -3894,7 +3894,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setRedeemCodeSubTab('active')}
                     className={`px-6 py-3 font-semibold text-base transition-all border-b-2 flex items-center gap-2 ${redeemCodeSubTab === 'active'
-                      ? 'text-white border-b-green-500 bg-gray-800/50'
+                      ? 'text-white border-b-[#00FFFF] bg-gray-800/50'
                       : 'text-gray-400 border-b-transparent hover:text-gray-300 hover:bg-gray-800/30'
                       }`}
                   >
@@ -3925,7 +3925,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       loadCodeRedemptions();
                     }}
                     className={`px-6 py-3 font-semibold text-base transition-all border-b-2 flex items-center gap-2 ${redeemCodeSubTab === 'claims'
-                      ? 'text-white border-b-blue-500 bg-gray-800/50'
+                      ? 'text-white border-b-[#00fbff] bg-gray-800/50'
                       : 'text-gray-400 border-b-transparent hover:text-gray-300 hover:bg-gray-800/30'
                       }`}
                   >
@@ -3946,7 +3946,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             <select
                               value={selectedCodeFilter}
                               onChange={(e) => setSelectedCodeFilter(e.target.value)}
-                              className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500 min-w-[140px]"
+                              className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                             >
                               <option value="all">All Codes</option>
                               {redeemCodes.map(code => (
@@ -3960,7 +3960,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                               type="date"
                               value={redemptionDateFilter.start || ''}
                               onChange={(e) => setRedemptionDateFilter({ ...redemptionDateFilter, start: e.target.value })}
-                              className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                              className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                             />
                           </div>
                           <div className="flex items-center gap-2">
@@ -3969,12 +3969,12 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                               type="date"
                               value={redemptionDateFilter.end || ''}
                               onChange={(e) => setRedemptionDateFilter({ ...redemptionDateFilter, end: e.target.value })}
-                              className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                              className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                             />
                           </div>
                           <button
                             onClick={loadCodeRedemptions}
-                            className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors whitespace-nowrap"
+                            className="px-4 py-1.5 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded font-bold text-sm transition-all btn-hover-glow whitespace-nowrap"
                           >
                             Apply Filters
                           </button>
@@ -3985,7 +3985,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           <select
                             value={redemptionSortBy}
                             onChange={(e) => setRedemptionSortBy(e.target.value as any)}
-                            className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                            className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                           >
                             <option value="newest">Newest First</option>
                             <option value="oldest">Oldest First</option>
@@ -3996,7 +3996,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       </div>
                       {loadingRedemptions ? (
                         <div className="flex items-center justify-center py-12">
-                          <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                          <div className="w-8 h-8 border-2 border-[#00FFFF] border-t-transparent rounded-full animate-spin"></div>
                         </div>
                       ) : codeRedemptions.length === 0 ? (
                         <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-8 text-center">
@@ -4033,7 +4033,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     )}
                                     <div className="flex flex-wrap gap-2 mt-2">
                                       {redemption.rewards?.map((reward: any, idx: number) => (
-                                        <span key={idx} className="px-2 py-1 bg-blue-900/30 text-blue-400 text-xs rounded border border-blue-700">
+                                        <span key={idx} className="px-2 py-1 bg-[#00FFFF]/10 text-[#00FFFF] text-xs rounded border border-[#00FFFF]/20">
                                           {reward.displayName}
                                         </span>
                                       ))}
@@ -4078,7 +4078,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     </>
                   ) : loadingRedeemCodes ? (
                     <div className="flex items-center justify-center py-12">
-                      <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-8 h-8 border-2 border-[#00FFFF] border-t-transparent rounded-full animate-spin"></div>
                     </div>
                   ) : (() => {
                     let filteredCodes = redeemCodeSubTab === 'expired'
@@ -4126,7 +4126,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 });
                                 setShowRedeemCodeModal(true);
                               }}
-                              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                              className="px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow"
                             >
                               Create First Code
                             </button>
@@ -4146,7 +4146,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             <select
                               value={codeSortBy}
                               onChange={(e) => setCodeSortBy(e.target.value as any)}
-                              className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500 min-w-0 flex-shrink"
+                              className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFFF] min-w-0 flex-shrink"
                             >
                               <option value="newest">Newest First</option>
                               <option value="oldest">Oldest First</option>
@@ -4167,7 +4167,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   {code.expiresAt && code.expiresAt < Date.now() ? (
                                     <span className="px-2 py-1 bg-red-900/30 text-red-400 text-xs font-semibold rounded border border-red-700">Expired</span>
                                   ) : code.enabled ? (
-                                    <span className="px-2 py-1 bg-green-900/30 text-green-400 text-xs font-semibold rounded border border-green-700">Active</span>
+                                    <span className="px-2 py-1 bg-[#00FFFF]/10 text-[#00FFFF] text-xs font-semibold rounded border border-[#00FFFF]/20">Active</span>
                                   ) : (
                                     <span className="px-2 py-1 bg-gray-700/50 text-gray-400 text-xs font-semibold rounded border border-gray-600">Disabled</span>
                                   )}
@@ -4177,7 +4177,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 )}
                                 <div className="flex flex-wrap gap-2 mb-2">
                                   {code.rewards.map((reward, idx) => (
-                                    <span key={idx} className="px-2 py-1 bg-blue-900/30 text-blue-400 text-xs rounded border border-blue-700">
+                                    <span key={idx} className="px-2 py-1 bg-[#00FFFF]/10 text-[#00FFFF] text-xs rounded border border-[#00FFFF]/20">
                                       {reward.displayName}
                                     </span>
                                   ))}
@@ -4208,7 +4208,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     });
                                     setShowRedeemCodeModal(true);
                                   }}
-                                  className="p-2 text-blue-400 hover:bg-blue-900/20 rounded-lg transition-colors"
+                                  className="p-2 text-[#00FFFF] hover:bg-[#00FFFF]/10 rounded-lg transition-all"
                                   title="Edit"
                                 >
                                   <Edit size={16} />
@@ -4257,7 +4257,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       setMediaPreview('');
                       setShowWikiModal(true);
                     }}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                    className="flex items-center gap-2 px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow"
                   >
                     <Plus size={18} />
                     Create Feature
@@ -4276,7 +4276,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         value={wikiSearchTerm}
                         onChange={(e) => setWikiSearchTerm(e.target.value)}
                         placeholder="Search features..."
-                        className="w-full pl-9 pr-8 py-1.5 bg-gray-800 border border-gray-600 rounded text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        className="w-full pl-9 pr-8 py-1.5 bg-gray-800 border border-gray-600 rounded text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                       />
                       {wikiSearchTerm && (
                         <button
@@ -4298,7 +4298,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         setWikiCategoryFilter(e.target.value);
                         setWikiSubcategoryFilter('all');
                       }}
-                      className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                     >
                       <option value="all">All Categories</option>
                       <option value="automation">Automation</option>
@@ -4319,7 +4319,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       value={wikiSubcategoryFilter}
                       onChange={(e) => setWikiSubcategoryFilter(e.target.value)}
                       disabled={wikiCategoryFilter === 'all'}
-                      className={`w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500 ${wikiCategoryFilter === 'all' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={`w-full bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFFF] ${wikiCategoryFilter === 'all' ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <option value="all">{wikiCategoryFilter === 'all' ? 'Select category first' : 'All Subcategories'}</option>
                       {wikiCategoryFilter === 'automation' && (
@@ -4394,7 +4394,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         setWikiMcVersionFilter('all');
                         setWikiModVersionFilter('all');
                       }}
-                      className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors whitespace-nowrap"
+                      className="px-4 py-1.5 bg-[#00FFFF] text-black hover:bg-[#00fbff] font-bold transition-all btn-hover-glow rounded text-sm transition-colors whitespace-nowrap"
                     >
                       Clear Filters
                     </button>
@@ -4409,7 +4409,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     <select
                       value={wikiMcVersionFilter}
                       onChange={(e) => setWikiMcVersionFilter(e.target.value)}
-                      className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                     >
                       <option value="all">All</option>
                       {config.mcVersions.map(v => (
@@ -4424,7 +4424,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     <select
                       value={wikiModVersionFilter}
                       onChange={(e) => setWikiModVersionFilter(e.target.value)}
-                      className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                     >
                       <option value="all">All</option>
                       {config.modVersions.map(v => (
@@ -4439,7 +4439,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     <select
                       value={wikiSortBy}
                       onChange={(e) => setWikiSortBy(e.target.value as any)}
-                      className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                     >
                       <option value="newest">Newest First</option>
                       <option value="oldest">Oldest First</option>
@@ -4452,7 +4452,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
                   {loadingWikiFeatures ? (
                     <div className="flex items-center justify-center py-12">
-                      <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                      <div className="w-8 h-8 border-2 border-[#00FFFF] border-t-transparent rounded-full animate-spin"></div>
                     </div>
                   ) : wikiFeatures.length === 0 ? (
                     <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-8 text-center">
@@ -4477,7 +4477,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           setMediaPreview('');
                           setShowWikiModal(true);
                         }}
-                        className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                        className="px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow"
                       >
                         Create First Feature
                       </button>
@@ -4564,7 +4564,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 <div className="flex items-center gap-3 mb-2 flex-wrap">
                                   <h3 className="text-lg font-bold text-white">{feature.title}</h3>
                                   {(feature.categories || (feature as any).category ? [(feature as any).category].filter(Boolean) : []).map((cat: string) => (
-                                    <span key={cat} className="px-2 py-1 bg-green-900/30 text-green-400 text-xs font-semibold rounded border border-green-700">
+                                    <span key={cat} className="px-2 py-1 bg-[#00FFFF]/10 text-[#00FFFF] text-xs font-semibold rounded border border-[#00FFFF]/20">
                                       {cat}
                                     </span>
                                   ))}
@@ -4606,7 +4606,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     setMediaPreview(feature.media || (feature as any).image || (feature as any).video || '');
                                     setShowWikiModal(true);
                                   }}
-                                  className="p-2 text-blue-400 hover:bg-blue-900/20 rounded-lg transition-colors"
+                                  className="p-2 text-[#00FFFF] hover:bg-[#00FFFF]/10 rounded-lg transition-all"
                                   title="Edit"
                                 >
                                   <Edit size={16} />
@@ -4636,7 +4636,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setConfigTab('home')}
                     className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${configTab === 'home'
-                      ? 'text-white border-blue-500'
+                      ? 'text-white border-[#00FFFF]'
                       : 'text-gray-400 border-transparent hover:text-gray-300'
                       }`}
                     title="Home"
@@ -4649,7 +4649,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setConfigTab('navbar')}
                     className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${configTab === 'navbar'
-                      ? 'text-white border-blue-500'
+                      ? 'text-white border-[#00FFFF]'
                       : 'text-gray-400 border-transparent hover:text-gray-300'
                       }`}
                     title="Navbar"
@@ -4662,7 +4662,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setConfigTab('links')}
                     className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${configTab === 'links'
-                      ? 'text-white border-blue-500'
+                      ? 'text-white border-[#00FFFF]'
                       : 'text-gray-400 border-transparent hover:text-gray-300'
                       }`}
                     title="Links/Social"
@@ -4675,7 +4675,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <button
                     onClick={() => setConfigTab('footer')}
                     className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 flex-shrink-0 ${configTab === 'footer'
-                      ? 'text-white border-blue-500'
+                      ? 'text-white border-[#00FFFF]'
                       : 'text-gray-400 border-transparent hover:text-gray-300'
                       }`}
                     title="Footer"
@@ -4691,7 +4691,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                 <div className="flex-shrink-0 mb-2">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
                     <h2 className="text-xl sm:text-2xl font-bold text-white">System Configuration</h2>
-                    <button onClick={saveGeneralConfig} className="bg-green-700 hover:bg-green-600 text-white px-3 sm:px-4 py-2 rounded font-bold flex items-center gap-2 text-xs sm:text-sm shadow-lg shadow-green-900/20 transition-all w-full sm:w-auto justify-center"><Save size={14} className="sm:w-4 sm:h-4" /> <span className="hidden sm:inline">Save All Changes</span><span className="sm:hidden">Save</span></button>
+                    <button onClick={saveGeneralConfig} className="bg-[#00FFFF] text-black hover:bg-[#00fbff] px-3 sm:px-4 py-2 rounded font-bold flex items-center gap-2 text-xs sm:text-sm shadow-lg shadow-[#00FFFF]/20 transition-all w-full sm:w-auto justify-center btn-hover-glow"><Save size={14} className="sm:w-4 sm:h-4" /> <span className="hidden sm:inline">Save All Changes</span><span className="sm:hidden">Save</span></button>
                   </div>
                 </div>
 
@@ -4728,20 +4728,20 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   value={(() => {
                                     const color = heroConfig.headlineColor || '';
                                     const hexMatch = color.match(/#[0-9a-fA-F]{6}/);
-                                    return hexMatch ? hexMatch[0] : '#34d399';
+                                    return hexMatch ? hexMatch[0] : '#00FFFF';
                                   })()}
                                   onChange={(e) => setHeroConfig({ ...heroConfig, headlineColor: e.target.value })}
                                   className="w-12 h-10 bg-black/30 border border-gray-700 rounded cursor-pointer flex-shrink-0"
                                 />
                                 <input
                                   type="text"
-                                  placeholder="#34d399 or linear-gradient(to right, #34d399, #059669)"
+                                  placeholder="#00FFFF or linear-gradient(to right, #00FFFF, #00fbff)"
                                   value={heroConfig.headlineColor || ''}
                                   onChange={(e) => setHeroConfig({ ...heroConfig, headlineColor: e.target.value })}
                                   className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
                                 />
                               </div>
-                              <p className="text-[10px] text-gray-500 mt-1">Hex color (e.g., #34d399) or CSS gradient</p>
+                              <p className="text-[10px] text-gray-500 mt-1">Hex color (e.g., #00FFFF) or CSS gradient</p>
                             </div>
                             <div className="md:col-span-1">
                               <label className="block text-xs text-gray-500 mb-1">Headline Glow Color</label>
@@ -4751,20 +4751,20 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   value={(() => {
                                     const color = heroConfig.headlineGlowColor || '';
                                     const hexMatch = color.match(/#[0-9a-fA-F]{6}/);
-                                    return hexMatch ? hexMatch[0] : '#34d399';
+                                    return hexMatch ? hexMatch[0] : '#00fbff';
                                   })()}
                                   onChange={(e) => setHeroConfig({ ...heroConfig, headlineGlowColor: e.target.value })}
                                   className="w-12 h-10 bg-black/30 border border-gray-700 rounded cursor-pointer flex-shrink-0"
                                 />
                                 <input
                                   type="text"
-                                  placeholder="#34d399 or rgb(52, 211, 153)"
+                                  placeholder="#00FFFF or rgb(0, 255, 255)"
                                   value={heroConfig.headlineGlowColor || ''}
                                   onChange={(e) => setHeroConfig({ ...heroConfig, headlineGlowColor: e.target.value })}
                                   className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm"
                                 />
                               </div>
-                              <p className="text-[10px] text-gray-500 mt-1">Hex color (e.g., #34d399) or CSS gradient</p>
+                              <p className="text-[10px] text-gray-500 mt-1">Hex color (e.g., #00FFFF) or CSS gradient</p>
                             </div>
                             <div className="md:col-span-2">
                               <label className="block text-xs text-gray-500 mb-1">Description</label>
@@ -4798,12 +4798,12 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full min-w-0">
                           <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
                             <h3 className="text-sm font-bold text-gray-400 uppercase mb-4">Minecraft Versions</h3>
-                            <div className="flex gap-2 mb-4"><input placeholder="e.g. 1.21" value={configMcVer} onChange={e => setConfigMcVer(e.target.value)} className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /><button onClick={() => { if (configMcVer) { onUpdateConfig({ ...config, mcVersions: [configMcVer, ...config.mcVersions] }); setConfigMcVer(""); } }} className="bg-blue-600 text-white px-3 py-2 rounded"><Plus size={18} /></button></div>
+                            <div className="flex gap-2 mb-4"><input placeholder="e.g. 1.21" value={configMcVer} onChange={e => setConfigMcVer(e.target.value)} className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /><button onClick={() => { if (configMcVer) { onUpdateConfig({ ...config, mcVersions: [configMcVer, ...config.mcVersions] }); setConfigMcVer(""); } }} className="bg-[#00FFFF] text-black hover:bg-[#00fbff] px-3 py-2 rounded transition-all btn-hover-glow"><Plus size={18} /></button></div>
                             <div className="flex flex-wrap gap-2">{config.mcVersions.map(v => <span key={v} className="px-3 py-1.5 bg-gray-800 rounded text-sm text-gray-300 border border-gray-700 flex items-center gap-2 group">{v}<button onClick={() => onUpdateConfig({ ...config, mcVersions: config.mcVersions.filter(x => x !== v) })} className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100"><X size={14} /></button></span>)}</div>
                           </div>
                           <div className="bg-[#121212] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full min-w-0 box-border">
                             <h3 className="text-sm font-bold text-gray-400 uppercase mb-4">Mod Versions</h3>
-                            <div className="flex gap-2 mb-4"><input placeholder="e.g. 1.6.0" value={configModVer} onChange={e => setConfigModVer(e.target.value)} className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /><button onClick={() => { if (configModVer) { onUpdateConfig({ ...config, modVersions: [configModVer, ...config.modVersions] }); setConfigModVer(""); } }} className="bg-blue-600 text-white px-3 py-2 rounded"><Plus size={18} /></button></div>
+                            <div className="flex gap-2 mb-4"><input placeholder="e.g. 1.6.0" value={configModVer} onChange={e => setConfigModVer(e.target.value)} className="flex-1 bg-black/30 border border-gray-700 rounded px-3 py-2 text-white text-sm" /><button onClick={() => { if (configModVer) { onUpdateConfig({ ...config, modVersions: [configModVer, ...config.modVersions] }); setConfigModVer(""); } }} className="bg-[#00FFFF] text-black hover:bg-[#00fbff] px-3 py-2 rounded transition-all btn-hover-glow"><Plus size={18} /></button></div>
                             <div className="flex flex-wrap gap-2">{config.modVersions.map(v => <span key={v} className="px-3 py-1.5 bg-gray-800 rounded text-sm text-gray-300 border border-gray-700 flex items-center gap-2 group">{v}<button onClick={() => onUpdateConfig({ ...config, modVersions: config.modVersions.filter(x => x !== v) })} className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100"><X size={14} /></button></span>)}</div>
                           </div>
                         </div>
@@ -4854,9 +4854,9 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
                               <div className="mt-auto hidden md:block">
                                 <div
-                                  className={`bg-green-900/20 border-2 rounded-lg px-3 py-2 transition-colors ${navbarDragActive
-                                    ? 'border-green-500 bg-green-900/40'
-                                    : 'border-green-500/30'
+                                  className={`bg-[#00FFFF]/10 border-2 rounded-lg px-3 py-2 transition-colors ${navbarDragActive
+                                    ? 'border-[#00FFFF] bg-[#00FFFF]/20'
+                                    : 'border-[#00FFFF]/30'
                                     }`}
                                   onDragEnter={(e) => {
                                     e.preventDefault();
@@ -4985,7 +4985,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                             setNavbarCropPosition({ x: 0, y: 0 });
                                           }
                                         }}
-                                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
+                                        className="px-3 py-1.5 bg-[#00FFFF] hover:bg-[#00fbff] text-black rounded-lg font-bold transition-all btn-hover-glow flex items-center justify-center gap-1.5 text-xs"
                                         title="Crop"
                                       >
                                         <Crop size={14} />
@@ -5011,7 +5011,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   </div>
                                   <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
                                     <div
-                                      className="bg-green-500 h-full transition-all duration-300 ease-out"
+                                      className="bg-[#00FFFF] h-full transition-all duration-300 ease-out"
                                       style={{ width: `${navbarUploadProgress}%` }}
                                     ></div>
                                   </div>
@@ -5083,7 +5083,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                             setNavbarCropPosition({ x: 0, y: 0 });
                                           }
                                         }}
-                                        className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center text-xs"
+                                        className="px-2 py-1 bg-[#00FFFF] hover:bg-[#00fbff] text-black rounded-lg transition-all btn-hover-glow flex items-center justify-center text-xs"
                                         title="Crop"
                                       >
                                         <Crop size={12} />
@@ -5260,7 +5260,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   setNavbarPreviewZoom(newZoom);
                                 }}
                                 className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                style={{ accentColor: '#22c55e' }}
+                                style={{ accentColor: '#00FFFF' }}
                               />
                             </div>
 
@@ -5283,7 +5283,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   value={navbarIconConfig.borderRadius || 8}
                                   onChange={(e) => setNavbarIconConfig({ ...navbarIconConfig, borderRadius: parseInt(e.target.value) || 0 })}
                                   className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                  style={{ accentColor: '#22c55e' }}
+                                  style={{ accentColor: '#00FFFF' }}
                                 />
                               </div>
                               <div>
@@ -5304,7 +5304,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   value={navbarIconConfig.backgroundOpacity || 1}
                                   onChange={(e) => setNavbarIconConfig({ ...navbarIconConfig, backgroundOpacity: parseFloat(e.target.value) || 1 })}
                                   className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                  style={{ accentColor: '#22c55e' }}
+                                  style={{ accentColor: '#00FFFF' }}
                                 />
                               </div>
                             </div>
@@ -5328,7 +5328,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   value={navbarIconConfig.padding || 0}
                                   onChange={(e) => setNavbarIconConfig({ ...navbarIconConfig, padding: parseInt(e.target.value) || 0 })}
                                   className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                  style={{ accentColor: '#22c55e' }}
+                                  style={{ accentColor: '#00FFFF' }}
                                 />
                               </div>
                               <div>
@@ -5348,7 +5348,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   value={navbarIconConfig.borderWidth || 0}
                                   onChange={(e) => setNavbarIconConfig({ ...navbarIconConfig, borderWidth: parseInt(e.target.value) || 0 })}
                                   className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                  style={{ accentColor: '#22c55e' }}
+                                  style={{ accentColor: '#00FFFF' }}
                                 />
                               </div>
                             </div>
@@ -5506,7 +5506,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                         e.stopPropagation();
                                         setShowAddLinkInput({ person: 'author', url: '' });
                                       }}
-                                      className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded border border-blue-700/50 hover:border-blue-600 transition-colors cursor-pointer"
+                                      className="text-xs text-[#00FFFF] hover:text-[#00fbff] px-2 py-1 rounded border border-[#00FFFF]/50 hover:border-[#00FFFF] transition-all cursor-pointer"
                                     >
                                       + Add Custom Link
                                     </button>
@@ -5625,7 +5625,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                             setShowAddLinkInput({ person: null, url: '' });
                                           }
                                         }}
-                                        className="text-xs text-green-400 hover:text-green-300 px-2 py-1"
+                                        className="text-xs text-[#00FFFF] hover:text-[#00fbff] px-2 py-1"
                                         title="Add"
                                       >
                                         ✓
@@ -5773,7 +5773,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                         e.stopPropagation();
                                         setShowAddLinkInput({ person: 'leadDev', url: '' });
                                       }}
-                                      className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded border border-blue-700/50 hover:border-blue-600 transition-colors cursor-pointer"
+                                      className="text-xs text-[#00FFFF] hover:text-[#00fbff] px-2 py-1 rounded border border-[#00FFFF]/50 hover:border-[#00FFFF] transition-all cursor-pointer"
                                     >
                                       + Add Custom Link
                                     </button>
@@ -5891,7 +5891,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                             setShowAddLinkInput({ person: null, url: '' });
                                           }
                                         }}
-                                        className="text-xs text-green-400 hover:text-green-300 px-2 py-1"
+                                        className="text-xs text-[#00FFFF] hover:text-[#00fbff] px-2 py-1"
                                         title="Add"
                                       >
                                         ✓
@@ -6063,9 +6063,9 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
                               <div className="mt-auto hidden md:block">
                                 <div
-                                  className={`bg-green-900/20 border-2 rounded-lg px-3 py-2 transition-colors ${footerDragActive
-                                    ? 'border-green-500 bg-green-900/40'
-                                    : 'border-green-500/30'
+                                  className={`bg-[#00FFFF]/10 border-2 rounded-lg px-3 py-2 transition-colors ${footerDragActive
+                                    ? 'border-[#00FFFF] bg-[#00FFFF]/20'
+                                    : 'border-[#00FFFF]/30'
                                     }`}
                                   onDragEnter={(e) => {
                                     e.preventDefault();
@@ -6171,7 +6171,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                             setFooterCropPosition({ x: 0, y: 0 });
                                           }
                                         }}
-                                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-1.5 text-xs"
+                                        className="px-3 py-1.5 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow flex items-center justify-center gap-1.5 text-xs"
                                         title="Crop"
                                       >
                                         <Crop size={14} />
@@ -6235,7 +6235,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   </div>
                                   <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
                                     <div
-                                      className="bg-green-500 h-full transition-all duration-300 ease-out"
+                                      className="bg-[#00FFFF] h-full transition-all duration-300 ease-out"
                                       style={{ width: `${footerUploadProgress}%` }}
                                     ></div>
                                   </div>
@@ -6307,7 +6307,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                             setFooterCropPosition({ x: 0, y: 0 });
                                           }
                                         }}
-                                        className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center text-xs"
+                                        className="px-2 py-1 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg transition-all btn-hover-glow flex items-center justify-center text-xs"
                                         title="Crop"
                                       >
                                         <Crop size={12} />
@@ -6446,7 +6446,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   setFooterPreviewZoom(newZoom);
                                 }}
                                 className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                style={{ accentColor: '#22c55e' }}
+                                style={{ accentColor: '#00FFFF' }}
                               />
                             </div>
 
@@ -6469,7 +6469,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   value={footerIconConfig.borderRadius || 8}
                                   onChange={(e) => setFooterIconConfig({ ...footerIconConfig, borderRadius: parseInt(e.target.value) || 0 })}
                                   className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                  style={{ accentColor: '#22c55e' }}
+                                  style={{ accentColor: '#00FFFF' }}
                                 />
                               </div>
                               <div>
@@ -6490,7 +6490,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   value={footerIconConfig.backgroundOpacity || 1}
                                   onChange={(e) => setFooterIconConfig({ ...footerIconConfig, backgroundOpacity: parseFloat(e.target.value) || 1 })}
                                   className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                  style={{ accentColor: '#22c55e' }}
+                                  style={{ accentColor: '#00FFFF' }}
                                 />
                               </div>
                             </div>
@@ -6514,7 +6514,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   value={footerIconConfig.padding || 0}
                                   onChange={(e) => setFooterIconConfig({ ...footerIconConfig, padding: parseInt(e.target.value) || 0 })}
                                   className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                  style={{ accentColor: '#22c55e' }}
+                                  style={{ accentColor: '#00FFFF' }}
                                 />
                               </div>
                               <div>
@@ -6534,7 +6534,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   value={footerIconConfig.borderWidth || 0}
                                   onChange={(e) => setFooterIconConfig({ ...footerIconConfig, borderWidth: parseInt(e.target.value) || 0 })}
                                   className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                  style={{ accentColor: '#22c55e' }}
+                                  style={{ accentColor: '#00FFFF' }}
                                 />
                               </div>
                             </div>
@@ -6630,7 +6630,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 placeholder="Provide a reason for rejecting this suggestion..."
-                className="w-full bg-black/30 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-red-500 outline-none"
+                className="w-full bg-black/30 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm focus:ring-2 focus:ring-[#00FFFF] outline-none"
                 rows={4}
               />
             </div>
@@ -6647,7 +6647,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
               </button>
               <button
                 onClick={handleConfirmReject}
-                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors font-medium flex items-center gap-2"
+                className="px-4 py-2 rounded-lg bg-[#00FFFF] text-black hover:bg-[#00fbff] font-bold transition-all btn-hover-glow flex items-center gap-2"
               >
                 <Ban size={16} />
                 Reject Suggestion
@@ -6727,7 +6727,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
               </button>
               <button
                 onClick={handleSaveBugEdit}
-                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors font-medium flex items-center gap-2"
+                className="px-4 py-2 rounded-lg bg-[#00FFFF] text-black hover:bg-[#00fbff] font-bold transition-all btn-hover-glow flex items-center gap-2"
               >
                 <Save size={16} />
                 Save Changes
@@ -6871,7 +6871,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     </button>
                     <button
                       onClick={handleNavbarCropAndSave}
-                      className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                      className="flex-1 px-4 py-2.5 bg-[#00FFFF] text-black hover:bg-[#00fbff] font-bold transition-all btn-hover-glow rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                     >
                       <Save size={16} />
                       Apply & Save
@@ -7018,7 +7018,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     </button>
                     <button
                       onClick={handleFooterCropAndSave}
-                      className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                      className="flex-1 px-4 py-2.5 bg-[#00FFFF] text-black hover:bg-[#00fbff] font-bold transition-all btn-hover-glow rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
                     >
                       <Save size={16} />
                       Apply & Save
@@ -7065,14 +7065,14 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
               </button>
               <button
                 onClick={() => handleSyncToCloud('Microsoft Azure')}
-                className="w-full px-4 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors flex items-center justify-center gap-3"
+                className="w-full px-4 py-3 rounded-lg bg-[#00FFFF] hover:bg-[#00fbff] text-black font-bold transition-all btn-hover-glow flex items-center justify-center gap-3"
               >
                 <i className="fab fa-microsoft text-xl"></i>
                 <span>Microsoft Azure</span>
               </button>
               <button
                 onClick={() => handleSyncToCloud('Dropbox')}
-                className="w-full px-4 py-3 rounded-lg bg-blue-500 hover:bg-blue-600 text-white font-medium transition-colors flex items-center justify-center gap-3"
+                className="w-full px-4 py-3 rounded-lg bg-[#00FFFF] hover:bg-[#00fbff] text-black font-bold transition-all btn-hover-glow flex items-center justify-center gap-3"
               >
                 <i className="fab fa-dropbox text-xl"></i>
                 <span>Dropbox</span>
@@ -7086,7 +7086,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
               </button>
               <button
                 onClick={() => handleSyncToCloud('MongoDB Atlas')}
-                className="w-full px-4 py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium transition-colors flex items-center justify-center gap-3"
+                className="w-full px-4 py-3 rounded-lg bg-[#00FFFF] text-black hover:bg-[#00fbff] font-bold transition-all btn-hover-glow font-medium transition-colors flex items-center justify-center gap-3"
               >
                 <i className="fas fa-database text-xl"></i>
                 <span>MongoDB Atlas</span>
@@ -7129,7 +7129,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${(newChangelog.visibility || 'private') === 'private'
                     ? 'bg-gray-700 text-gray-300 border border-gray-600 hover:bg-gray-600'
                     : (newChangelog.visibility || 'private') === 'public'
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
+                      ? 'bg-[#00FFFF] text-black hover:bg-[#00fbff]'
                       : 'bg-purple-600 text-white hover:bg-purple-700'
                     }`}
                   title={
@@ -7193,7 +7193,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   value={newChangelog.title || ''}
                   onChange={(e) => setNewChangelog({ ...newChangelog, title: e.target.value })}
                   placeholder="e.g., Latest Version or Version 2.0.1"
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                 />
                 <p className="text-xs text-gray-500 mt-1">This will be displayed as the heading for this changelog entry</p>
               </div>
@@ -7206,7 +7206,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       type="button"
                       onClick={async () => {
                         if (!config.curseforgeProjectSlug && !config.links?.curseforge) {
-                          alert('Please configure CurseForge project slug or URL in the Config tab first.');
+                          setToast({ msg: 'Please configure CurseForge project slug or URL in the Config tab first.', type: 'error' });
                           return;
                         }
 
@@ -7266,13 +7266,13 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             }
                           }
                         } catch (error: any) {
-                          alert(`Failed to fetch version from CurseForge: ${error.message || 'Unknown error'}`);
+                          setToast({ msg: `Failed to fetch version from CurseForge: ${error.message || 'Unknown error'}`, type: 'error' });
                         } finally {
                           setFetchingVersion(false);
                         }
                       }}
                       disabled={fetchingVersion}
-                      className="px-3 py-0.5 bg-transparent border border-white text-white hover:bg-white/10 rounded transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium disabled:border-gray-600 disabled:text-gray-500"
+                      className="px-3 py-0.5 bg-transparent border border-[#00FFFF] text-[#00FFFF] hover:bg-[#00FFFF]/10 rounded transition-all btn-hover-glow flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium disabled:border-gray-600 disabled:text-gray-500"
                       title="Fetch latest version from CurseForge"
                     >
                       {fetchingVersion ? (
@@ -7294,7 +7294,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         setShowJarDropdown(false); // Close dropdown when typing
                       }}
                       placeholder="e.g., 2.0.1"
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                     />
                     {showJarDropdown && matchingJarFiles.length > 0 && (
                       <div ref={jarDropdownRef} className="absolute z-50 w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
@@ -7332,7 +7332,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       type="button"
                       onClick={async () => {
                         if (!config.curseforgeProjectSlug && !config.links?.curseforge) {
-                          alert('Please configure CurseForge project slug or URL in the Config tab first.');
+                          setToast({ msg: 'Please configure CurseForge project slug or URL in the Config tab first.', type: 'error' });
                           return;
                         }
 
@@ -7355,13 +7355,13 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             throw new Error('File name not found in latest release.');
                           }
                         } catch (error: any) {
-                          alert(`Failed to fetch file name from CurseForge: ${error.message || 'Unknown error'}`);
+                          setToast({ msg: `Failed to fetch file name from CurseForge: ${error.message || 'Unknown error'}`, type: 'error' });
                         } finally {
                           setFetchingFileName(false);
                         }
                       }}
                       disabled={fetchingFileName}
-                      className="px-3 py-0.5 bg-transparent border border-white text-white hover:bg-white/10 rounded transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium disabled:border-gray-600 disabled:text-gray-500"
+                      className="px-3 py-0.5 bg-transparent border border-[#00FFFF] text-[#00FFFF] hover:bg-[#00FFFF]/10 rounded transition-all btn-hover-glow flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed text-xs font-medium disabled:border-gray-600 disabled:text-gray-500"
                       title="Fetch latest file name from CurseForge"
                     >
                       {fetchingFileName ? (
@@ -7379,7 +7379,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     value={newChangelog.fileName || ''}
                     onChange={(e) => setNewChangelog({ ...newChangelog, fileName: e.target.value })}
                     placeholder="e.g., buildscape-2.0.1.jar"
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                   />
                 </div>
                 <div>
@@ -7388,7 +7388,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     type="date"
                     value={newChangelog.fileDate || ''}
                     onChange={(e) => setNewChangelog({ ...newChangelog, fileDate: e.target.value })}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                   />
                 </div>
               </div>
@@ -7401,7 +7401,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     value={newChangelog.downloadUrl || ''}
                     onChange={(e) => setNewChangelog({ ...newChangelog, downloadUrl: e.target.value })}
                     placeholder="https://... (auto-filled when jar name and MC version are set)"
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                   />
                 </div>
                 <div>
@@ -7420,7 +7420,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           }
                         }}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${(newChangelog.mcVersions || []).includes(version)
-                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          ? 'bg-[#00FFFF] text-black hover:bg-[#00fbff]'
                           : 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700'
                           }`}
                       >
@@ -7437,7 +7437,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <select
                     value={newChangelog.type || 'release'}
                     onChange={(e) => setNewChangelog({ ...newChangelog, type: e.target.value as 'patch' | 'release' })}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                   >
                     <option value="release">Release</option>
                     <option value="patch">Patch</option>
@@ -7455,7 +7455,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       }
                     }}
                     className={`w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors ${allowPatch
-                      ? 'bg-green-600 text-white hover:bg-green-700'
+                      ? 'bg-[#00FFFF] text-black hover:bg-[#00fbff]'
                       : 'bg-gray-800 text-gray-300 border border-gray-700 hover:bg-gray-700'
                       }`}
                   >
@@ -7467,7 +7467,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <select
                     value={newChangelog.changelogType || 'markdown'}
                     onChange={(e) => setNewChangelog({ ...newChangelog, changelogType: e.target.value as 'html' | 'markdown' })}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                   >
                     <option value="markdown">Markdown</option>
                     <option value="html">HTML</option>
@@ -7761,7 +7761,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     }}
                     placeholder="Enter changelog content here..."
                     rows={showPreview ? 8 : 15}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-b-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500 font-mono text-sm resize-y"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-b-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF] font-mono text-sm resize-y"
                   />
 
                   {showBugAutocomplete && (allowPatch || newChangelog.type === 'patch') && (
@@ -7863,7 +7863,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     setNewChangelog({ ...newChangelog, linkedBugReports: current.filter(id => id !== report.id) });
                                   }
                                 }}
-                                className="mt-1 w-4 h-4 text-green-600 bg-gray-800 border-gray-700 rounded focus:ring-green-500"
+                                className="mt-1 w-4 h-4 text-[#00FFFF] bg-gray-800 border-gray-700 rounded focus:ring-[#00FFFF]"
                               />
                               <div className="flex-1">
                                 <div className="text-sm text-white font-medium">{report.title}</div>
@@ -7885,7 +7885,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   id="isLatest"
                   checked={newChangelog.isLatest || false}
                   onChange={(e) => setNewChangelog({ ...newChangelog, isLatest: e.target.checked })}
-                  className="w-4 h-4 text-green-600 bg-gray-800 border-gray-700 rounded focus:ring-green-500"
+                  className="w-4 h-4 text-[#00FFFF] bg-gray-800 border-gray-700 rounded focus:ring-[#00FFFF]"
                 />
                 <label htmlFor="isLatest" className="text-sm text-gray-300">
                   Mark as latest version
@@ -7907,7 +7907,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                 onClick={async () => {
                   try {
                     if (!newChangelog.title || !newChangelog.modVersion || !newChangelog.fileName || !newChangelog.changelog || !newChangelog.fileDate || !newChangelog.mcVersions?.length) {
-                      alert('Please fill in all required fields');
+                      setToast({ msg: 'Please fill in all required fields', type: 'error' });
                       return;
                     }
 
@@ -7939,7 +7939,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       await StorageService.saveAll(reports, suggestions, updatedConfig);
                     } catch (e: any) {
                       console.error("Failed to save changelogs:", e);
-                      alert('Failed to save changelog. Please try again.');
+                      setToast({ msg: 'Failed to save changelog. Please try again.', type: 'error' });
                       return;
                     }
 
@@ -7963,10 +7963,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     setShowPreview(false);
                   } catch (error: any) {
                     console.error("Error creating changelog:", error);
-                    alert(`Error: ${error.message || 'Failed to create changelog. Please try again.'}`);
+                    setToast({ msg: `Error: ${error.message || 'Failed to create changelog. Please try again.'}`, type: 'error' });
                   }
                 }}
-                className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors"
+                className="px-4 py-2 rounded-lg bg-[#00FFFF] text-black hover:bg-[#00fbff] font-bold transition-all btn-hover-glow transition-colors"
               >
                 {editingChangelog ? 'Save Changes' : 'Create Changelog'}
               </button>
@@ -7985,17 +7985,17 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-sm font-medium text-gray-300 mb-2">Tier Name *</label><input type="text" value={editingTierForm.name || ''} onChange={(e) => setEditingTierForm({ ...editingTierForm, name: e.target.value })} placeholder="e.g., Bronze, Silver, Gold" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500" /></div>
-                <div><label className="block text-sm font-medium text-gray-300 mb-2">Ko-fi Tier Name *</label><input type="text" value={editingTierForm.koFiTierName || ''} onChange={(e) => setEditingTierForm({ ...editingTierForm, koFiTierName: e.target.value })} placeholder="Exact name from Ko-fi" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500" /><p className="text-xs text-gray-500 mt-1">Must match exactly as shown in Ko-fi</p></div>
+                <div><label className="block text-sm font-medium text-gray-300 mb-2">Tier Name *</label><input type="text" value={editingTierForm.name || ''} onChange={(e) => setEditingTierForm({ ...editingTierForm, name: e.target.value })} placeholder="e.g., Bronze, Silver, Gold" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]" /></div>
+                <div><label className="block text-sm font-medium text-gray-300 mb-2">Ko-fi Tier Name *</label><input type="text" value={editingTierForm.koFiTierName || ''} onChange={(e) => setEditingTierForm({ ...editingTierForm, koFiTierName: e.target.value })} placeholder="Exact name from Ko-fi" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]" /><p className="text-xs text-gray-500 mt-1">Must match exactly as shown in Ko-fi</p></div>
               </div>
-              <div><label className="block text-sm font-medium text-gray-300 mb-2">Description</label><textarea value={editingTierForm.description || ''} onChange={(e) => setEditingTierForm({ ...editingTierForm, description: e.target.value })} placeholder="Describe this tier..." className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500" rows={3} /></div>
+              <div><label className="block text-sm font-medium text-gray-300 mb-2">Description</label><textarea value={editingTierForm.description || ''} onChange={(e) => setEditingTierForm({ ...editingTierForm, description: e.target.value })} placeholder="Describe this tier..." className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]" rows={3} /></div>
               <div className="grid grid-cols-3 gap-4">
-                <div><label className="block text-sm font-medium text-gray-300 mb-2">Priority</label><input type="number" value={editingTierForm.priority || 0} onChange={(e) => setEditingTierForm({ ...editingTierForm, priority: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500" /><p className="text-xs text-gray-500 mt-1">Higher = more important</p></div>
-                <div><label className="block text-sm font-medium text-gray-300 mb-2">Duration Type</label><select value={editingTierForm.durationType || 'subscription'} onChange={(e) => setEditingTierForm({ ...editingTierForm, durationType: e.target.value as 'permanent' | 'subscription' })} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"><option value="subscription">With Subscription</option><option value="permanent">Permanent</option></select></div>
-                <div className="flex items-end"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={editingTierForm.enabled !== false} onChange={(e) => setEditingTierForm({ ...editingTierForm, enabled: e.target.checked })} className="w-4 h-4 rounded bg-gray-800 border-gray-700 text-green-600 focus:ring-green-500" /><span className="text-sm text-gray-300">Enabled</span></label></div>
+                <div><label className="block text-sm font-medium text-gray-300 mb-2">Priority</label><input type="number" value={editingTierForm.priority || 0} onChange={(e) => setEditingTierForm({ ...editingTierForm, priority: parseInt(e.target.value) || 0 })} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]" /><p className="text-xs text-gray-500 mt-1">Higher = more important</p></div>
+                <div><label className="block text-sm font-medium text-gray-300 mb-2">Duration Type</label><select value={editingTierForm.durationType || 'subscription'} onChange={(e) => setEditingTierForm({ ...editingTierForm, durationType: e.target.value as 'permanent' | 'subscription' })} className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"><option value="subscription">With Subscription</option><option value="permanent">Permanent</option></select></div>
+                <div className="flex items-end"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={editingTierForm.enabled !== false} onChange={(e) => setEditingTierForm({ ...editingTierForm, enabled: e.target.checked })} className="w-4 h-4 rounded bg-gray-800 border-gray-700 text-[#00FFFF] focus:ring-[#00FFFF]" /><span className="text-sm text-gray-300">Enabled</span></label></div>
               </div>
               <div className="border-t border-gray-700 pt-4">
-                <div className="flex items-center justify-between mb-4"><h4 className="text-lg font-semibold text-white">Rewards</h4><button onClick={() => { const newReward: KofiRewardItem = { id: Date.now().toString(), type: 'item', displayName: '', itemId: '', itemCount: 1 }; setEditingTierForm({ ...editingTierForm, rewards: [...(editingTierForm.rewards || []), newReward] }); setEditingReward(newReward); }} className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm"><Plus size={16} />Add Reward</button></div>
+                <div className="flex items-center justify-between mb-4"><h4 className="text-lg font-semibold text-white">Rewards</h4><button onClick={() => { const newReward: KofiRewardItem = { id: Date.now().toString(), type: 'item', displayName: '', itemId: '', itemCount: 1 }; setEditingTierForm({ ...editingTierForm, rewards: [...(editingTierForm.rewards || []), newReward] }); setEditingReward(newReward); }} className="flex items-center gap-2 px-3 py-1.5 bg-[#00FFFF] text-black hover:bg-[#00fbff] font-bold transition-all btn-hover-glow rounded-lg text-sm"><Plus size={16} />Add Reward</button></div>
                 <div className="space-y-2">
                   {(editingTierForm.rewards || []).map((reward, idx) => (
                     <div key={reward.id || idx} className="bg-gray-800/50 border border-gray-700 rounded-lg p-3">
@@ -8011,7 +8011,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 setEditingTierForm({ ...editingTierForm, rewards: updated });
                               }}
                               placeholder="Display Name *"
-                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                             />
                             <select
                               value={reward.type}
@@ -8020,7 +8020,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 updated[idx] = { ...reward, type: e.target.value as any };
                                 setEditingTierForm({ ...editingTierForm, rewards: updated });
                               }}
-                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                             >
                               <option value="item">Item</option>
                               <option value="command">Command</option>
@@ -8041,7 +8041,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   setEditingTierForm({ ...editingTierForm, rewards: updated });
                                 }}
                                 placeholder="Item ID (e.g., minecraft:diamond)"
-                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                               />
                               <input
                                 type="number"
@@ -8052,7 +8052,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   setEditingTierForm({ ...editingTierForm, rewards: updated });
                                 }}
                                 placeholder="Count"
-                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                               />
                             </div>
                           )}
@@ -8066,7 +8066,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 setEditingTierForm({ ...editingTierForm, rewards: updated });
                               }}
                               placeholder="Command (use {player} for player name)"
-                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                             />
                           )}
                           {reward.type === 'permission' && (
@@ -8079,7 +8079,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 setEditingTierForm({ ...editingTierForm, rewards: updated });
                               }}
                               placeholder="Permission node"
-                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                             />
                           )}
                           {reward.type === 'custom' && (
@@ -8091,7 +8091,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 setEditingTierForm({ ...editingTierForm, rewards: updated });
                               }}
                               placeholder="Custom JSON data"
-                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500 font-mono"
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF] font-mono"
                               rows={2}
                             />
                           )}
@@ -8105,7 +8105,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 setEditingTierForm({ ...editingTierForm, rewards: updated });
                               }}
                               placeholder="Download URL (e.g., https://example.com/file.zip)"
-                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                             />
                           )}
                           {reward.type === 'cosmetic' && (
@@ -8125,7 +8125,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   setEditingTierForm({ ...editingTierForm, rewards: updated });
                                 }}
                                 placeholder="Item ID (e.g., buildscape:hammer)"
-                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                               />
                               <input
                                 type="text"
@@ -8142,7 +8142,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   setEditingTierForm({ ...editingTierForm, rewards: updated });
                                 }}
                                 placeholder="Skin ID (optional)"
-                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                               />
                               <input
                                 type="url"
@@ -8159,7 +8159,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   setEditingTierForm({ ...editingTierForm, rewards: updated });
                                 }}
                                 placeholder="Texture URL (optional)"
-                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                               />
                               <textarea
                                 value={reward.cosmeticData?.modelData || ''}
@@ -8175,7 +8175,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   setEditingTierForm({ ...editingTierForm, rewards: updated });
                                 }}
                                 placeholder="Custom Model Data (JSON, optional)"
-                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500 font-mono"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF] font-mono"
                                 rows={2}
                               />
                             </div>
@@ -8189,7 +8189,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                               setEditingTierForm({ ...editingTierForm, rewards: updated });
                             }}
                             placeholder="Description (optional)"
-                            className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                            className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                           />
                         </div>
                         <button
@@ -8213,7 +8213,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
             </div>
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-end mt-6 pt-4 border-t border-gray-700">
               <button onClick={() => { setShowTierModal(false); setEditingTier(null); setEditingReward(null); }} className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm sm:text-base">Cancel</button>
-              <button onClick={async () => { if (!editingTierForm.name || !editingTierForm.koFiTierName) { alert('Tier Name and Ko-fi Tier Name are required'); return; } const updatedTier: KofiTier = { ...editingTier, ...editingTierForm, updatedAt: Date.now(), createdAt: editingTier.createdAt || Date.now() } as KofiTier; const updated = editingTier.id && kofiTiers.find(t => t.id === editingTier.id) ? kofiTiers.map(t => t.id === editingTier.id ? updatedTier : t) : [...kofiTiers, updatedTier]; setKofiTiers(updated); await saveKofiTiers(updated); setShowTierModal(false); setEditingTier(null); setEditingReward(null); setToast({ msg: 'Tier saved successfully', type: 'success' }); }} className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm sm:text-base flex items-center justify-center gap-1.5 sm:gap-2"><Save size={14} className="sm:w-4 sm:h-4" /><span>Save Tier</span></button>
+              <button onClick={async () => { if (!editingTierForm.name || !editingTierForm.koFiTierName) { setToast({ msg: 'Tier Name and Ko-fi Tier Name are required', type: 'error' }); return; } const updatedTier: KofiTier = { ...editingTier, ...editingTierForm, updatedAt: Date.now(), createdAt: editingTier.createdAt || Date.now() } as KofiTier; const updated = editingTier.id && kofiTiers.find(t => t.id === editingTier.id) ? kofiTiers.map(t => t.id === editingTier.id ? updatedTier : t) : [...kofiTiers, updatedTier]; setKofiTiers(updated); await saveKofiTiers(updated); setShowTierModal(false); setEditingTier(null); setEditingReward(null); setToast({ msg: 'Tier saved successfully', type: 'success' }); }} className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-[#00FFFF] text-black hover:bg-[#00fbff] font-bold transition-all btn-hover-glow text-sm sm:text-base flex items-center justify-center gap-1.5 sm:gap-2"><Save size={14} className="sm:w-4 sm:h-4" /><span>Save Tier</span></button>
             </div>
           </div>
         </div>
@@ -8229,13 +8229,13 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
             </div>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="block text-sm font-medium text-gray-300 mb-2">Tier Name *</label><input type="text" value={editingTwitchTierForm.name || ''} onChange={(e) => setEditingTwitchTierForm({ ...editingTwitchTierForm, name: e.target.value })} placeholder="e.g., Prime Member, Tier 1 Sub" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500" /></div>
+                <div><label className="block text-sm font-medium text-gray-300 mb-2">Tier Name *</label><input type="text" value={editingTwitchTierForm.name || ''} onChange={(e) => setEditingTwitchTierForm({ ...editingTwitchTierForm, name: e.target.value })} placeholder="e.g., Prime Member, Tier 1 Sub" className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]" /></div>
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Twitch Level *</label>
                   <select
                     value={editingTwitchTierForm.twitchTierLevel || '1000'}
                     onChange={(e) => setEditingTwitchTierForm({ ...editingTwitchTierForm, twitchTierLevel: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                   >
                     <option value="1000">Tier 1 (1000)</option>
                     <option value="2000">Tier 2 (2000)</option>
@@ -8243,11 +8243,11 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   </select>
                 </div>
               </div>
-              <div><label className="block text-sm font-medium text-gray-300 mb-2">Description</label><textarea value={editingTwitchTierForm.description || ''} onChange={(e) => setEditingTwitchTierForm({ ...editingTwitchTierForm, description: e.target.value })} placeholder="Describe this tier..." className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500" rows={3} /></div>
-              <div className="flex items-end"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={editingTwitchTierForm.enabled !== false} onChange={(e) => setEditingTwitchTierForm({ ...editingTwitchTierForm, enabled: e.target.checked })} className="w-4 h-4 rounded bg-gray-800 border-gray-700 text-purple-600 focus:ring-purple-500" /><span className="text-sm text-gray-300">Enabled</span></label></div>
+              <div><label className="block text-sm font-medium text-gray-300 mb-2">Description</label><textarea value={editingTwitchTierForm.description || ''} onChange={(e) => setEditingTwitchTierForm({ ...editingTwitchTierForm, description: e.target.value })} placeholder="Describe this tier..." className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]" rows={3} /></div>
+              <div className="flex items-end"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={editingTwitchTierForm.enabled !== false} onChange={(e) => setEditingTwitchTierForm({ ...editingTwitchTierForm, enabled: e.target.checked })} className="w-4 h-4 rounded bg-gray-800 border-gray-700 text-purple-600 focus:ring-[#00FFFF]" /><span className="text-sm text-gray-300">Enabled</span></label></div>
 
               <div className="border-t border-gray-700 pt-4">
-                <div className="flex items-center justify-between mb-4"><h4 className="text-lg font-semibold text-white">Rewards</h4><button onClick={() => { const newReward: KofiRewardItem = { id: Date.now().toString(), type: 'item', displayName: '', itemId: '', itemCount: 1 }; setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: [...(editingTwitchTierForm.rewards || []), newReward] }); }} className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm"><Plus size={16} />Add Reward</button></div>
+                <div className="flex items-center justify-between mb-4"><h4 className="text-lg font-semibold text-white">Rewards</h4><button onClick={() => { const newReward: KofiRewardItem = { id: Date.now().toString(), type: 'item', displayName: '', itemId: '', itemCount: 1 }; setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: [...(editingTwitchTierForm.rewards || []), newReward] }); }} className="flex items-center gap-2 px-3 py-1.5 bg-[#00FFFF] hover:bg-[#00fbff] text-black font-bold transition-all btn-hover-glow rounded-lg text-sm"><Plus size={16} />Add Reward</button></div>
                 <div className="space-y-2">
                   {(editingTwitchTierForm.rewards || []).map((reward, idx) => (
                     <div key={reward.id || idx} className="bg-gray-800/50 border border-gray-700 rounded-lg p-3">
@@ -8263,7 +8263,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
                               }}
                               placeholder="Display Name *"
-                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                             />
                             <select
                               value={reward.type}
@@ -8272,7 +8272,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 updated[idx] = { ...reward, type: e.target.value as any };
                                 setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
                               }}
-                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                             >
                               <option value="item">Item</option>
                               <option value="command">Command</option>
@@ -8293,7 +8293,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
                                 }}
                                 placeholder="Item ID (e.g., minecraft:diamond)"
-                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                               />
                               <input
                                 type="number"
@@ -8304,7 +8304,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
                                 }}
                                 placeholder="Count"
-                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                               />
                             </div>
                           )}
@@ -8318,7 +8318,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
                               }}
                               placeholder="Command (use {player} for player name)"
-                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                             />
                           )}
                           {reward.type === 'permission' && (
@@ -8331,7 +8331,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
                               }}
                               placeholder="Permission node"
-                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                             />
                           )}
                           {reward.type === 'custom' && (
@@ -8343,7 +8343,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
                               }}
                               placeholder="Custom JSON data"
-                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500 font-mono"
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF] font-mono"
                               rows={2}
                             />
                           )}
@@ -8357,7 +8357,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
                               }}
                               placeholder="Download URL (e.g., https://example.com/file.zip)"
-                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                              className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                             />
                           )}
                           {reward.type === 'cosmetic' && (
@@ -8377,7 +8377,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
                                 }}
                                 placeholder="Cosmetic ID"
-                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                               />
                               <input
                                 type="text"
@@ -8394,7 +8394,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   setEditingTwitchTierForm({ ...editingTwitchTierForm, rewards: updated });
                                 }}
                                 placeholder="Skin ID (optional)"
-                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-purple-500"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                               />
                               <input
                                 type="url"
@@ -8473,7 +8473,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
               <button
                 onClick={async () => {
                   if (!editingTwitchTierForm.name || !editingTwitchTierForm.twitchTierLevel) {
-                    alert('Tier Name and Twitch Level are required');
+                    setToast({ msg: 'Tier Name and Twitch Level are required', type: 'error' });
                     return;
                   }
                   const updatedTier: TwitchTier = {
@@ -8507,7 +8507,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
           <div className="bg-[#1e1e1e] border border-gray-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 my-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6"><h3 className="text-xl font-bold text-white flex items-center gap-2"><Gift size={20} />Grant Manual Reward</h3><button onClick={() => { setShowRewardModal(false); setSelectedRewardUser(''); setRewardUserSearch(''); setManualRewardReason(''); setManualRewardItems([]); }} className="p-1 text-gray-400 hover:text-white"><X size={20} /></button></div>
             <div className="space-y-4">
-              <div><label className="block text-sm font-medium text-gray-300 mb-2">Select User *</label><input type="text" value={rewardUserSearch} onChange={(e) => { setRewardUserSearch(e.target.value); }} onFocus={async () => { try { const users = await AuthService.getAllUsers(); setAvailableUsers(users); } catch (error) { console.error('Failed to load users:', error); } }} placeholder="Search for user..." className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500" />{rewardUserSearch && (<div className="mt-2 max-h-40 overflow-y-auto bg-gray-900 border border-gray-700 rounded-lg">{availableUsers.filter(u => u.username.toLowerCase().includes(rewardUserSearch.toLowerCase())).slice(0, 10).map(user => (<button key={user.id} onClick={() => { setSelectedRewardUser(user.id); setRewardUserSearch(user.username); }} className="w-full text-left px-3 py-2 hover:bg-gray-800 text-white text-sm border-b border-gray-800 last:border-0">{user.username} {user.minecraftUsername && `(${user.minecraftUsername})`}</button>))}</div>)}</div>
+              <div><label className="block text-sm font-medium text-gray-300 mb-2">Select User *</label><input type="text" value={rewardUserSearch} onChange={(e) => { setRewardUserSearch(e.target.value); }} onFocus={async () => { try { const users = await AuthService.getAllUsers(); setAvailableUsers(users); } catch (error) { console.error('Failed to load users:', error); } }} placeholder="Search for user..." className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]" />{rewardUserSearch && (<div className="mt-2 max-h-40 overflow-y-auto bg-gray-900 border border-gray-700 rounded-lg">{availableUsers.filter(u => u.username.toLowerCase().includes(rewardUserSearch.toLowerCase())).slice(0, 10).map(user => (<button key={user.id} onClick={() => { setSelectedRewardUser(user.id); setRewardUserSearch(user.username); }} className="w-full text-left px-3 py-2 hover:bg-gray-800 text-white text-sm border-b border-gray-800 last:border-0">{user.username} {user.minecraftUsername && `(${user.minecraftUsername})`}</button>))}</div>)}</div>
               {selectedRewardUser && (
                 <>
                   <div>
@@ -8516,7 +8516,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       value={manualRewardReason}
                       onChange={(e) => setManualRewardReason(e.target.value)}
                       placeholder="Reason for granting this reward..."
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                      className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                       rows={3}
                     />
                   </div>
@@ -8534,7 +8534,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           };
                           setManualRewardItems([...manualRewardItems, newReward]);
                         }}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-[#00FFFF] text-black hover:bg-[#00fbff] font-bold transition-all btn-hover-glow rounded-lg text-sm"
                       >
                         <Plus size={16} />
                         Add Reward
@@ -8555,7 +8555,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     setManualRewardItems(updated);
                                   }}
                                   placeholder="Display Name *"
-                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                                 />
                                 <select
                                   value={reward.type}
@@ -8564,7 +8564,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     updated[idx] = { ...reward, type: e.target.value as any };
                                     setManualRewardItems(updated);
                                   }}
-                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                                 >
                                   <option value="item">Item</option>
                                   <option value="command">Command</option>
@@ -8585,7 +8585,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                       setManualRewardItems(updated);
                                     }}
                                     placeholder="Item ID"
-                                    className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                    className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                                   />
                                   <input
                                     type="number"
@@ -8596,7 +8596,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                       setManualRewardItems(updated);
                                     }}
                                     placeholder="Count"
-                                    className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                    className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                                   />
                                 </div>
                               )}
@@ -8610,7 +8610,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     setManualRewardItems(updated);
                                   }}
                                   placeholder="Command (use {player} for player name)"
-                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                                 />
                               )}
                               {reward.type === 'permission' && (
@@ -8623,7 +8623,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     setManualRewardItems(updated);
                                   }}
                                   placeholder="Permission node"
-                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                                 />
                               )}
                               {reward.type === 'custom' && (
@@ -8635,7 +8635,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     setManualRewardItems(updated);
                                   }}
                                   placeholder="Custom JSON data"
-                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500 font-mono"
+                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF] font-mono"
                                   rows={2}
                                 />
                               )}
@@ -8649,7 +8649,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     setManualRewardItems(updated);
                                   }}
                                   placeholder="Download URL (e.g., https://example.com/file.zip)"
-                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                                 />
                               )}
                               {reward.type === 'cosmetic' && (
@@ -8669,7 +8669,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                       setManualRewardItems(updated);
                                     }}
                                     placeholder="Item ID (e.g., buildscape:hammer)"
-                                    className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                    className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                                   />
                                   <input
                                     type="text"
@@ -8686,7 +8686,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                       setManualRewardItems(updated);
                                     }}
                                     placeholder="Skin ID (optional)"
-                                    className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                    className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                                   />
                                   <input
                                     type="url"
@@ -8703,7 +8703,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                       setManualRewardItems(updated);
                                     }}
                                     placeholder="Texture URL (optional)"
-                                    className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                    className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                                   />
                                   <textarea
                                     value={reward.cosmeticData?.modelData || ''}
@@ -8719,7 +8719,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                       setManualRewardItems(updated);
                                     }}
                                     placeholder="Custom Model Data (JSON, optional)"
-                                    className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500 font-mono"
+                                    className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF] font-mono"
                                     rows={2}
                                   />
                                 </div>
@@ -8755,7 +8755,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     <button
                       onClick={async () => {
                         if (!selectedRewardUser || !manualRewardReason || manualRewardItems.length === 0) {
-                          alert('Please fill in all required fields');
+                          setToast({ msg: 'Please fill in all required fields', type: 'error' });
                           return;
                         }
                         const newReward: ManualReward = {
@@ -8777,7 +8777,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         setManualRewardItems([]);
                         setToast({ msg: 'Manual reward granted', type: 'success' });
                       }}
-                      className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white text-sm sm:text-base flex items-center justify-center gap-1.5 sm:gap-2 w-full sm:w-auto"
+                      className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-[#00FFFF] text-black hover:bg-[#00fbff] font-bold transition-all btn-hover-glow text-sm sm:text-base flex items-center justify-center gap-1.5 sm:gap-2 w-full sm:w-auto"
                     >
                       <Gift size={14} className="sm:w-4 sm:h-4" />
                       <span>Grant Reward</span>
@@ -8850,7 +8850,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                 <button
                   onClick={async () => {
                     if (!importTierNames.trim()) {
-                      alert('Please enter at least one tier name');
+                      setToast({ msg: 'Please enter at least one tier name', type: 'error' });
                       return;
                     }
 
@@ -8861,7 +8861,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       .filter(name => name.length > 0);
 
                     if (tierNames.length === 0) {
-                      alert('No valid tier names found');
+                      setToast({ msg: 'No valid tier names found', type: 'error' });
                       return;
                     }
 
@@ -8903,7 +8903,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     }
 
                     if (newTiers.length === 0) {
-                      alert('All tiers already exist');
+                      setToast({ msg: 'All tiers already exist', type: 'error' });
                       setShowImportTiersModal(false);
                       setImportTierNames('');
                       return;
@@ -8921,7 +8921,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     setShowImportTiersModal(false);
                     setImportTierNames('');
                   }}
-                  className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors text-sm sm:text-base flex items-center justify-center gap-1.5 sm:gap-2"
+                  className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-[#00FFFF] text-black hover:bg-[#00fbff] font-bold transition-all btn-hover-glow text-sm sm:text-base flex items-center justify-center gap-1.5 sm:gap-2"
                 >
                   <RefreshCw size={14} className="sm:w-4 sm:h-4" />
                   <span className="hidden sm:inline">Import </span>
@@ -8938,8 +8938,8 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
       {toast && (
         <div className="fixed bottom-6 right-6 z-[100] toast-enter pointer-events-none">
-          <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border text-sm font-medium ${toast.type === 'success' ? 'bg-[#1e1e1e] border-green-900 text-green-400' :
-            toast.type === 'info' ? 'bg-[#1e1e1e] border-blue-900 text-blue-400' :
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border text-sm font-medium ${toast.type === 'success' ? 'bg-[#1a1a1a] border-[#00FFFF]/30 text-[#00FFFF]' :
+            toast.type === 'info' ? 'bg-[#1a1a1a] border-[#00FFFF]/30 text-[#00FFFF]' :
               'bg-[#1e1e1e] border-red-900 text-red-400'
             }`}>
             {toast.type === 'success' ? <CheckCircle size={20} /> :
@@ -9070,7 +9070,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   value={newRedeemCode.code || ''}
                   onChange={(e) => setNewRedeemCode({ ...newRedeemCode, code: e.target.value.toUpperCase() })}
                   placeholder="KINGO-DROPED-CODE"
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white font-mono focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white font-mono focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                 />
               </div>
 
@@ -9081,7 +9081,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   onChange={(e) => setNewRedeemCode({ ...newRedeemCode, description: e.target.value })}
                   placeholder="Description of what this code gives"
                   rows={2}
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                 />
               </div>
 
@@ -9103,7 +9103,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   setNewRedeemCode({ ...newRedeemCode, rewards: updated });
                                 }}
                                 placeholder="Display Name *"
-                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                               />
                               <select
                                 value={reward.type}
@@ -9112,7 +9112,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   updated[idx] = { ...reward, type: e.target.value as any };
                                   setNewRedeemCode({ ...newRedeemCode, rewards: updated });
                                 }}
-                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                               >
                                 <option value="item">Item</option>
                                 <option value="command">Command</option>
@@ -9133,7 +9133,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     setNewRedeemCode({ ...newRedeemCode, rewards: updated });
                                   }}
                                   placeholder="Item ID (e.g., minecraft:diamond)"
-                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                                 />
                                 <input
                                   type="number"
@@ -9144,7 +9144,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     setNewRedeemCode({ ...newRedeemCode, rewards: updated });
                                   }}
                                   placeholder="Count"
-                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                                 />
                               </div>
                             )}
@@ -9158,7 +9158,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   setNewRedeemCode({ ...newRedeemCode, rewards: updated });
                                 }}
                                 placeholder="Command (use {player} for player name)"
-                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                               />
                             )}
                             {reward.type === 'permission' && (
@@ -9171,7 +9171,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   setNewRedeemCode({ ...newRedeemCode, rewards: updated });
                                 }}
                                 placeholder="Permission node"
-                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                               />
                             )}
                             {reward.type === 'custom' && (
@@ -9184,7 +9184,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 }}
                                 placeholder='Custom JSON data (e.g., {"downloadUrl": "https://..."})'
                                 rows={3}
-                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm font-mono focus:outline-none focus:ring-1 focus:ring-green-500"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                               />
                             )}
                             {reward.type === 'downloadable' && (
@@ -9197,7 +9197,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   setNewRedeemCode({ ...newRedeemCode, rewards: updated });
                                 }}
                                 placeholder="Download URL (e.g., https://example.com/file.zip)"
-                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                               />
                             )}
                             {reward.type === 'cosmetic' && (
@@ -9217,7 +9217,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     setNewRedeemCode({ ...newRedeemCode, rewards: updated });
                                   }}
                                   placeholder="Item ID (e.g., buildscape:hammer)"
-                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                                 />
                                 <input
                                   type="text"
@@ -9234,7 +9234,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     setNewRedeemCode({ ...newRedeemCode, rewards: updated });
                                   }}
                                   placeholder="Skin ID (optional)"
-                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                                 />
                                 <input
                                   type="url"
@@ -9251,7 +9251,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     setNewRedeemCode({ ...newRedeemCode, rewards: updated });
                                   }}
                                   placeholder="Texture URL (optional)"
-                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                                 />
                                 <textarea
                                   value={reward.cosmeticData?.modelData || ''}
@@ -9267,7 +9267,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     setNewRedeemCode({ ...newRedeemCode, rewards: updated });
                                   }}
                                   placeholder="Custom Model Data (JSON, optional)"
-                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500 font-mono"
+                                  className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF] font-mono"
                                   rows={2}
                                 />
                               </div>
@@ -9282,7 +9282,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   setNewRedeemCode({ ...newRedeemCode, rewards: updated });
                                 }}
                                 placeholder="Description (optional)"
-                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                                className="w-full px-2 py-1.5 bg-gray-900 border border-gray-600 rounded text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#00FFFF]"
                               />
                             )}
                           </div>
@@ -9332,7 +9332,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     onChange={(e) => setNewRedeemCode({ ...newRedeemCode, maxUses: e.target.value ? parseInt(e.target.value) : undefined })}
                     placeholder="Unlimited if empty"
                     min="1"
-                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                   />
                 </div>
                 <div>
@@ -9360,7 +9360,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         setNewRedeemCode({ ...newRedeemCode, expiresAt: undefined });
                       }
                     }}
-                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                   />
                 </div>
               </div>
@@ -9372,7 +9372,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   value={newRedeemCode.requiresMembership || ''}
                   onChange={(e) => setNewRedeemCode({ ...newRedeemCode, requiresMembership: e.target.value || undefined })}
                   placeholder="Tier name (leave empty if no requirement)"
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                 />
               </div>
 
@@ -9381,7 +9381,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   type="checkbox"
                   checked={newRedeemCode.enabled !== false}
                   onChange={(e) => setNewRedeemCode({ ...newRedeemCode, enabled: e.target.checked })}
-                  className="w-4 h-4 text-green-600 bg-gray-700 border-gray-600 rounded focus:ring-green-500"
+                  className="w-4 h-4 text-[#00FFFF] bg-gray-700 border-gray-600 rounded focus:ring-[#00FFFF]"
                 />
                 <label className="text-sm text-gray-300">Code is enabled</label>
               </div>
@@ -9407,7 +9407,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                 </button>
                 <button
                   onClick={saveRedeemCode}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                  className="px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow"
                 >
                   {editingRedeemCode ? 'Update Code' : 'Create Code'}
                 </button>
@@ -9483,7 +9483,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   value={newWikiFeature.title || ''}
                   onChange={(e) => setNewWikiFeature({ ...newWikiFeature, title: e.target.value })}
                   placeholder="Feature Title"
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                 />
               </div>
 
@@ -9507,7 +9507,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           }
                         }}
                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${isSelected
-                          ? 'bg-green-600 text-white border-2 border-green-500'
+                          ? 'bg-[#00FFFF] text-black border-2 border-[#00FFFF]'
                           : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border-2 border-transparent'
                           }`}
                       >
@@ -9615,7 +9615,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                           }
                                         }}
                                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${isSelected
-                                          ? 'bg-blue-600 text-white border-2 border-blue-500'
+                                          ? 'bg-[#00FFFF] text-black border-2 border-[#00FFFF]'
                                           : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border-2 border-transparent'
                                           }`}
                                       >
@@ -9693,7 +9693,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                           }
                                         }}
                                         className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${isSelected
-                                          ? 'bg-green-600 text-white border-2 border-green-500'
+                                          ? 'bg-[#00FFFF] text-black border-2 border-[#00FFFF]'
                                           : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border-2 border-transparent'
                                           }`}
                                       >
@@ -9769,7 +9769,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                             }
                                           }}
                                           className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${isSelected
-                                            ? 'bg-blue-600 text-white border-2 border-blue-500'
+                                            ? 'bg-[#00FFFF] text-black border-2 border-[#00FFFF]'
                                             : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border-2 border-transparent'
                                             }`}
                                         >
@@ -9810,7 +9810,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                 <select
                   value={newWikiFeature.descriptionType || 'markdown'}
                   onChange={(e) => setNewWikiFeature({ ...newWikiFeature, descriptionType: e.target.value as 'html' | 'markdown' })}
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                 >
                   <option value="markdown">Markdown</option>
                   <option value="html">HTML</option>
@@ -9918,12 +9918,12 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         }
                       }}
                       disabled={aiReviewing}
-                      className="flex items-center gap-1 px-2 py-1 text-xs text-blue-400 hover:text-white bg-blue-900/20 hover:bg-blue-900/40 rounded transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-[#00FFFF] hover:text-white bg-[#00FFFF]/10 hover:bg-[#00FFFF]/20 rounded transition-all btn-hover-glow disabled:opacity-50"
                       title="AI Review: Enhance title, description, and add detail points"
                     >
                       {aiReviewing ? (
                         <>
-                          <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                          <div className="w-3 h-3 border-2 border-[#00FFFF] border-t-transparent rounded-full animate-spin"></div>
                           Reviewing...
                         </>
                       ) : (
@@ -10344,7 +10344,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
                               return (
                                 <div key={idx} className="flex items-start gap-2 text-gray-300 my-1">
-                                  <span className="text-green-500 flex-shrink-0" style={{ marginTop: '0.125rem' }}>•</span>
+                                  <span className="text-[#00FFFF] flex-shrink-0" style={{ marginTop: '0.125rem' }}>•</span>
                                   <span className="flex-1">{trimmed.substring(2)}</span>
                                 </div>
                               );
@@ -10363,7 +10363,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     onChange={(e) => setNewWikiFeature({ ...newWikiFeature, description: e.target.value })}
                     placeholder="Feature description"
                     rows={6}
-                    className={`w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500 font-mono text-sm ${newWikiFeature.descriptionType === 'html' || newWikiFeature.descriptionType === 'markdown' ? 'rounded-t-none' : ''}`}
+                    className={`w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF] font-mono text-sm ${newWikiFeature.descriptionType === 'html' || newWikiFeature.descriptionType === 'markdown' ? 'rounded-t-none' : ''}`}
                   />
                 )}
               </div>
@@ -10422,7 +10422,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   </div>
                   {newWikiFeature.media && (
                     <div className="text-xs text-gray-400">
-                      Media URL: <span className="text-blue-400 break-all">{newWikiFeature.media}</span>
+                      Media URL: <span className="text-[#00FFFF] break-all">{newWikiFeature.media}</span>
                     </div>
                   )}
                   <input
@@ -10434,7 +10434,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       setMediaPreview(url);
                     }}
                     placeholder="Or paste image/video URL (YouTube, Vimeo, Google Drive, etc.)"
-                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF] text-sm"
                   />
                   {mediaPreview ? (
                     <div className="mt-2">
@@ -10465,7 +10465,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           return (
                             <div className="bg-gray-800 border border-gray-600 rounded-lg p-4 text-center">
                               <p className="text-gray-400 text-sm">Google Drive link detected. Make sure the file is set to "Anyone with the link can view".</p>
-                              <a href={mediaPreview} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-sm mt-2 inline-block">
+                              <a href={mediaPreview} target="_blank" rel="noopener noreferrer" className="text-[#00FFFF] hover:text-[#00fbff] text-sm mt-2 inline-block">
                                 Open in Google Drive
                               </a>
                             </div>
@@ -10542,7 +10542,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         return (
                           <div className="bg-gray-800 border border-gray-600 rounded-lg p-4 text-center">
                             <p className="text-gray-400 text-sm mb-2">Preview not available for this URL format.</p>
-                            <a href={mediaPreview} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-sm">
+                            <a href={mediaPreview} target="_blank" rel="noopener noreferrer" className="text-[#00FFFF] hover:text-[#00fbff] text-sm">
                               Open URL
                             </a>
                           </div>
@@ -10593,7 +10593,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       }
                     }}
                     placeholder="Add detail point (press Enter)"
-                    className="flex-1 bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    className="flex-1 bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#00FFFF]"
                   />
                   <button
                     onClick={() => {
@@ -10605,7 +10605,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         setNewDetail('');
                       }
                     }}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                    className="px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow"
                   >
                     <Plus size={18} />
                   </button>
@@ -10638,7 +10638,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                 </button>
                 <button
                   onClick={saveWikiFeature}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                  className="px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow"
                 >
                   {editingWikiFeature ? 'Update Feature' : 'Create Feature'}
                 </button>

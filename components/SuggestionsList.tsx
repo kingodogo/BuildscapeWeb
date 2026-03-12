@@ -99,9 +99,9 @@ export default function SuggestionsList({
 
   const getStatusColor = (status: Suggestion['status']) => {
     switch (status) {
-      case 'Implemented': return 'bg-green-900/20 border-green-800 text-green-400';
-      case 'Planned': return 'bg-blue-900/20 border-blue-800 text-blue-400';
-      case 'Under Review': return 'bg-yellow-900/20 border-yellow-800 text-yellow-400';
+      case 'Implemented': return 'bg-[#00FFFF]/10 border-[#00FFFF]/30 text-[#00FFFF]';
+      case 'Planned': return 'bg-[#00fbff]/10 border-[#00fbff]/30 text-[#00fbff]';
+      case 'Under Review': return 'bg-amber-900/10 border-amber-800/30 text-amber-400';
       case 'Rejected': return 'bg-red-900/20 border-red-800 text-red-400';
       default: return 'bg-gray-800/50 border-gray-700/50 text-gray-300';
     }
@@ -119,10 +119,10 @@ export default function SuggestionsList({
 
   const getCategoryColor = (category: Suggestion['category']) => {
     switch (category) {
-      case 'Feature': return 'bg-purple-900/20 border-purple-800 text-purple-300';
-      case 'Enhancement': return 'bg-blue-900/20 border-blue-800 text-blue-300';
-      case 'Block': return 'bg-green-900/20 border-green-800 text-green-300';
-      case 'Item': return 'bg-yellow-900/20 border-yellow-800 text-yellow-300';
+      case 'Feature': return 'bg-purple-900/10 border-purple-800/30 text-purple-300';
+      case 'Enhancement': return 'bg-[#00fbff]/10 border-[#00fbff]/30 text-[#00fbff]';
+      case 'Block': return 'bg-[#00FFFF]/10 border-[#00FFFF]/30 text-[#00FFFF]';
+      case 'Item': return 'bg-amber-900/10 border-amber-800/30 text-amber-400';
       default: return 'bg-gray-800 border-gray-700 text-gray-300';
     }
   };
@@ -135,7 +135,7 @@ export default function SuggestionsList({
           onClick={() => setActiveTab('active')}
           className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 ${
             activeTab === 'active'
-              ? 'text-white border-blue-500'
+              ? 'text-white border-[#00FFFF]'
               : 'text-gray-400 border-transparent hover:text-gray-300'
           }`}
         >
@@ -148,7 +148,7 @@ export default function SuggestionsList({
           onClick={() => setActiveTab('closed')}
           className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 ${
             activeTab === 'closed'
-              ? 'text-white border-green-500'
+              ? 'text-white border-[#00fbff]'
               : 'text-gray-400 border-transparent hover:text-gray-300'
           }`}
         >
@@ -162,7 +162,7 @@ export default function SuggestionsList({
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
           <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-            <Lightbulb className="text-blue-500" />
+            <Lightbulb className="text-[#00FFFF]" />
             {activeTab === 'active' ? 'Suggestions & Feature Requests' : 'Approved/Closed Suggestions'}
           </h2>
           <div className="flex gap-2 font-mono text-xs mt-2">
@@ -170,15 +170,15 @@ export default function SuggestionsList({
               Total: {activeTab === 'active' ? activeCount : closedCount}
             </span>
             {activeTab === 'active' ? (
-              <span className="bg-blue-900/20 border border-blue-900/50 text-blue-400 px-3 py-1 rounded-full">
+              <span className="bg-[#00FFFF]/10 border border-[#00FFFF]/30 text-[#00FFFF] px-3 py-1 rounded-full">
                 Active: {activeCount}
               </span>
             ) : (
               <>
-                <span className="bg-green-900/20 border border-green-900/50 text-green-400 px-3 py-1 rounded-full">
+                <span className="bg-[#00FFFF]/10 border border-[#00FFFF]/30 text-[#00FFFF] px-3 py-1 rounded-full">
                   Accepted: {acceptedCount}
                 </span>
-                <span className="bg-red-900/20 border border-red-900/50 text-red-400 px-3 py-1 rounded-full">
+                <span className="bg-red-900/10 border border-red-900/30 text-red-400 px-3 py-1 rounded-full">
                   Denied: {deniedCount}
                 </span>
               </>
@@ -195,7 +195,7 @@ export default function SuggestionsList({
                 placeholder="Search suggestions or tags..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#1e1e1e] border border-gray-700 text-white text-sm rounded-lg pl-9 pr-3 py-2 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                className="w-full bg-[#1e1e1e] border border-gray-700 text-white text-sm rounded-lg pl-9 pr-3 py-2 focus:ring-1 focus:ring-[#00FFFF] focus:border-[#00FFFF] outline-none"
                 />
             </div>
             
@@ -203,7 +203,7 @@ export default function SuggestionsList({
                 <select 
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="bg-[#1e1e1e] border border-gray-700 text-white text-sm rounded-lg px-3 py-2 focus:ring-1 focus:ring-blue-500 outline-none"
+                    className="bg-[#1e1e1e] border border-gray-700 text-white text-sm rounded-lg px-3 py-2 focus:ring-1 focus:ring-[#00FFFF] outline-none"
                 >
                     <option value="All">All Status</option>
                     <option value="Open">Open</option>
@@ -255,11 +255,11 @@ export default function SuggestionsList({
                     </span>
                     <span className={`text-[10px] font-bold px-2 py-1 rounded border font-mono uppercase tracking-wide
                     ${suggestion.priority === 'High' ? 'text-red-400 border-red-500/30 bg-red-500/10' : 
-                        suggestion.priority === 'Medium' ? 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10' : 
-                        'text-green-400 border-green-500/30 bg-green-500/10'}`}>
+                        suggestion.priority === 'Medium' ? 'text-amber-400 border-amber-500/30 bg-amber-500/10' : 
+                        'text-[#00FFFF] border-[#00FFFF]/30 bg-[#00FFFF]/10'}`}>
                     {suggestion.priority}
                     </span>
-                    <h3 className="text-white font-semibold text-lg truncate pr-2 group-hover:text-blue-400 transition-colors">{suggestion.title}</h3>
+                    <h3 className="text-white font-semibold text-lg truncate pr-2 group-hover:text-[#00FFFF] transition-colors">{suggestion.title}</h3>
                 </div>
                 
                 <p className="text-gray-400 text-sm leading-relaxed mb-3 line-clamp-2">{suggestion.description}</p>
@@ -327,7 +327,8 @@ export default function SuggestionsList({
                         </button>
                         <button 
                             onClick={(e) => { e.stopPropagation(); setSelectedSuggestion(suggestion); }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-blue-600/10 hover:bg-blue-600/20 border border-blue-900/30 text-xs font-semibold text-blue-400 hover:text-blue-300 transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#00FFFF]/10 hover:bg-[#00FFFF]/20 border border-[#00FFFF]/30 text-xs font-semibold text-[#00FFFF] hover:text-[#00fbff] transition-all transform hover:scale-105 active:scale-95 btn-hover-glow"
+                            style={{ '--glow-color': 'rgba(0, 255, 255, 0.4)' } as any}
                         >
                             <ExternalLink size={14} /> 
                             View

@@ -184,7 +184,7 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
                 <form onSubmit={handleFormSubmit} className="space-y-6">
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">Issue Title <span className="text-red-400">*</span></label>
-                        <input type="text" required disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 outline-none disabled:opacity-50" placeholder="e.g., Game crashes when breaking Icicle" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} />
+                        <input type="text" required disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-[#00FFFF] outline-none disabled:opacity-50" placeholder="e.g., Game crashes when breaking Icicle" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} />
                     </div>
 
                     <div className="space-y-4">
@@ -192,7 +192,7 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
                             <label className="block text-sm font-medium text-gray-300 mb-2">Minecraft Versions <span className="text-red-400">*</span></label>
                             <div className="flex flex-wrap gap-2">
                                 {mcVersions.map(v => (
-                                    <button type="button" key={v} disabled={analyzing} onClick={() => toggleMcVersion(v)} className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selectedMcVersions.includes(v) ? 'bg-green-900/30 border-green-500 text-green-300' : 'bg-[#121212] border-gray-700 text-gray-400 hover:border-gray-500'} disabled:opacity-50`}>{v}</button>
+                                    <button type="button" key={v} disabled={analyzing} onClick={() => toggleMcVersion(v)} className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selectedMcVersions.includes(v) ? 'bg-[#00FFFF]/20 border-[#00FFFF] text-[#00FFFF]' : 'bg-[#121212] border-gray-700 text-gray-400 hover:border-gray-500'} disabled:opacity-50`}>{v}</button>
                                 ))}
                             </div>
                         </div>
@@ -200,7 +200,7 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
                             <label className="block text-sm font-medium text-gray-300 mb-2">Mod Versions <span className="text-red-400">*</span></label>
                             <div className="flex flex-wrap gap-2">
                                 {modVersions.map(v => (
-                                    <button type="button" key={v} disabled={analyzing} onClick={() => toggleModVersion(v)} className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selectedModVersions.includes(v) ? 'bg-blue-900/30 border-blue-500 text-blue-300' : 'bg-[#121212] border-gray-700 text-gray-400 hover:border-gray-500'} disabled:opacity-50`}>v{v}</button>
+                                    <button type="button" key={v} disabled={analyzing} onClick={() => toggleModVersion(v)} className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${selectedModVersions.includes(v) ? 'bg-[#00fbff]/20 border-[#00fbff] text-[#00fbff]' : 'bg-[#121212] border-gray-700 text-gray-400 hover:border-gray-500'} disabled:opacity-50`}>v{v}</button>
                                 ))}
                             </div>
                         </div>
@@ -208,21 +208,21 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
 
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">Reporter Name</label>
-                        <input type="text" disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 outline-none disabled:opacity-50" placeholder="Your IGN or Discord username" value={formData.author} onChange={(e) => setFormData({...formData, author: e.target.value})} />
+                        <input type="text" disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-[#00FFFF] outline-none disabled:opacity-50" placeholder="Your IGN or Discord username" value={formData.author} onChange={(e) => setFormData({...formData, author: e.target.value})} />
                     </div>
 
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">Tags (Optional)</label>
                         <div className="relative">
                             <Tag className="absolute left-3 top-3 text-gray-500 w-4 h-4" />
-                            <input type="text" disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg pl-9 pr-3 py-3 text-white focus:ring-2 focus:ring-green-500 outline-none disabled:opacity-50" placeholder="e.g. textures, crash, mod-compat (comma separated)" value={formData.tags} onChange={(e) => setFormData({...formData, tags: e.target.value})} />
+                            <input type="text" disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg pl-9 pr-3 py-3 text-white focus:ring-2 focus:ring-[#00FFFF] outline-none disabled:opacity-50" placeholder="e.g. textures, crash, mod-compat (comma separated)" value={formData.tags} onChange={(e) => setFormData({...formData, tags: e.target.value})} />
                         </div>
                     </div>
 
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">External Links (Logs, Screenshots, Videos)</label>
                         <div className="flex gap-2 mb-2">
-                            <input type="url" disabled={analyzing} className="flex-1 bg-[#121212] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-green-500 outline-none disabled:opacity-50" placeholder="https://pastebin.com/..." value={newLink} onChange={(e) => setNewLink(e.target.value)} />
+                            <input type="url" disabled={analyzing} className="flex-1 bg-[#121212] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-[#00FFFF] outline-none disabled:opacity-50" placeholder="https://pastebin.com/..." value={newLink} onChange={(e) => setNewLink(e.target.value)} />
                             <button type="button" disabled={analyzing} onClick={addLink} className="bg-gray-800 hover:bg-gray-700 text-white px-3 rounded-lg border border-gray-600 disabled:opacity-50"><Plus size={18} /></button>
                         </div>
                         <p className="text-[10px] text-gray-500 mb-3">Supported: Pastebin, GitHub Gist, mclo.gs, Imgur, YouTube, Twitch, CurseForge, Modrinth.</p>
@@ -240,28 +240,28 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
 
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">Description <span className="text-red-400">*</span></label>
-                        <textarea required rows={4} disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 outline-none resize-none disabled:opacity-50" placeholder="Please describe what happened in detail..." value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
+                        <textarea required rows={4} disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-[#00FFFF] outline-none resize-none disabled:opacity-50" placeholder="Please describe what happened in detail..." value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} />
                     </div>
 
                     <div>
                         <label className="block text-sm font-medium text-gray-300 mb-1.5">Steps to Reproduce</label>
-                        <textarea rows={4} disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 outline-none resize-none font-mono text-sm disabled:opacity-50" placeholder={`1. Open inventory\n2. Select item...\n3. Place block...`} value={formData.steps} onChange={(e) => setFormData({...formData, steps: e.target.value})} />
+                        <textarea rows={4} disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-[#00FFFF] outline-none resize-none font-mono text-sm disabled:opacity-50" placeholder={`1. Open inventory\n2. Select item...\n3. Place block...`} value={formData.steps} onChange={(e) => setFormData({...formData, steps: e.target.value})} />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-1.5">Expected Behavior</label>
-                            <textarea rows={3} disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 outline-none resize-none text-sm disabled:opacity-50" placeholder="What should have happened?" value={formData.expected} onChange={(e) => setFormData({...formData, expected: e.target.value})} />
+                            <textarea rows={3} disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-[#00FFFF] outline-none resize-none text-sm disabled:opacity-50" placeholder="What should have happened?" value={formData.expected} onChange={(e) => setFormData({...formData, expected: e.target.value})} />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-1.5">Actual Behavior</label>
-                            <textarea rows={3} disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-green-500 outline-none resize-none text-sm disabled:opacity-50" placeholder="What actually happened?" value={formData.actual} onChange={(e) => setFormData({...formData, actual: e.target.value})} />
+                            <textarea rows={3} disabled={analyzing} className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-[#00FFFF] outline-none resize-none text-sm disabled:opacity-50" placeholder="What actually happened?" value={formData.actual} onChange={(e) => setFormData({...formData, actual: e.target.value})} />
                         </div>
                     </div>
 
                     <div className="flex gap-4 pt-4 border-t border-gray-800">
-                        <button type="submit" disabled={analyzing} className="px-6 py-2.5 rounded-lg font-medium bg-minecraft-grass hover:bg-green-700 text-white shadow-lg shadow-green-900/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-                            {analyzing && <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>}
+                        <button type="submit" disabled={analyzing} className="px-6 py-2.5 rounded-lg font-medium bg-[#00FFFF] hover:bg-[#00fbff] text-black shadow-lg shadow-[#00FFFF]/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 btn-shine">
+                            {analyzing && <div className="animate-spin h-4 w-4 border-2 border-black border-t-transparent rounded-full"></div>}
                             {analyzing ? 'Analyzing...' : 'Submit Report'}
                         </button>
                         <button type="button" onClick={onCancel} className="px-6 py-2.5 rounded-lg font-medium bg-transparent hover:bg-white/5 text-gray-400 hover:text-white transition-all border border-transparent hover:border-gray-700">Cancel</button>
@@ -281,11 +281,11 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
                                 <p className="text-xs opacity-70">Your report will be automatically analyzed when you click Submit, or check it manually now.</p>
                             </div>
                         )}
-                        {analyzing && <div className="text-center py-12"><div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-500 mb-3"></div><p className="text-gray-400 text-sm font-medium animate-pulse">Analyzing report...</p></div>}
+                        {analyzing && <div className="text-center py-12"><div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#00FFFF] mb-3"></div><p className="text-gray-400 text-sm font-medium animate-pulse">Analyzing report...</p></div>}
                         {aiResult && !analyzing && (
                             <div className="space-y-4 fade-in">
                                 <div className="flex items-center gap-3 flex-wrap">
-                                    <div className={`text-sm font-bold px-3 py-1.5 rounded-md border shadow-sm ${aiResult.qualityScore >= 8 ? 'text-green-400 border-green-800 bg-green-900/20' : aiResult.qualityScore >= 5 ? 'text-yellow-400 border-yellow-800 bg-yellow-900/20' : 'text-red-400 border-red-800 bg-red-900/20'}`}>Quality Score: {aiResult.qualityScore}/10</div>
+                                    <div className={`text-sm font-bold px-3 py-1.5 rounded-md border shadow-sm ${aiResult.qualityScore >= 8 ? 'text-[#00FFFF] border-[#00FFFF]/30 bg-[#00FFFF]/10' : aiResult.qualityScore >= 5 ? 'text-yellow-400 border-yellow-800 bg-yellow-900/20' : 'text-red-400 border-red-800 bg-red-900/20'}`}>Quality Score: {aiResult.qualityScore}/10</div>
                                     <div className="text-sm font-bold px-3 py-1.5 rounded-md bg-gray-800 text-gray-200 border border-gray-700 shadow-sm">Severity: {aiResult.severityAssessment}</div>
                                 </div>
                                 <div className="bg-[#1f1f1f] p-4 rounded-lg border border-gray-700"><span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold block mb-1.5">Analysis Summary</span><p className="text-gray-300 text-sm leading-relaxed">{aiResult.summary}</p></div>
@@ -327,7 +327,7 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
               <h3 className="text-xl font-bold text-white mb-4">Confirm Submission</h3>
               <p className="text-gray-400 mb-6">Are you sure you want to submit this bug report? Please ensure all details are correct.</p>
               {aiResult && aiResult.qualityScore < 5 && (<div className="bg-yellow-900/20 border border-yellow-800 text-yellow-300 p-3 rounded mb-6 text-sm flex gap-2 items-start"><AlertTriangle size={16} className="mt-0.5 flex-shrink-0" /><p>The Report Quality Score is low ({aiResult.qualityScore}/10). You might want to add more details.</p></div>)}
-              <div className="flex gap-3 justify-end"><button onClick={() => setShowConfirmModal(false)} className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors flex items-center gap-2"><X size={16} /> Cancel</button><button onClick={confirmSubmit} className="px-4 py-2 rounded-lg bg-minecraft-grass hover:bg-green-700 text-white transition-colors flex items-center gap-2 font-medium shadow-lg"><Check size={16} /> Confirm</button></div>
+              <div className="flex gap-3 justify-end"><button onClick={() => setShowConfirmModal(false)} className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors flex items-center gap-2"><X size={16} /> Cancel</button><button onClick={confirmSubmit} className="px-4 py-2 rounded-lg bg-[#00FFFF] hover:bg-[#00fbff] text-black transition-colors flex items-center gap-2 font-medium shadow-lg btn-shine"><Check size={16} /> Confirm</button></div>
             </div>
           </div>
         , document.body)}

@@ -19,7 +19,7 @@ export default function Hero({ onReportClick, onSuggestionsClick, config, links 
       ? (isGradient 
           ? config.headlineColor 
           : `linear-gradient(to right, ${config.headlineColor}, ${config.headlineColor})`)
-      : 'linear-gradient(to right, #34d399, #059669)';
+      : 'linear-gradient(to right, #00FFFF, #00fbff)';
     
     return {
       backgroundImage: bgValue,
@@ -40,11 +40,11 @@ export default function Hero({ onReportClick, onSuggestionsClick, config, links 
   }, [config.headlineColor]);
 
   const glowBoxStyle = useMemo(() => {
-    const glowColor = config.headlineGlowColor || '#34d399';
+    const glowColor = config.headlineGlowColor || '#00fbff';
     const rgbMatch = glowColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
     const hexMatch = glowColor.match(/#([0-9a-fA-F]{6})/);
     
-    let glowRgb = '52, 211, 153';
+    let glowRgb = '0, 251, 255';
     if (rgbMatch) {
       glowRgb = `${rgbMatch[1]}, ${rgbMatch[2]}, ${rgbMatch[3]}`;
     } else if (hexMatch) {
@@ -98,7 +98,7 @@ export default function Hero({ onReportClick, onSuggestionsClick, config, links 
           <div className="rounded-md shadow">
             <button 
               onClick={onReportClick}
-              className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-minecraft-grass hover:bg-green-700 md:py-4 md:text-lg md:px-10 transition-all shadow-lg hover:shadow-green-900/30 transform hover:-translate-y-0.5 h-[48px] md:h-[56px] whitespace-nowrap"
+              className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-lg text-black bg-[#00FFFF] hover:bg-[#00fbff] md:py-4 md:text-lg md:px-10 transition-all shadow-lg hover:shadow-[#00FFFF]/30 transform hover:-translate-y-0.5 h-[48px] md:h-[56px] whitespace-nowrap btn-shine"
             >
               <span className="text-center">Report a Bug</span>
               <ArrowRight className="ml-2 h-5 w-5 flex-shrink-0" />
@@ -108,7 +108,7 @@ export default function Hero({ onReportClick, onSuggestionsClick, config, links 
             <div className="mt-3 rounded-md shadow sm:mt-0">
               <button 
                 onClick={onSuggestionsClick}
-                className="w-full flex items-center justify-center px-8 py-3 border border-blue-600 text-base font-medium rounded-lg text-blue-400 bg-blue-900/20 hover:bg-blue-900/30 md:py-4 md:text-lg md:px-10 transition-all hover:border-blue-500 transform hover:-translate-y-0.5 h-[48px] md:h-[56px] whitespace-nowrap"
+                className="w-full flex items-center justify-center px-8 py-3 border border-[#00FFFF]/50 text-[#00FFFF] bg-[#00FFFF]/10 hover:bg-[#00FFFF]/20 md:py-4 md:text-lg md:px-10 transition-all hover:border-[#00FFFF] transform hover:-translate-y-0.5 h-[48px] md:h-[56px] whitespace-nowrap btn-hover-glow"
               >
                 <Lightbulb className="mr-2 h-5 w-5 flex-shrink-0" />
                 <span className="text-center">Suggestions</span>
@@ -130,11 +130,11 @@ export default function Hero({ onReportClick, onSuggestionsClick, config, links 
         
         <div className="mt-12 flex justify-center space-x-8 text-gray-500 text-sm font-mono">
           <div className="flex items-center">
-            <span className="w-2 h-2 bg-green-500 rounded-full mr-2 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
+            <span className="w-2 h-2 bg-[#00FFFF] rounded-full mr-2 shadow-[0_0_8px_rgba(0,255,255,0.6)] animate-pulse"></span>
             Latest: {config.latestModVersion}
           </div>
           <div className="flex items-center">
-            <span className="w-2 h-2 bg-blue-500 rounded-full mr-2 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></span>
+            <span className="w-2 h-2 bg-[#00fbff] rounded-full mr-2 shadow-[0_0_8px_rgba(0,251,255,0.6)] animate-pulse"></span>
             MC: {config.latestMcVersions}
           </div>
         </div>

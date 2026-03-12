@@ -712,8 +712,8 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
           
           <div className="bg-[#1a1a1a] border-b border-gray-800 px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center">
-                <UserCircle size={20} className="text-white" />
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#00FFFF] to-[#00fbff]/50 flex items-center justify-center">
+                <UserCircle size={20} className="text-black" />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white">Profile Settings</h1>
@@ -759,7 +759,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
               onClick={() => setActiveTab('edit')}
               className={`px-4 py-3 font-semibold text-sm transition-all border-b-2 ${
                 activeTab === 'edit'
-                  ? 'text-white border-green-500'
+                  ? 'text-white border-[#00FFFF]'
                   : 'text-gray-400 border-transparent hover:text-gray-300'
               }`}
             >
@@ -772,7 +772,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
               onClick={() => setActiveTab('accounts')}
               className={`px-4 py-3 font-semibold text-sm transition-all border-b-2 ${
                 activeTab === 'accounts'
-                  ? 'text-white border-green-500'
+                  ? 'text-white border-[#00FFFF]'
                   : 'text-gray-400 border-transparent hover:text-gray-300'
               }`}
             >
@@ -785,7 +785,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
               onClick={() => setActiveTab('rewards')}
               className={`px-4 py-3 font-semibold text-sm transition-all border-b-2 ${
                 activeTab === 'rewards'
-                  ? 'text-white border-green-500'
+                  ? 'text-white border-[#00FFFF]'
                   : 'text-gray-400 border-transparent hover:text-gray-300'
               }`}
             >
@@ -815,8 +815,8 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                       className="w-20 h-20 rounded-full object-cover border-2 border-gray-700"
                     />
                   ) : (
-                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center border-2 border-gray-700">
-                      <UserCircle size={32} className="text-white" />
+                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#00FFFF] to-[#00fbff]/50 flex items-center justify-center border-2 border-gray-700">
+                      <UserCircle size={32} className="text-black" />
                     </div>
                   )}
                 </div>
@@ -838,7 +838,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                       </div>
                       <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
                         <div 
-                          className="bg-green-500 h-full transition-all duration-300 ease-out"
+                          className="bg-[#00FFFF] h-full shadow-[0_0_10px_rgba(0,255,255,0.4)] transition-all duration-300 ease-out"
                           style={{ width: `${uploadProgress}%` }}
                         ></div>
                       </div>
@@ -893,9 +893,9 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                     usernameError || usernameAvailable === false
                       ? 'border-red-500'
                       : usernameAvailable === true
-                      ? 'border-green-500'
+                      ? 'border-[#00FFFF]'
                       : 'border-gray-700'
-                  } rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors`}
+                  } rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors`}
                   placeholder="Enter username"
                   disabled={streamerMode}
                 />
@@ -907,7 +907,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                 {!isCheckingUsername && username !== currentUser.username && (
                   <div className="absolute right-3 top-1/2 -translate-y-1/2">
                     {usernameAvailable === true && (
-                      <CheckCircle size={20} className="text-green-500" />
+                      <CheckCircle size={20} className="text-[#00FFFF]" />
                     )}
                     {usernameAvailable === false && (
                       <AlertCircle size={20} className="text-red-500" />
@@ -922,7 +922,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                 </p>
               )}
               {usernameAvailable === true && username !== currentUser.username && (
-                <p className="mt-1.5 text-sm text-green-400 flex items-center gap-1">
+                <p className="mt-1.5 text-sm text-[#00FFFF] flex items-center gap-1">
                   <CheckCircle size={14} />
                   Username is available
                 </p>
@@ -948,7 +948,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                     }}
                     className={`w-full bg-[#1a1a1a] border ${
                       emailError ? 'border-red-500' : 'border-gray-700'
-                    } rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors`}
+                    } rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors`}
                     placeholder="Enter your email address"
                     disabled={isUpdatingEmail || streamerMode}
                   />
@@ -1002,7 +1002,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                     }
                   }}
                   disabled={streamerMode || isUpdatingEmail || !email.trim() || email.trim() === currentUser.email}
-                  className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-4 py-2 bg-[#00FFFF] hover:bg-[#00fbff] text-black rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed btn-shine"
                 >
                   {isUpdatingEmail ? (
                     <>
@@ -1032,7 +1032,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                     type="password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full bg-[#121212] border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                    className="w-full bg-[#121212] border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors"
                     placeholder="Enter current password"
                   />
                 </div>
@@ -1043,7 +1043,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full bg-[#121212] border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors"
+                    className="w-full bg-[#121212] border border-gray-700 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors"
                     placeholder="Enter new password (min 6 characters)"
                   />
                 </div>
@@ -1058,16 +1058,16 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                       newPassword && newPassword !== confirmPassword
                         ? 'border-red-500'
                         : newPassword && newPassword === confirmPassword
-                        ? 'border-green-500'
+                        ? 'border-[#00FFFF]'
                         : 'border-gray-700'
-                    } rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors`}
+                    } rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors`}
                     placeholder="Confirm new password"
                   />
                   {newPassword && newPassword !== confirmPassword && (
                     <p className="mt-1.5 text-sm text-red-400">Passwords do not match</p>
                   )}
                   {newPassword && newPassword === confirmPassword && newPassword.length >= 6 && (
-                    <p className="mt-1.5 text-sm text-green-400">Passwords match</p>
+                    <p className="mt-1.5 text-sm text-[#00FFFF]">Passwords match</p>
                   )}
                 </div>
               </div>
@@ -1086,9 +1086,9 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                 disabled={!canSave || isSaving}
                 className={`flex-1 px-4 py-2.5 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
                   canSave && !isSaving
-                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    ? 'bg-[#00FFFF] hover:bg-[#00fbff] text-black'
                     : 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                }`}
+                } btn-shine`}
               >
                 {isSaving ? (
                   <>
@@ -1129,8 +1129,8 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <CheckCircle size={20} className="text-green-500" />
-                      <span className="text-xs text-green-400">Linked</span>
+                      <CheckCircle size={20} className="text-[#00FFFF]" />
+                      <span className="text-xs text-[#00FFFF]">Linked</span>
                     </div>
                   </div>
                   
@@ -1240,7 +1240,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                             }
                           }}
                           disabled={isLinkingMinecraft || !minecraftUsername.trim()}
-                          className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold transition-all hover:shadow-lg disabled:opacity-50"
+                          className="px-4 py-2 bg-[#00FFFF] hover:bg-[#00fbff] text-black rounded-lg text-sm font-bold transition-all hover:shadow-lg disabled:opacity-50 btn-shine"
                         >
                           Link Username
                         </button>
@@ -1324,7 +1324,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                         }}
                         className={`w-full bg-[#1a1a1a] border ${
                           kofiUsernameError ? 'border-red-500' : 'border-gray-700'
-                        } rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-colors`}
+                        } rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors`}
                         placeholder="Enter your Ko-fi name"
                         disabled={isUpdatingKofiUsername}
                       />
@@ -1637,7 +1637,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                             }}
                             className={`flex-1 bg-[#1a1a1a] border ${
                               twitchError ? 'border-red-500' : 'border-gray-700'
-                            } rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-colors text-sm`}
+                            } rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors text-sm`}
                             placeholder="Twitch Username"
                             disabled={isVerifyingTwitch}
                           />
@@ -1716,7 +1716,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                   
                   {isLoadingRewards ? (
                     <div className="bg-[#121212] rounded-lg p-8 text-center">
-                      <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                      <div className="w-8 h-8 border-2 border-[#00FFFF] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                       <p className="text-gray-400">Loading rewards...</p>
           </div>
                   ) : rewards.length === 0 ? (
@@ -1736,7 +1736,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                             window.dispatchEvent(new HashChangeEvent('hashchange'));
                           }
                         }}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-[#00FFFF] hover:bg-[#00fbff] text-black rounded-lg font-medium transition-colors btn-shine"
                       >
                         <Gift size={16} />
                         Redeem Code
@@ -1754,7 +1754,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                                   reward.source === 'kofi' ? 'bg-[#FF5E5B]/20 text-[#FF5E5B] border border-[#FF5E5B]/50' :
                                   reward.source === 'membership' ? 'bg-purple-900/30 text-purple-400 border border-purple-700' :
                                   reward.source === 'streamelements' ? 'bg-[#9146FF]/30 text-purple-300 border border-[#9146FF]/50' :
-                                  reward.source === 'manual' ? 'bg-green-900/30 text-green-400 border border-green-700' :
+                                  reward.source === 'manual' ? 'bg-[#00FFFF]/20 text-[#00FFFF] border border-[#00FFFF]/30' :
                                   'bg-gray-700/50 text-gray-300 border border-gray-600'
                                 }`}>
                                   {reward.source === 'code' ? 'Code' :
@@ -1776,7 +1776,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                                     })()}
                                   </span>
                                 ) : (
-                                  <span className="px-2 py-1 rounded text-[10px] font-bold bg-green-900/20 text-green-400 border border-green-700/50 flex items-center gap-1">
+                                  <span className="px-2 py-1 rounded text-[10px] font-bold bg-[#00FFFF]/10 text-[#00FFFF] border border-[#00FFFF]/30 flex items-center gap-1">
                                     <CheckCircle size={10} />
                                     Permanent
                                   </span>
@@ -1806,7 +1806,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                                             return (
                                               <button
                                                 onClick={() => handleDownloadAsset(reward.id, downloadUrl)}
-                                                className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium flex items-center gap-2"
+                                                className="px-3 py-1.5 bg-[#00FFFF] hover:bg-[#00fbff] text-black rounded text-xs font-medium flex items-center gap-2 btn-shine"
                                               >
                                                 <Download size={14} />
                                                 {reward.downloaded ? 'Download Again' : 'Download'}
@@ -1911,7 +1911,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                       step="0.01"
                       value={cropScale}
                       onChange={(e) => setCropScale(parseFloat(e.target.value))}
-                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-[#00FFFF]"
                     />
                   </div>
 
@@ -1933,7 +1933,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                         step="5"
                         value={cropPosition.x}
                         onChange={(e) => setCropPosition(prev => ({ ...prev, x: parseInt(e.target.value) }))}
-                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-[#00FFFF]"
                       />
                     </div>
                     <div>
@@ -1953,7 +1953,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                         step="5"
                         value={cropPosition.y}
                         onChange={(e) => setCropPosition(prev => ({ ...prev, y: parseInt(e.target.value) }))}
-                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-green-500"
+                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-[#00FFFF]"
                       />
                     </div>
                   </div>
@@ -1972,7 +1972,7 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
                     </button>
                     <button
                       onClick={handleCropAndSave}
-                      className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                      className="flex-1 px-4 py-2.5 bg-[#00FFFF] hover:bg-[#00fbff] text-black rounded-lg font-medium transition-colors flex items-center justify-center gap-2 btn-shine"
                     >
                       <Save size={16} />
                       Apply & Save
@@ -1992,8 +1992,8 @@ export default function Profile({ currentUser, onUpdate, onCancel, onNotify, kof
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[1000] flex items-center justify-center p-6">
           <div className="max-w-xs w-full bg-[#1a1a1a] border border-gray-800 rounded-2xl p-8 text-center shadow-2xl transform animate-in fade-in zoom-in duration-300">
             <div className="relative w-16 h-16 mx-auto mb-6">
-              <div className="absolute inset-0 border-4 border-green-500/20 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-green-500 border-t-transparent rounded-full animate-spin"></div>
+              <div className="absolute inset-0 border-4 border-[#00FFFF]/20 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-[#00FFFF] border-t-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(0,255,255,0.4)]"></div>
             </div>
             <h3 className="text-xl font-bold text-white mb-2">Linking Account</h3>
             <p className="text-sm text-gray-400 leading-relaxed">

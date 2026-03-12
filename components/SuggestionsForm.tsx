@@ -109,8 +109,8 @@ export default function SuggestionsForm({ onSubmit, onCancel, mcVersions, modVer
         <div className="max-w-5xl mx-auto bg-[#1e1e1e] rounded-xl shadow-2xl border border-gray-800 p-6 md:p-8 mb-8">
             <div className="flex items-center justify-between mb-8 pb-6 border-b border-gray-800">
                 <h2 className="text-2xl font-bold text-white flex items-center gap-3">
-                    <div className="bg-blue-500/10 p-2 rounded-lg">
-                        <Lightbulb className="text-blue-500" />
+                    <div className="bg-[#00FFFF]/10 p-2 rounded-lg">
+                        <Lightbulb className="text-[#00FFFF]" />
                     </div>
                     Submit Suggestion
                 </h2>
@@ -123,7 +123,7 @@ export default function SuggestionsForm({ onSubmit, onCancel, mcVersions, modVer
                     <input 
                         type="text" 
                         required 
-                        className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" 
+                        className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-[#00FFFF]/30 focus:border-[#00FFFF] outline-none transition-all" 
                         placeholder="e.g., Add new decorative blocks for medieval builds" 
                         value={formData.title} 
                         onChange={(e) => setFormData({...formData, title: e.target.value})} 
@@ -141,7 +141,7 @@ export default function SuggestionsForm({ onSubmit, onCancel, mcVersions, modVer
                                     onClick={() => setSelectedCategory(cat)} 
                                     className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${
                                         selectedCategory === cat 
-                                            ? 'bg-blue-900/30 border-blue-500 text-blue-300' 
+                                            ? 'bg-[#00fbff]/20 border-[#00fbff] text-[#00fbff]' 
                                             : 'bg-[#121212] border-gray-700 text-gray-400 hover:border-gray-500'
                                     }`}
                                 >
@@ -161,10 +161,10 @@ export default function SuggestionsForm({ onSubmit, onCancel, mcVersions, modVer
                                     className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${
                                         selectedPriority === pri 
                                             ? pri === 'High' 
-                                                ? 'bg-red-900/30 border-red-500 text-red-300'
+                                                ? 'bg-red-900/10 border-red-500/30 text-red-300'
                                                 : pri === 'Medium'
-                                                ? 'bg-yellow-900/30 border-yellow-500 text-yellow-300'
-                                                : 'bg-green-900/30 border-green-500 text-green-300'
+                                                ? 'bg-amber-900/10 border-amber-800/30 text-amber-400'
+                                                : 'bg-[#00FFFF]/10 border-[#00FFFF]/30 text-[#00FFFF]'
                                             : 'bg-[#121212] border-gray-700 text-gray-400 hover:border-gray-500'
                                     }`}
                                 >
@@ -186,7 +186,7 @@ export default function SuggestionsForm({ onSubmit, onCancel, mcVersions, modVer
                                     onClick={() => toggleMcVersion(v)} 
                                     className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${
                                         selectedMcVersions.includes(v) 
-                                            ? 'bg-green-900/30 border-green-500 text-green-300' 
+                                            ? 'bg-[#00FFFF]/10 border-[#00FFFF]/30 text-[#00FFFF]' 
                                             : 'bg-[#121212] border-gray-700 text-gray-400 hover:border-gray-500'
                                     }`}
                                 >
@@ -205,7 +205,7 @@ export default function SuggestionsForm({ onSubmit, onCancel, mcVersions, modVer
                                     onClick={() => toggleModVersion(v)} 
                                     className={`px-3 py-1.5 rounded-lg text-sm border transition-all ${
                                         selectedModVersions.includes(v) 
-                                            ? 'bg-blue-900/30 border-blue-500 text-blue-300' 
+                                            ? 'bg-[#00fbff]/10 border-[#00fbff]/30 text-[#00fbff]' 
                                             : 'bg-[#121212] border-gray-700 text-gray-400 hover:border-gray-500'
                                     }`}
                                 >
@@ -220,7 +220,7 @@ export default function SuggestionsForm({ onSubmit, onCancel, mcVersions, modVer
                     <label className="block text-sm font-medium text-gray-300 mb-1.5">Your Name</label>
                     <input 
                         type="text" 
-                        className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" 
+                        className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-[#00FFFF]/30 focus:border-[#00FFFF] outline-none transition-all" 
                         placeholder="Your IGN or Discord username" 
                         value={formData.author} 
                         onChange={(e) => setFormData({...formData, author: e.target.value})} 
@@ -233,7 +233,7 @@ export default function SuggestionsForm({ onSubmit, onCancel, mcVersions, modVer
                         <Tag className="absolute left-3 top-3 text-gray-500 w-4 h-4" />
                         <input 
                             type="text" 
-                            className="w-full bg-[#121212] border border-gray-700 rounded-lg pl-9 pr-3 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none" 
+                            className="w-full bg-[#121212] border border-gray-700 rounded-lg pl-9 pr-3 py-3 text-white focus:ring-2 focus:ring-[#00FFFF]/30 focus:border-[#00FFFF] outline-none transition-all" 
                             placeholder="e.g. decorative, blocks, building (comma separated)" 
                             value={formData.tags} 
                             onChange={(e) => setFormData({...formData, tags: e.target.value})} 
@@ -246,7 +246,7 @@ export default function SuggestionsForm({ onSubmit, onCancel, mcVersions, modVer
                     <div className="flex gap-2 mb-2">
                         <input 
                             type="url" 
-                            className="flex-1 bg-[#121212] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-blue-500 outline-none" 
+                            className="flex-1 bg-[#121212] border border-gray-700 rounded-lg p-2.5 text-white text-sm focus:border-[#00FFFF] outline-none transition-all" 
                             placeholder="https://imgur.com/..." 
                             value={newLink} 
                             onChange={(e) => setNewLink(e.target.value)} 
@@ -286,7 +286,7 @@ export default function SuggestionsForm({ onSubmit, onCancel, mcVersions, modVer
                     <textarea 
                         required 
                         rows={6} 
-                        className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 outline-none resize-none" 
+                        className="w-full bg-[#121212] border border-gray-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-[#00FFFF]/30 focus:border-[#00FFFF] outline-none resize-none transition-all" 
                         placeholder="Describe your suggestion in detail. What would you like to see added or improved? How would it work? Why would it be useful?" 
                         value={formData.description} 
                         onChange={(e) => setFormData({...formData, description: e.target.value})} 
@@ -296,7 +296,7 @@ export default function SuggestionsForm({ onSubmit, onCancel, mcVersions, modVer
                 <div className="flex gap-4 pt-4 border-t border-gray-800">
                     <button 
                         type="submit" 
-                        className="px-6 py-2.5 rounded-lg font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-900/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2"
+                        className="px-6 py-2.5 rounded-lg font-medium bg-[#00FFFF] hover:bg-[#00fbff] text-black shadow-lg shadow-[#00FFFF]/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2 btn-shine"
                     >
                         <Sparkles size={18} />
                         Submit Suggestion
@@ -326,7 +326,7 @@ export default function SuggestionsForm({ onSubmit, onCancel, mcVersions, modVer
                 </button>
                 <button 
                     onClick={confirmSubmit} 
-                    className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors flex items-center gap-2 font-medium shadow-lg"
+                    className="px-4 py-2 rounded-lg bg-[#00FFFF] hover:bg-[#00fbff] text-black transition-colors flex items-center gap-2 font-medium shadow-lg btn-shine"
                 >
                     <Check size={16} /> Confirm
                 </button>

@@ -102,7 +102,7 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
           onClick={() => setActiveTab('active')}
           className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 ${
             activeTab === 'active'
-              ? 'text-white border-minecraft-grass'
+              ? 'text-white border-[#00FFFF]'
               : 'text-gray-400 border-transparent hover:text-gray-300'
           }`}
         >
@@ -115,7 +115,7 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
           onClick={() => setActiveTab('resolved')}
           className={`px-4 py-2 font-semibold text-sm transition-all border-b-2 ${
             activeTab === 'resolved'
-              ? 'text-white border-green-500'
+              ? 'text-white border-[#00fbff]'
               : 'text-gray-400 border-transparent hover:text-gray-300'
           }`}
         >
@@ -129,7 +129,7 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div className="w-full md:w-auto">
           <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2 sm:gap-3 mb-3 md:mb-2">
-            <Bug className="text-minecraft-grass w-5 h-5 sm:w-6 sm:h-6" />
+            <Bug className="text-[#00FFFF] w-5 h-5 sm:w-6 sm:h-6" />
             {activeTab === 'active' ? 'Issue Tracker' : 'Resolved Issues'}
           </h2>
           <div className="flex flex-wrap gap-2 font-mono text-xs">
@@ -138,18 +138,18 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
             </span>
             {activeTab === 'active' ? (
               <>
-                <span className="bg-green-900/20 border border-green-900/50 text-green-400 px-2.5 sm:px-3 py-1 rounded-full whitespace-nowrap">
+                <span className="bg-[#00FFFF]/10 border border-[#00FFFF]/30 text-[#00FFFF] px-2.5 sm:px-3 py-1 rounded-full whitespace-nowrap">
                   Active: {openCount}
                 </span>
-                <span className="bg-blue-900/20 border border-blue-900/50 text-blue-400 px-2.5 sm:px-3 py-1 rounded-full whitespace-nowrap">
+                <span className="bg-[#00fbff]/10 border border-[#00fbff]/30 text-[#00fbff] px-2.5 sm:px-3 py-1 rounded-full whitespace-nowrap">
                   Assigned: {assignedCount}
                 </span>
-                <span className="bg-yellow-900/20 border border-yellow-900/50 text-yellow-400 px-2.5 sm:px-3 py-1 rounded-full whitespace-nowrap">
+                <span className="bg-amber-900/10 border border-amber-900/30 text-amber-400 px-2.5 sm:px-3 py-1 rounded-full whitespace-nowrap">
                   In Progress: {inProgressCount}
                 </span>
               </>
             ) : (
-              <span className="bg-green-900/20 border border-green-900/50 text-green-400 px-2.5 sm:px-3 py-1 rounded-full whitespace-nowrap">
+              <span className="bg-[#00FFFF]/10 border border-[#00FFFF]/30 text-[#00FFFF] px-2.5 sm:px-3 py-1 rounded-full whitespace-nowrap">
                 Resolved: {resolvedCount}
               </span>
             )}
@@ -165,7 +165,7 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
                 placeholder="Search issues or tags..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg pl-9 pr-3 py-2.5 h-10 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors hover:border-gray-600"
+                className="w-full bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg pl-9 pr-3 py-2.5 h-10 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors hover:border-gray-600"
                 />
             </div>
             
@@ -173,7 +173,7 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
                 <select 
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg px-3 py-2.5 h-10 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8 w-full md:w-auto"
+                    className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg px-3 py-2.5 h-10 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8 w-full md:w-auto"
                 >
                     <option value="All">All Status</option>
                     <option value="Open">Open</option>
@@ -184,7 +184,7 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
                 <select 
                     value={severityFilter}
                     onChange={(e) => setSeverityFilter(e.target.value)}
-                    className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg px-3 py-2.5 h-10 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8 w-full md:w-auto"
+                    className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg px-3 py-2.5 h-10 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8 w-full md:w-auto"
                 >
                     <option value="All">All Severity</option>
                     <option value="Critical">Critical</option>
@@ -196,7 +196,7 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
                 <select 
                     value={versionFilter}
                     onChange={(e) => setVersionFilter(e.target.value)}
-                    className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg px-3 py-2.5 h-10 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8 w-full md:w-auto"
+                    className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg px-3 py-2.5 h-10 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8 w-full md:w-auto"
                 >
                     <option value="All">All Mod Ver</option>
                     {modVersions.map(v => <option key={v} value={v}>v{v}</option>)}
@@ -205,7 +205,7 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
                 <select 
                     value={mcVersionFilter}
                     onChange={(e) => setMcVersionFilter(e.target.value)}
-                    className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg px-3 py-2.5 h-10 focus:ring-2 focus:ring-green-500/20 focus:border-green-500 outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8 w-full md:w-auto"
+                    className="bg-[#1a1a1a] border border-gray-700 text-white text-sm rounded-lg px-3 py-2.5 h-10 focus:ring-2 focus:ring-[#00FFFF]/20 focus:border-[#00FFFF] outline-none transition-colors hover:border-gray-600 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIiIGhlaWdodD0iOCIgdmlld0JveD0iMCAwIDEyIDgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xIDFMNiA2TDExIDEiIHN0cm9rZT0iIzlDQTNBRiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KPC9zdmc+')] bg-[length:12px_8px] bg-[right_0.75rem_center] bg-no-repeat pr-8 w-full md:w-auto"
                 >
                     <option value="All">All MC Ver</option>
                     {mcVersions.map(v => <option key={v} value={v}>MC {v}</option>)}
@@ -227,7 +227,7 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
                         'text-green-400 border-green-500/30 bg-green-500/10'}`}>
                     {bug.severity}
                     </span>
-                    <h3 className="text-white font-semibold text-lg truncate min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap group-hover:text-green-400 transition-colors">{bug.title}</h3>
+                    <h3 className="text-white font-semibold text-lg truncate min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap group-hover:text-[#00FFFF] transition-colors">{bug.title}</h3>
                     {bug.aiAnalysis && (
                     <span className="bg-purple-900/20 text-purple-300 text-[10px] font-bold px-2 py-0.5 rounded border border-purple-500/30 flex items-center gap-1">
                         <Sparkles size={12} /> Verified
@@ -241,16 +241,16 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
                     <div className="flex flex-wrap items-center gap-y-1 text-xs text-gray-500">
                         <span className="mr-2">•</span>
                         <span className={`px-2 py-0.5 rounded text-xs ${
-                          bug.status === 'Resolved' ? 'bg-green-900/20 text-green-400' : 
-                          bug.status === 'In Progress' ? 'bg-blue-900/20 text-blue-400' : 
+                          bug.status === 'Resolved' ? 'bg-[#00FFFF]/10 text-[#00FFFF]' : 
+                          bug.status === 'In Progress' ? 'bg-[#00fbff]/10 text-[#00fbff]' : 
                           'bg-gray-800 text-gray-300'
                         }`}>{bug.status}</span>
                         <span className="mx-2">•</span>
                         <span className={`px-2 py-0.5 rounded text-xs ${
-                          bug.severity === 'Critical' ? 'bg-red-900/20 text-red-400' :
-                          bug.severity === 'High' ? 'bg-orange-900/20 text-orange-400' :
-                          bug.severity === 'Medium' ? 'bg-yellow-900/20 text-yellow-400' :
-                          'bg-green-900/20 text-green-400'
+                          bug.severity === 'Critical' ? 'bg-red-900/10 text-red-400' :
+                          bug.severity === 'High' ? 'bg-orange-900/10 text-orange-400' :
+                          bug.severity === 'Medium' ? 'bg-amber-900/10 text-amber-400' :
+                          'bg-[#00FFFF]/10 text-[#00FFFF]'
                         }`}>{bug.severity}</span>
                         {bug.assignedTo && (
                           <>
@@ -300,8 +300,8 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
 
                 <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-3 pl-0 sm:pl-4 border-t sm:border-t-0 border-gray-800 pt-3 sm:pt-0 mt-1 sm:mt-0">
                     <div className={`flex items-center gap-1.5 text-sm font-medium px-2.5 py-1 rounded-full border
-                        ${bug.status === 'Resolved' ? 'bg-green-900/20 border-green-800 text-green-400' : 
-                        bug.status === 'In Progress' ? 'bg-blue-900/20 border-blue-800 text-blue-400' : 
+                        ${bug.status === 'Resolved' ? 'bg-[#00FFFF]/10 border-[#00FFFF]/30 text-[#00FFFF]' : 
+                        bug.status === 'In Progress' ? 'bg-[#00fbff]/10 border-[#00fbff]/30 text-[#00fbff]' : 
                         'bg-gray-800/50 border-gray-700/50 text-gray-300'}`}>
                         {bug.status === 'Resolved' ? <CheckCircle size={14} /> : 
                         bug.status === 'In Progress' ? <Clock size={14} /> : 
@@ -319,7 +319,8 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
                         </button>
                         <button 
                             onClick={(e) => { e.stopPropagation(); setSelectedBugId(bug.id); }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-minecraft-grass/10 hover:bg-minecraft-grass/20 border border-green-900/30 text-xs font-semibold text-green-400 hover:text-green-300 transition-colors"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[#00FFFF]/10 hover:bg-[#00FFFF]/20 border border-[#00FFFF]/30 text-xs font-semibold text-[#00FFFF] hover:text-[#00fbff] transition-all transform hover:scale-105 active:scale-95 btn-hover-glow"
+                            style={{ '--glow-color': 'rgba(0, 255, 255, 0.4)' } as any}
                         >
                             <ExternalLink size={14} /> 
                             View

@@ -32,9 +32,27 @@ export const handler = async (event: any, context: any) => {
       
       const { action, featureId } = body;
 
-      // User Actions (Require Auth but not Admin)
+      // User Actions
       if (action === 'like' || action === 'favorite') {
         const { user } = await verifyAuthToken(event);
+
+        // Anonymous like support
+        if (action === 'like' && !user) {
+          const { isLiking } = body;
+          if (typeof isLiking !== 'boolean') {
+             return corsResponse(400, { error: "isLiking boolean required for anonymous likes" });
+          }
+          const { data: featureData, error: selectErr } = await supabaseAdmin.from('wiki_features').select('likes').eq('id', featureId).single();
+          if (selectErr && selectErr.code !== 'PGRST116') throw selectErr; // Ignore no rows error if it somehow happens but throw others
+          const currentLikes = featureData?.likes || 0;
+          const newLikes = isLiking ? currentLikes + 1 : Math.max(0, currentLikes - 1);
+          
+          const { error: updateErr } = await supabaseAdmin.from('wiki_features').update({ likes: newLikes }).eq('id', featureId);
+          if (updateErr) throw updateErr;
+
+          return corsResponse(200, { success: true, liked: isLiking, newLikes });
+        }
+
         if (!user) return corsResponse(401, { error: "Unauthorized" });
 
         const userId = user.id;
