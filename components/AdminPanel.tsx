@@ -14,8 +14,10 @@ interface AdminPanelProps {
   reports: BugReport[];
   suggestions: Suggestion[];
   onUpdateReport: (r: BugReport) => void;
+  onUpdateReports: (rs: BugReport[]) => void;
   onDeleteReport: (id: string) => void;
   onUpdateSuggestion: (s: Suggestion) => void;
+  onUpdateSuggestions: (ss: Suggestion[]) => void;
   onDeleteSuggestion: (id: string) => void;
   config: AppConfig;
   onUpdateConfig: (c: AppConfig) => void;
@@ -24,7 +26,7 @@ interface AdminPanelProps {
   onChangelogEditComplete?: () => void;
 }
 
-export default function AdminPanel({ currentUser, onLogout, reports, suggestions, onUpdateReport, onDeleteReport, onUpdateSuggestion, onDeleteSuggestion, config, onUpdateConfig, onRestoreData, initialChangelogToEdit, onChangelogEditComplete }: AdminPanelProps) {
+export default function AdminPanel({ currentUser, onLogout, reports, suggestions, onUpdateReport, onUpdateReports, onDeleteReport, onUpdateSuggestion, onUpdateSuggestions, onDeleteSuggestion, config, onUpdateConfig, onRestoreData, initialChangelogToEdit, onChangelogEditComplete }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<'bugs' | 'suggestions' | 'users' | 'config' | 'database' | 'changelogs' | 'kofi' | 'twitch' | 'redeem-rewards' | 'wiki'>(() => {
     if (typeof window === 'undefined') return 'bugs';
     const params = new URLSearchParams(window.location.search);
@@ -790,7 +792,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
       const dateStr = formatDate(report.timestamp);
 
       const statusColors = {
-        'Resolved': 'bg-[#00FFFF]/10 border-[#00FFFF]/30 text-[#00FFFF]',
+        'Resolved': 'bg-green-600/10 border-green-500/30 text-green-400',
         'In Progress': 'bg-[#00fbff]/10 border-[#00fbff]/30 text-[#00fbff]',
         'Open': 'bg-gray-800/50 text-gray-300'
       };
@@ -799,14 +801,14 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
         'Critical': 'bg-red-700/50 text-red-300',
         'High': 'bg-orange-700/50 text-orange-300',
         'Medium': 'bg-amber-700/50 text-amber-300',
-        'Low': 'bg-[#00FFFF]/10 border-[#00FFFF]/30 text-[#00FFFF]'
+        'Low': 'bg-green-600/10 border-green-500/30 text-green-400'
       };
 
       const severityTagColors = {
         'Critical': 'bg-red-900/30 text-red-600 border-red-700',
         'High': 'bg-orange-900/30 text-orange-600 border-orange-700',
         'Medium': 'bg-amber-900/30 text-amber-500 border-amber-700',
-        'Low': 'bg-[#00FFFF]/10 text-[#00FFFF] border-[#00FFFF]/30'
+        'Low': 'bg-green-600/10 text-green-400 border-green-500/30'
       };
 
       const escapeHtml = (str: string) => {
@@ -839,7 +841,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
         >
           <div class="flex items-center gap-2 mb-1">
             <span class="px-2 py-0.5 rounded text-xs font-semibold border ${severityTagClass}">${escapedSeverity.toUpperCase()}</span>
-            <span class="font-medium text-[#00FFFF]">${escapedTitle}</span>
+            <span class="font-medium text-green-400">${escapedTitle}</span>
           </div>
           ${escapedDescription ? `<div class="text-gray-400 text-sm mb-2">${escapedDescription}</div>` : ''}
           <div class="flex flex-wrap items-center gap-y-1 text-xs">
@@ -921,7 +923,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
           processedLine = processedLine.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
           processedLine = processedLine.replace(/\*(.+?)\*/g, '<em>$1</em>');
           processedLine = processedLine.replace(/`(.+?)`/g, '<code class="bg-gray-800 px-1 py-0.5 rounded text-xs">$1</code>');
-          processedLine = processedLine.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" class="text-[#00FFFF] hover:underline">$1</a>');
+          processedLine = processedLine.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" class="text-blue-400 hover:underline">$1</a>');
           const sanitized = sanitizeHTMLPermissive(processedLine);
           return <p key={idx} className="text-gray-300" dangerouslySetInnerHTML={{ __html: sanitized }} />;
         })}
@@ -1684,9 +1686,42 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
   const toggleSelectAll = () => { if (selectedIds.size === filteredReports.length) setSelectedIds(new Set()); else setSelectedIds(new Set(filteredReports.map(r => r.id))); };
   const toggleSelect = (id: string) => { const newSet = new Set(selectedIds); if (newSet.has(id)) newSet.delete(id); else newSet.add(id); setSelectedIds(newSet); };
-  const handleBulkResolve = () => { if (!confirm(`Mark ${selectedIds.size} reports as Resolved?`)) return; reports.forEach(bug => { if (selectedIds.has(bug.id)) onUpdateReport({ ...bug, status: 'Resolved', resolvedBy: currentUser.username }); }); setSelectedIds(new Set()); };
+  
+  const handleBulkResolve = () => { 
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Mark ${selectedIds.size} reports as Resolved?`)) return; 
+    
+    const updated = reports.map(bug => { 
+      if (selectedIds.has(bug.id)) {
+        return { ...bug, status: 'Resolved' as const, resolvedBy: currentUser.username }; 
+      }
+      return bug;
+    }); 
+    
+    const changes = updated.filter(b => selectedIds.has(b.id));
+    onUpdateReports(changes);
+    setSelectedIds(new Set()); 
+  };
+  
   const handleBulkDelete = () => { if (!confirm(`Permanently delete ${selectedIds.size} reports?`)) return; reports.forEach(bug => { if (selectedIds.has(bug.id)) onDeleteReport(bug.id); }); setSelectedIds(new Set()); };
-  const handleBulkAssign = () => { if (!bulkAssignUser) return setToast({ msg: "Select user.", type: "error" }); if (!confirm(`Assign ${selectedIds.size} reports?`)) return; reports.forEach(bug => { if (selectedIds.has(bug.id)) onUpdateReport({ ...bug, assignedTo: bulkAssignUser }); }); setSelectedIds(new Set()); setBulkAssignUser(""); };
+  
+  const handleBulkAssign = () => { 
+    if (!bulkAssignUser) return setToast({ msg: "Select user.", type: "error" }); 
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Assign ${selectedIds.size} reports to ${bulkAssignUser}?`)) return; 
+    
+    const updated = reports.map(bug => { 
+      if (selectedIds.has(bug.id)) {
+        return { ...bug, assignedTo: bulkAssignUser }; 
+      }
+      return bug;
+    }); 
+    
+    const changes = updated.filter(b => selectedIds.has(b.id));
+    onUpdateReports(changes);
+    setSelectedIds(new Set()); 
+    setBulkAssignUser(""); 
+  };
 
   const handleEditBug = (bug: BugReport) => {
     setEditingBug(bug);
@@ -1764,13 +1799,18 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
   };
 
   const handleBulkImplement = () => {
-    if (!onUpdateSuggestion) return;
+    if (selectedSuggestionIds.size === 0) return;
     if (!confirm(`Mark ${selectedSuggestionIds.size} suggestions as Implemented?`)) return;
-    suggestions.forEach(suggestion => {
+    
+    const updated = suggestions.map(suggestion => {
       if (selectedSuggestionIds.has(suggestion.id)) {
-        onUpdateSuggestion({ ...suggestion, status: 'Implemented' });
+        return { ...suggestion, status: 'Implemented' as const };
       }
+      return suggestion;
     });
+    
+    const changes = updated.filter(s => selectedSuggestionIds.has(s.id));
+    onUpdateSuggestions(changes);
     setSelectedSuggestionIds(new Set());
   };
 
@@ -2125,7 +2165,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       <button onClick={() => setSortBy(sortBy === 'newest' ? 'oldest' : 'newest')} className="bg-gray-800 hover:bg-gray-700 px-3 py-2.5 h-10 rounded-lg text-sm text-gray-300 transition-colors flex items-center justify-center"><ArrowUpDown size={14} /></button>
                     </div>
                   </div>
-                  {selectedIds.size > 0 && <div className="flex items-center justify-between bg-[#00FFFF]/10 p-2 rounded border border-[#00FFFF]/20"><span className="text-sm text-[#00fbff]">{selectedIds.size} selected</span><div className="flex gap-2"><button onClick={handleBulkResolve} className="bg-[#00FFFF] text-black hover:bg-[#00fbff] px-3 py-1 text-xs rounded font-bold transition-all btn-hover-glow">Resolve</button><button onClick={handleBulkDelete} className="bg-red-700/20 text-red-400 border border-red-900/50 hover:bg-red-700 hover:text-white px-3 py-1 text-xs rounded transition-all">Delete</button></div></div>}
+                  {selectedIds.size > 0 && <div className="flex items-center justify-between bg-green-600/10 p-2 rounded border border-green-500/20"><span className="text-sm text-green-400">{selectedIds.size} selected</span><div className="flex gap-2"><button onClick={handleBulkResolve} className="bg-green-600 text-white hover:bg-green-500 px-3 py-1 text-xs rounded font-bold transition-all btn-hover-glow">Resolve</button><button onClick={handleBulkDelete} className="bg-red-700/20 text-red-400 border border-red-900/50 hover:bg-red-700 hover:text-white px-3 py-1 text-xs rounded transition-all">Delete</button></div></div>}
                 </div>
 
 
@@ -2141,23 +2181,23 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           <div className="text-xs text-gray-500 mt-1">
                             <div className="flex flex-wrap items-center gap-y-1">
                               <span className="mr-2">•</span>
-                              <span className={`px-2 py-0.5 rounded ${bug.status === 'Resolved' ? 'bg-[#00FFFF]/10 text-[#00FFFF] border border-[#00FFFF]/20' : bug.status === 'In Progress' ? 'bg-[#00fbff]/10 text-[#00fbff] border border-[#00fbff]/20' : 'bg-gray-800 text-gray-300'}`}>{bug.status}</span>
+                              <span className={`px-2 py-0.5 rounded ${bug.status === 'Resolved' ? 'bg-green-600/10 text-green-400 border border-green-500/20' : bug.status === 'In Progress' ? 'bg-[#00fbff]/10 text-[#00fbff] border border-[#00fbff]/20' : 'bg-gray-800 text-gray-300'}`}>{bug.status}</span>
                               <span className="mx-2">•</span>
                               <span className={`px-2 py-0.5 rounded ${bug.severity === 'Critical' ? 'bg-red-900/20 text-red-400' :
                                 bug.severity === 'High' ? 'bg-orange-900/20 text-orange-400' :
                                   bug.severity === 'Medium' ? 'bg-amber-900/20 text-amber-400' :
-                                    'bg-[#00FFFF]/10 text-[#00FFFF] border border-[#00FFFF]/20'
+                                    'bg-green-600/10 text-green-400 border border-green-500/20'
                                 }`}>{bug.severity}</span>
                               {bug.assignedTo && (
                                 <>
                                   <span className="mx-2">•</span>
-                                  <span className="text-[#00fbff]">Assigned: {bug.assignedTo}</span>
+                                  <span className="text-green-400">Assigned: {bug.assignedTo}</span>
                                 </>
                               )}
                               {bug.status === 'Resolved' && bug.resolvedBy && (
                                 <>
                                   <span className="mx-2">•</span>
-                                  <span className="text-[#00FFFF]">Resolved by: {bug.resolvedBy}</span>
+                                  <span className="text-green-400">Resolved by: {bug.resolvedBy}</span>
                                 </>
                               )}
                             </div>
@@ -2182,7 +2222,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           {bug.status !== 'Resolved' && (
                             <button
                               onClick={() => handleQuickAction(bug, 'resolve')}
-                              className="p-1.5 text-[#00FFFF] hover:text-[#00fbff] hover:bg-[#00FFFF]/10 rounded transition-colors btn-hover-glow"
+                              className="p-1.5 text-green-400 hover:text-green-300 hover:bg-green-600/10 rounded transition-colors btn-hover-glow"
                               title="Mark as Resolved"
                             >
                               <CheckCircle size={16} />
@@ -2298,10 +2338,10 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                     </div>
                   </div>
                   {selectedSuggestionIds.size > 0 && (
-                    <div className="flex items-center justify-between bg-[#00FFFF]/10 p-2 rounded border border-[#00FFFF]/20">
-                      <span className="text-sm text-[#00fbff]">{selectedSuggestionIds.size} selected</span>
+                    <div className="flex items-center justify-between bg-green-600/10 p-2 rounded border border-green-500/20">
+                      <span className="text-sm text-green-400">{selectedSuggestionIds.size} selected</span>
                       <div className="flex gap-2">
-                        <button onClick={handleBulkImplement} className="bg-[#00FFFF] text-black hover:bg-[#00fbff] px-3 py-1 text-xs rounded font-bold transition-all btn-hover-glow">Mark Implemented</button>
+                        <button onClick={handleBulkImplement} className="bg-green-600 text-white hover:bg-green-500 px-3 py-1 text-xs rounded font-bold transition-all btn-hover-glow">Mark Implemented</button>
                         <button onClick={handleBulkDeleteSuggestions} className="bg-red-700/20 text-red-400 border border-red-900/50 hover:bg-red-700 hover:text-white px-3 py-1 text-xs rounded transition-all">Delete</button>
                       </div>
                     </div>
@@ -2319,7 +2359,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         <div className="flex-1 min-w-0">
                           <div className="text-white text-sm font-medium truncate">{suggestion.title}</div>
                           <div className="text-xs text-gray-500 mt-1">
-                            <span className={`px-2 py-0.5 rounded ${suggestion.status === 'Implemented' ? 'bg-[#00FFFF]/10 text-[#00FFFF]' :
+                            <span className={`px-2 py-0.5 rounded ${suggestion.status === 'Implemented' ? 'bg-green-600/10 text-green-400' :
                               suggestion.status === 'Rejected' ? 'bg-red-900/20 text-red-400' :
                                 suggestion.status === 'Planned' ? 'bg-blue-900/20 text-blue-400' :
                                   suggestion.status === 'Under Review' ? 'bg-yellow-900/20 text-yellow-400' :
@@ -2328,14 +2368,14 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             <span className="mx-2">•</span>
                             <span className={`px-2 py-0.5 rounded ${suggestion.category === 'Feature' ? 'bg-purple-900/20 text-purple-300' :
                               suggestion.category === 'Enhancement' ? 'bg-blue-900/20 text-blue-300' :
-                                suggestion.category === 'Block' ? 'bg-[#00FFFF]/10 text-[#00FFFF]' :
+                                suggestion.category === 'Block' ? 'bg-green-600/10 text-green-400' :
                                   suggestion.category === 'Item' ? 'bg-yellow-900/20 text-yellow-300' :
                                     'bg-gray-800 text-gray-300'
                               }`}>{suggestion.category}</span>
                             <span className="mx-2">•</span>
                             <span className={`px-2 py-0.5 rounded ${suggestion.priority === 'High' ? 'bg-red-900/20 text-red-400' :
                               suggestion.priority === 'Medium' ? 'bg-yellow-900/20 text-yellow-400' :
-                                'bg-[#00FFFF]/10 text-[#00FFFF]'
+                                'bg-green-600/10 text-green-400'
                               }`}>{suggestion.priority}</span>
                             {suggestion.mcVersions && suggestion.mcVersions.length > 0 && <><span className="mx-2">•</span><span>MC {suggestion.mcVersions.join(', ')}</span></>}
                             {suggestion.modVersions && suggestion.modVersions.length > 0 && <><span className="mx-2">•</span><span>v{suggestion.modVersions.join(', ')}</span></>}
@@ -2352,7 +2392,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           {suggestion.status !== 'Implemented' && suggestion.status !== 'Rejected' && (
                             <button
                               onClick={() => handleQuickSuggestionAction(suggestion, 'implement')}
-                              className="p-1.5 text-[#00FFFF] hover:text-[#00fbff] hover:bg-[#00FFFF]/10 rounded transition-colors btn-hover-glow"
+                              className="p-1.5 text-green-400 hover:text-green-300 hover:bg-green-600/10 rounded transition-colors btn-hover-glow"
                               title="Mark as Implemented"
                             >
                               <CheckCircle size={16} />
@@ -2656,7 +2696,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             };
                             setEditingRole(newRole);
                           }}
-                          className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all text-xs sm:text-sm w-full sm:w-auto justify-center btn-hover-glow"
+                          className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 text-white hover:bg-green-500 rounded-lg font-bold transition-all text-xs sm:text-sm w-full sm:w-auto justify-center btn-hover-glow"
                         >
                           <Plus size={14} className="sm:w-4 sm:h-4" />
                           <span className="hidden sm:inline">Create Role</span>
@@ -2723,7 +2763,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             <div className="flex gap-2">
                               <button
                                 onClick={() => setShowAddLegacyModal(true)}
-                                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all text-xs sm:text-sm btn-hover-glow"
+                                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-green-600 text-white hover:bg-green-500 rounded-lg font-bold transition-all text-xs sm:text-sm btn-hover-glow"
                               >
                                 <UserPlus size={14} />
                                 <span>Create Legacy Account</span>
@@ -2858,7 +2898,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
 
                                   <div className="flex gap-3 justify-end mt-8">
                                     <button onClick={() => setShowAddLegacyModal(false)} className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm">Cancel</button>
-                                    <button onClick={handleAddLegacyUser} className="px-6 py-2 rounded-lg bg-[#00FFFF] text-black hover:bg-[#00fbff] font-bold transition-all btn-hover-glow text-sm">Create Entry</button>
+                                    <button onClick={handleAddLegacyUser} className="px-6 py-2 rounded-lg bg-green-600 text-white hover:bg-green-500 font-bold transition-all btn-hover-glow text-sm">Create Entry</button>
                                   </div>
                                 </div>
                               </div>
@@ -2968,7 +3008,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                       onUpdateConfig({ ...config, roles: updatedRoles });
                                       setEditingRole(null);
                                     }}
-                                    className="flex-1 px-4 py-2.5 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow flex items-center justify-center gap-2"
+                                    className="flex-1 px-4 py-2.5 bg-green-600 text-white hover:bg-green-500 rounded-lg font-bold transition-all btn-hover-glow flex items-center justify-center gap-2"
                                   >
                                     <Save size={16} />
                                     Save Role
@@ -3006,7 +3046,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       setAllowPatch(false);
                       setShowChangelogModal(true);
                     }}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow"
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-500 rounded-lg font-bold transition-all btn-hover-glow"
                   >
                     <Plus size={18} />
                     Add Changelog
@@ -3038,7 +3078,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           setAllowPatch(false);
                           setShowChangelogModal(true);
                         }}
-                        className="px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow"
+                        className="px-4 py-2 bg-green-600 text-white hover:bg-green-500 rounded-lg font-bold transition-all btn-hover-glow"
                       >
                         Create Changelog
                       </button>
@@ -3068,7 +3108,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     {changelog.isLatest ? 'Latest Version' : `Version ${changelog.modVersion}`}
                                   </h3>
                                   {changelog.isLatest && (
-                                    <span className="px-2 py-1 bg-[#00FFFF]/10 text-[#00FFFF] text-xs font-semibold rounded">Latest</span>
+                                    <span className="px-2 py-1 bg-green-600/10 text-green-400 text-xs font-semibold rounded">Latest</span>
                                   )}
                                 </div>
                                 <div className="text-sm text-gray-400 space-y-1">
@@ -3189,7 +3229,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   <div className="animate-fadeIn space-y-8 w-full min-w-0">
                     <div className="bg-[#1e1e1e] p-3 sm:p-4 md:p-6 rounded-lg border border-gray-800 w-full">
                       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                        <button onClick={() => setShowCloudSyncModal(true)} disabled={dbStatus !== 'connected'} className="bg-[#00FFFF] text-black hover:bg-[#00fbff] px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed transition-all btn-hover-glow w-full sm:w-auto"><Upload size={16} /> Sync Data</button>
+                        <button onClick={() => setShowCloudSyncModal(true)} disabled={dbStatus !== 'connected'} className="bg-green-600 text-white hover:bg-green-500 px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed transition-all btn-hover-glow w-full sm:w-auto"><Upload size={16} /> Sync Data</button>
                         <button onClick={handleExportData} className="bg-gray-800 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-sm sm:text-base transition-colors hover:bg-gray-700 w-full sm:w-auto"><Download size={16} /> Download backup</button>
                         <div className="relative w-full sm:w-auto">
                           <input type="file" ref={fileInputRef} onChange={handleImportData} className="hidden" accept=".json" />
@@ -3286,7 +3326,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                             });
                             setShowTierModal(true);
                           }}
-                          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all text-sm sm:text-base btn-hover-glow"
+                          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-green-600 text-white hover:bg-green-500 rounded-lg font-bold transition-all text-sm sm:text-base btn-hover-glow"
                         >
                           <Plus size={16} className="sm:w-[18px] sm:h-[18px]" />
                           <span className="hidden sm:inline">Add Tier</span>
@@ -3315,7 +3355,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                               });
                               setShowTierModal(true);
                             }}
-                            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all text-sm sm:text-base btn-hover-glow"
+                            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-green-600 text-white hover:bg-green-500 rounded-lg font-bold transition-all text-sm sm:text-base btn-hover-glow"
                           >
                             <span className="hidden sm:inline">Create First Tier</span>
                             <span className="sm:hidden">Create Tier</span>
@@ -3334,11 +3374,11 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                       {!tier.enabled && (
                                         <span className="px-2 py-1 bg-gray-700 text-gray-400 text-xs font-semibold rounded">Disabled</span>
                                       )}
-                                      <span className="px-2 py-1 bg-[#00FFFF]/10 text-[#00FFFF] text-xs font-semibold rounded">
+                                      <span className="px-2 py-1 bg-green-600/10 text-green-400 text-xs font-semibold rounded">
                                         Priority: {tier.priority}
                                       </span>
                                       <span className={`px-2 py-1 text-xs font-semibold rounded ${tier.durationType === 'permanent'
-                                        ? 'bg-[#00FFFF]/10 text-[#00FFFF] border border-[#00FFFF]/20'
+                                        ? 'bg-green-600/10 text-green-400 border border-green-500/20'
                                         : 'bg-yellow-600/20 text-yellow-400 border border-yellow-900/30'
                                         }`}>
                                         {tier.durationType === 'permanent' ? 'Permanent' : 'With Subscription'}
@@ -3417,7 +3457,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         <button
                           onClick={loadSubscribedUsers}
                           disabled={loadingKofiUsers}
-                          className="flex items-center gap-2 px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all disabled:opacity-50 btn-hover-glow"
+                          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-500 rounded-lg font-bold transition-all disabled:opacity-50 btn-hover-glow"
                         >
                           <RefreshCw size={18} className={loadingKofiUsers ? 'animate-spin' : ''} />
                           Refresh
@@ -3464,7 +3504,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   </td>
                                   <td className="p-3 text-sm">
                                     {user.kofiSubscription?.isActive ? (
-                                      <span className="px-2 py-1 bg-[#00FFFF]/10 text-[#00FFFF] border border-[#00FFFF]/20 text-xs font-semibold rounded">Active</span>
+                                      <span className="px-2 py-1 bg-green-600/10 text-green-400 border border-green-500/20 text-xs font-semibold rounded">Active</span>
                                     ) : (
                                       <span className="px-2 py-1 bg-gray-700 text-gray-400 text-xs font-semibold rounded">Inactive</span>
                                     )}
@@ -3492,7 +3532,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           onClick={() => {
                             setShowRewardModal(true);
                           }}
-                          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all text-sm sm:text-base btn-hover-glow"
+                          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-green-600 text-white hover:bg-green-500 rounded-lg font-bold transition-all text-sm sm:text-base btn-hover-glow"
                         >
                           <Plus size={16} className="sm:w-[18px] sm:h-[18px]" />
                           <span className="hidden sm:inline">Grant Reward</span>
@@ -3507,7 +3547,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           <p className="text-gray-500 text-sm mb-4">Grant rewards to players even without subscriptions</p>
                           <button
                             onClick={() => setShowRewardModal(true)}
-                            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all text-sm sm:text-base btn-hover-glow"
+                            className="px-3 sm:px-4 py-1.5 sm:py-2 bg-green-600 text-white hover:bg-green-500 rounded-lg font-bold transition-all text-sm sm:text-base btn-hover-glow"
                           >
                             <span className="hidden sm:inline">Grant First Reward</span>
                             <span className="sm:hidden">Grant Reward</span>
@@ -3522,7 +3562,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   <div className="flex items-center gap-3 mb-2">
                                     <h3 className="text-lg font-bold text-white">Manual Reward</h3>
                                     {reward.granted ? (
-                                      <span className="px-2 py-1 bg-[#00FFFF]/10 text-[#00FFFF] text-xs font-semibold rounded">Granted</span>
+                                      <span className="px-2 py-1 bg-green-600/10 text-green-400 text-xs font-semibold rounded">Granted</span>
                                     ) : (
                                       <span className="px-2 py-1 bg-yellow-600/20 text-yellow-400 text-xs font-semibold rounded">Pending</span>
                                     )}
@@ -3571,7 +3611,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                         setManualRewards(prev => prev.map(r => r.id === reward.id ? { ...r, granted: true } : r));
                                         await updateManualReward(reward.id, { granted: true });
                                       }}
-                                      className="p-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded transition-all btn-hover-glow"
+                                      className="p-2 bg-green-600 text-white hover:bg-green-500 rounded transition-all btn-hover-glow"
                                       title="Mark as Granted"
                                     >
                                       <CheckCircle size={16} />
@@ -3788,7 +3828,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         <button
                           onClick={loadTwitchSubscribedUsers}
                           disabled={loadingTwitchUsers}
-                          className="flex items-center gap-2 px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all disabled:opacity-50 btn-hover-glow"
+                          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-500 rounded-lg font-bold transition-all disabled:opacity-50 btn-hover-glow"
                         >
                           <RefreshCw size={18} className={loadingTwitchUsers ? 'animate-spin' : ''} />
                           Refresh
@@ -3839,7 +3879,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   </td>
                                   <td className="p-3 text-sm">
                                     {user.twitchSubscriptionData?.isSub ? (
-                                      <span className="px-2 py-1 bg-[#00FFFF]/10 text-[#00FFFF] border border-[#00FFFF]/20 text-xs font-semibold rounded">Active</span>
+                                      <span className="px-2 py-1 bg-green-600/10 text-green-400 border border-green-500/20 text-xs font-semibold rounded">Active</span>
                                     ) : (
                                       <span className="px-2 py-1 bg-gray-700 text-gray-400 text-xs font-semibold rounded">Inactive</span>
                                     )}
@@ -3882,7 +3922,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                       });
                       setShowRedeemCodeModal(true);
                     }}
-                    className="flex items-center gap-2 px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow"
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white hover:bg-green-500 rounded-lg font-bold transition-all btn-hover-glow"
                   >
                     <Plus size={18} />
                     Create Code
@@ -3974,7 +4014,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           </div>
                           <button
                             onClick={loadCodeRedemptions}
-                            className="px-4 py-1.5 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded font-bold text-sm transition-all btn-hover-glow whitespace-nowrap"
+                            className="px-4 py-1.5 bg-green-600 text-white hover:bg-green-500 rounded font-bold text-sm transition-all btn-hover-glow whitespace-nowrap"
                           >
                             Apply Filters
                           </button>
@@ -4033,7 +4073,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                     )}
                                     <div className="flex flex-wrap gap-2 mt-2">
                                       {redemption.rewards?.map((reward: any, idx: number) => (
-                                        <span key={idx} className="px-2 py-1 bg-[#00FFFF]/10 text-[#00FFFF] text-xs rounded border border-[#00FFFF]/20">
+                                        <span key={idx} className="px-2 py-1 bg-green-600/10 text-green-400 text-xs rounded border border-green-500/20">
                                           {reward.displayName}
                                         </span>
                                       ))}
@@ -4126,7 +4166,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 });
                                 setShowRedeemCodeModal(true);
                               }}
-                              className="px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow"
+                              className="px-4 py-2 bg-green-600 text-white hover:bg-green-500 rounded-lg font-bold transition-all btn-hover-glow"
                             >
                               Create First Code
                             </button>
@@ -4167,7 +4207,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                   {code.expiresAt && code.expiresAt < Date.now() ? (
                                     <span className="px-2 py-1 bg-red-900/30 text-red-400 text-xs font-semibold rounded border border-red-700">Expired</span>
                                   ) : code.enabled ? (
-                                    <span className="px-2 py-1 bg-[#00FFFF]/10 text-[#00FFFF] text-xs font-semibold rounded border border-[#00FFFF]/20">Active</span>
+                                    <span className="px-2 py-1 bg-green-600/10 text-green-400 text-xs font-semibold rounded border border-green-500/20">Active</span>
                                   ) : (
                                     <span className="px-2 py-1 bg-gray-700/50 text-gray-400 text-xs font-semibold rounded border border-gray-600">Disabled</span>
                                   )}
@@ -4177,7 +4217,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                 )}
                                 <div className="flex flex-wrap gap-2 mb-2">
                                   {code.rewards.map((reward, idx) => (
-                                    <span key={idx} className="px-2 py-1 bg-[#00FFFF]/10 text-[#00FFFF] text-xs rounded border border-[#00FFFF]/20">
+                                    <span key={idx} className="px-2 py-1 bg-green-600/10 text-green-400 text-xs rounded border border-green-500/20">
                                       {reward.displayName}
                                     </span>
                                   ))}
@@ -4691,7 +4731,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                 <div className="flex-shrink-0 mb-2">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
                     <h2 className="text-xl sm:text-2xl font-bold text-white">System Configuration</h2>
-                    <button onClick={saveGeneralConfig} className="bg-[#00FFFF] text-black hover:bg-[#00fbff] px-3 sm:px-4 py-2 rounded font-bold flex items-center gap-2 text-xs sm:text-sm shadow-lg shadow-[#00FFFF]/20 transition-all w-full sm:w-auto justify-center btn-hover-glow"><Save size={14} className="sm:w-4 sm:h-4" /> <span className="hidden sm:inline">Save All Changes</span><span className="sm:hidden">Save</span></button>
+                    <button onClick={saveGeneralConfig} className="bg-green-600 text-white hover:bg-green-500 px-3 sm:px-4 py-2 rounded font-bold flex items-center gap-2 text-xs sm:text-sm shadow-lg shadow-green-600/20 transition-all w-full sm:w-auto justify-center btn-hover-glow"><Save size={14} className="sm:w-4 sm:h-4" /> <span className="hidden sm:inline">Save All Changes</span><span className="sm:hidden">Save</span></button>
                   </div>
                 </div>
 
@@ -6647,7 +6687,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
               </button>
               <button
                 onClick={handleConfirmReject}
-                className="px-4 py-2 rounded-lg bg-[#00FFFF] text-black hover:bg-[#00fbff] font-bold transition-all btn-hover-glow flex items-center gap-2"
+                className="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-500 font-bold transition-all btn-hover-glow flex items-center gap-2"
               >
                 <Ban size={16} />
                 Reject Suggestion
@@ -6727,7 +6767,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
               </button>
               <button
                 onClick={handleSaveBugEdit}
-                className="px-4 py-2 rounded-lg bg-[#00FFFF] text-black hover:bg-[#00fbff] font-bold transition-all btn-hover-glow flex items-center gap-2"
+                className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-500 font-bold transition-all btn-hover-glow flex items-center gap-2"
               >
                 <Save size={16} />
                 Save Changes
@@ -9769,7 +9809,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                                             }
                                           }}
                                           className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap flex-shrink-0 ${isSelected
-                                            ? 'bg-[#00FFFF] text-black border-2 border-[#00FFFF]'
+                                            ? 'bg-blue-600 text-white border-2 border-blue-500'
                                             : 'bg-gray-800 text-gray-300 hover:bg-gray-700 border-2 border-transparent'
                                             }`}
                                         >
@@ -9918,7 +9958,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         }
                       }}
                       disabled={aiReviewing}
-                      className="flex items-center gap-1 px-2 py-1 text-xs text-[#00FFFF] hover:text-white bg-[#00FFFF]/10 hover:bg-[#00FFFF]/20 rounded transition-all btn-hover-glow disabled:opacity-50"
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-blue-400 hover:text-white bg-blue-900/20 hover:bg-blue-600 rounded transition-all btn-hover-glow disabled:opacity-50"
                       title="AI Review: Enhance title, description, and add detail points"
                     >
                       {aiReviewing ? (
@@ -10422,7 +10462,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                   </div>
                   {newWikiFeature.media && (
                     <div className="text-xs text-gray-400">
-                      Media URL: <span className="text-[#00FFFF] break-all">{newWikiFeature.media}</span>
+                      Media URL: <span className="text-blue-400 break-all">{newWikiFeature.media}</span>
                     </div>
                   )}
                   <input
@@ -10465,7 +10505,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                           return (
                             <div className="bg-gray-800 border border-gray-600 rounded-lg p-4 text-center">
                               <p className="text-gray-400 text-sm">Google Drive link detected. Make sure the file is set to "Anyone with the link can view".</p>
-                              <a href={mediaPreview} target="_blank" rel="noopener noreferrer" className="text-[#00FFFF] hover:text-[#00fbff] text-sm mt-2 inline-block">
+                              <a href={mediaPreview} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-sm mt-2 inline-block">
                                 Open in Google Drive
                               </a>
                             </div>
@@ -10605,7 +10645,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                         setNewDetail('');
                       }
                     }}
-                    className="px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow"
+                    className="px-4 py-2 bg-green-600 text-white hover:bg-green-500 rounded-lg font-bold transition-all btn-hover-glow"
                   >
                     <Plus size={18} />
                   </button>
@@ -10638,7 +10678,7 @@ export default function AdminPanel({ currentUser, onLogout, reports, suggestions
                 </button>
                 <button
                   onClick={saveWikiFeature}
-                  className="px-4 py-2 bg-[#00FFFF] text-black hover:bg-[#00fbff] rounded-lg font-bold transition-all btn-hover-glow"
+                  className="px-4 py-2 bg-green-600 text-white hover:bg-green-500 rounded-lg font-bold transition-all btn-hover-glow"
                 >
                   {editingWikiFeature ? 'Update Feature' : 'Create Feature'}
                 </button>

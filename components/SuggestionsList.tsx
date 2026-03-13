@@ -99,10 +99,10 @@ export default function SuggestionsList({
 
   const getStatusColor = (status: Suggestion['status']) => {
     switch (status) {
-      case 'Implemented': return 'bg-[#00FFFF]/10 border-[#00FFFF]/30 text-[#00FFFF]';
-      case 'Planned': return 'bg-[#00fbff]/10 border-[#00fbff]/30 text-[#00fbff]';
-      case 'Under Review': return 'bg-amber-900/10 border-amber-800/30 text-amber-400';
-      case 'Rejected': return 'bg-red-900/20 border-red-800 text-red-400';
+      case 'Implemented': return 'bg-green-600/10 border-green-500/20 text-green-400';
+      case 'Planned': return 'bg-blue-600/10 border-blue-500/20 text-blue-400';
+      case 'Under Review': return 'bg-amber-600/10 border-amber-500/20 text-amber-400';
+      case 'Rejected': return 'bg-red-600/10 border-red-500/20 text-red-400';
       default: return 'bg-gray-800/50 border-gray-700/50 text-gray-300';
     }
   };
@@ -119,10 +119,10 @@ export default function SuggestionsList({
 
   const getCategoryColor = (category: Suggestion['category']) => {
     switch (category) {
-      case 'Feature': return 'bg-purple-900/10 border-purple-800/30 text-purple-300';
-      case 'Enhancement': return 'bg-[#00fbff]/10 border-[#00fbff]/30 text-[#00fbff]';
-      case 'Block': return 'bg-[#00FFFF]/10 border-[#00FFFF]/30 text-[#00FFFF]';
-      case 'Item': return 'bg-amber-900/10 border-amber-800/30 text-amber-400';
+      case 'Feature': return 'bg-purple-600/10 border-purple-500/20 text-purple-300';
+      case 'Enhancement': return 'bg-blue-600/10 border-blue-500/20 text-blue-400';
+      case 'Block': return 'bg-green-600/10 border-green-500/20 text-green-400';
+      case 'Item': return 'bg-amber-600/10 border-amber-500/20 text-amber-400';
       default: return 'bg-gray-800 border-gray-700 text-gray-300';
     }
   };
@@ -175,7 +175,7 @@ export default function SuggestionsList({
               </span>
             ) : (
               <>
-                <span className="bg-[#00FFFF]/10 border border-[#00FFFF]/30 text-[#00FFFF] px-3 py-1 rounded-full">
+                <span className="bg-green-900/10 border border-green-900/30 text-green-400 px-3 py-1 rounded-full">
                   Accepted: {acceptedCount}
                 </span>
                 <span className="bg-red-900/10 border border-red-900/30 text-red-400 px-3 py-1 rounded-full">
@@ -256,7 +256,7 @@ export default function SuggestionsList({
                     <span className={`text-[10px] font-bold px-2 py-1 rounded border font-mono uppercase tracking-wide
                     ${suggestion.priority === 'High' ? 'text-red-400 border-red-500/30 bg-red-500/10' : 
                         suggestion.priority === 'Medium' ? 'text-amber-400 border-amber-500/30 bg-amber-500/10' : 
-                        'text-[#00FFFF] border-[#00FFFF]/30 bg-[#00FFFF]/10'}`}>
+                        'text-green-400 border-green-500/30 bg-green-500/10'}`}>
                     {suggestion.priority}
                     </span>
                     <h3 className="text-white font-semibold text-lg truncate pr-2 group-hover:text-[#00FFFF] transition-colors">{suggestion.title}</h3>

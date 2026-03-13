@@ -27,7 +27,7 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
     steps: "",
     expected: "",
     actual: "",
-    author: "",
+    author: currentUser?.username || "",
     tags: ""
   });
   
@@ -260,8 +260,8 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
                     </div>
 
                     <div className="flex gap-4 pt-4 border-t border-gray-800">
-                        <button type="submit" disabled={analyzing} className="px-6 py-2.5 rounded-lg font-medium bg-[#00FFFF] hover:bg-[#00fbff] text-black shadow-lg shadow-[#00FFFF]/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 btn-shine">
-                            {analyzing && <div className="animate-spin h-4 w-4 border-2 border-black border-t-transparent rounded-full"></div>}
+                        <button type="submit" disabled={analyzing} className="px-6 py-2.5 rounded-lg font-medium bg-green-600 hover:bg-green-500 text-white shadow-lg shadow-green-900/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 btn-shine">
+                            {analyzing && <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>}
                             {analyzing ? 'Analyzing...' : 'Submit Report'}
                         </button>
                         <button type="button" onClick={onCancel} className="px-6 py-2.5 rounded-lg font-medium bg-transparent hover:bg-white/5 text-gray-400 hover:text-white transition-all border border-transparent hover:border-gray-700">Cancel</button>
@@ -285,7 +285,7 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
                         {aiResult && !analyzing && (
                             <div className="space-y-4 fade-in">
                                 <div className="flex items-center gap-3 flex-wrap">
-                                    <div className={`text-sm font-bold px-3 py-1.5 rounded-md border shadow-sm ${aiResult.qualityScore >= 8 ? 'text-[#00FFFF] border-[#00FFFF]/30 bg-[#00FFFF]/10' : aiResult.qualityScore >= 5 ? 'text-yellow-400 border-yellow-800 bg-yellow-900/20' : 'text-red-400 border-red-800 bg-red-900/20'}`}>Quality Score: {aiResult.qualityScore}/10</div>
+                                    <div className={`text-sm font-bold px-3 py-1.5 rounded-md border shadow-sm ${aiResult.qualityScore >= 8 ? 'text-green-400 border-green-500/30 bg-green-500/10' : aiResult.qualityScore >= 5 ? 'text-yellow-400 border-yellow-800 bg-yellow-900/20' : 'text-red-400 border-red-800 bg-red-900/20'}`}>Quality Score: {aiResult.qualityScore}/10</div>
                                     <div className="text-sm font-bold px-3 py-1.5 rounded-md bg-gray-800 text-gray-200 border border-gray-700 shadow-sm">Severity: {aiResult.severityAssessment}</div>
                                 </div>
                                 <div className="bg-[#1f1f1f] p-4 rounded-lg border border-gray-700"><span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold block mb-1.5">Analysis Summary</span><p className="text-gray-300 text-sm leading-relaxed">{aiResult.summary}</p></div>
@@ -327,7 +327,7 @@ export default function BugForm({ onSubmit, onCancel, mcVersions, modVersions, o
               <h3 className="text-xl font-bold text-white mb-4">Confirm Submission</h3>
               <p className="text-gray-400 mb-6">Are you sure you want to submit this bug report? Please ensure all details are correct.</p>
               {aiResult && aiResult.qualityScore < 5 && (<div className="bg-yellow-900/20 border border-yellow-800 text-yellow-300 p-3 rounded mb-6 text-sm flex gap-2 items-start"><AlertTriangle size={16} className="mt-0.5 flex-shrink-0" /><p>The Report Quality Score is low ({aiResult.qualityScore}/10). You might want to add more details.</p></div>)}
-              <div className="flex gap-3 justify-end"><button onClick={() => setShowConfirmModal(false)} className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors flex items-center gap-2"><X size={16} /> Cancel</button><button onClick={confirmSubmit} className="px-4 py-2 rounded-lg bg-[#00FFFF] hover:bg-[#00fbff] text-black transition-colors flex items-center gap-2 font-medium shadow-lg btn-shine"><Check size={16} /> Confirm</button></div>
+              <div className="flex gap-3 justify-end"><button onClick={() => setShowConfirmModal(false)} className="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 transition-colors flex items-center gap-2"><X size={16} /> Cancel</button><button onClick={confirmSubmit} className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white transition-colors flex items-center gap-2 font-medium shadow-lg btn-shine"><Check size={16} /> Confirm</button></div>
             </div>
           </div>
         , document.body)}

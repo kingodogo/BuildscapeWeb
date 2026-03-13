@@ -81,7 +81,7 @@ export const handler = async (event: any) => {
             // Check if isSub is true (StreamElements returns this property)
             if (data.isSub) {
                 // 2. Update Profile with Twitch Data
-                await supabaseAdmin.from('profiles').update({
+                const { error: profileUpdateError } = await supabaseAdmin.from('profiles').update({
                     twitch_username: twitchUsername,
                     twitch_subscription_data: {
                         isSub: true,
@@ -90,6 +90,7 @@ export const handler = async (event: any) => {
                         lastModified: new Date().toISOString()
                     }
                 }).eq('id', user.id);
+                if (profileUpdateError) console.error("Failed to update profile with Twitch data:", profileUpdateError);
 
                 // 3. Grant Subscriber-only Cosmetics
                 // We fetch cosmetics that are marked as is_subscriber_only = true
@@ -102,6 +103,13 @@ export const handler = async (event: any) => {
                 if (subCosmetics && subCosmetics.length > 0 && profile?.minecraft_uuid) {
                     const cosmeticIds = subCosmetics.map(c => c.id);
                     grantedRewards = cosmeticIds;
+                    
+                    // Create a reward entry in user_rewards table with expiration (1 month)
+                    const rewardItems = subCosmetics.map(c => ({ 
+                        id: c.id, 
+                        type: 'cosmetic' as const, 
+                        displayName: (c as any).display_name || 'Subscriber Cosmetic' 
+                    }));
                     
                     // Create a reward entry in user_rewards table with expiration (1 month)
                     const now = Date.now();
@@ -117,7 +125,7 @@ export const handler = async (event: any) => {
                         minecraft_uuid: profile.minecraft_uuid,
                         source: 'streamelements',
                         source_id: 'twitch_subscription',
-                        rewards: cosmeticIds.map(id => ({ type: 'cosmetic', id })),
+                        rewards: rewardItems,
                         granted_at: now,
                         expires_at: expiresAt
                     });
@@ -134,12 +142,13 @@ export const handler = async (event: any) => {
                 });
             } else {
                 // Update profile to mark as not subscribed
-                await supabaseAdmin.from('profiles').update({
+                const { error: profileUpdateError } = await supabaseAdmin.from('profiles').update({
                     twitch_subscription_data: {
                         isSub: false,
                         lastModified: new Date().toISOString()
                     }
                 }).eq('id', user.id);
+                if (profileUpdateError) console.error("Failed to update profile sub status:", profileUpdateError);
 
                 return corsResponse(200, { 
                     success: false, 

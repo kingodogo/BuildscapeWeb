@@ -87,8 +87,8 @@ export const handler = async (event: any, context: any) => {
         return corsResponse(200, { message: 'Unclaimed payment recorded' });
     }
 
-    // Process Subscription for matched user
-    if (webhookData.type === 'Subscription' || webhookData.type === 'Donation') {
+    // Process Subscription, Donation, or Shop items for matched user
+    if (webhookData.type === 'Subscription' || webhookData.type === 'Donation' || webhookData.type === 'Shop') {
         const now = Date.now();
         let nextPaymentDate = null;
         if (webhookData.is_subscription_payment && webhookData.type === 'Subscription') {
@@ -99,7 +99,7 @@ export const handler = async (event: any, context: any) => {
 
         const subscription = {
             isActive: true,
-            tierName: webhookData.tier_name || null,
+            tierName: webhookData.tier_name || (webhookData.type === 'Shop' ? 'Shop Item' : 'Donation'),
             lastPaymentDate: now,
             nextPaymentDate: nextPaymentDate,
             amount: webhookData.amount,
@@ -107,47 +107,78 @@ export const handler = async (event: any, context: any) => {
             kofiTransactionId: webhookData.kofi_transaction_id
         };
 
-        await supabaseAdmin.from('profiles').update({ kofi_subscription: subscription }).eq('id', user.id);
+        // Update profile with subscription info
+        const { error: profileError } = await supabaseAdmin.from('profiles').update({ kofi_subscription: subscription }).eq('id', user.id);
+        if (profileError) console.error("Failed to update profile subscription:", profileError);
 
         // SYNC REWARDS TO MINECRAFT ACCOUNT
         const mUuid = user.minecraft_uuid;
-        if (mUuid && webhookData.tier_name) {
-            // 1. Get tier cosmetics
-            const { data: tier } = await supabaseAdmin
-                .from('support_tiers')
-                .select('cosmetics')
-                .ilike('name', webhookData.tier_name)
-                .maybeSingle();
+        
+        // 1. Get tiers from Config instead of support_tiers table (which isn't used by admin)
+        const { data: configRes } = await supabaseAdmin.from('config').select('data').eq('id', 'main_config').maybeSingle();
+        const config = configRes?.data;
+        
+        if (mUuid && config?.kofiTiers) {
+            // Find matching tier or shop item (Case Insensitive)
+            const tier = config.kofiTiers.find((t: any) => 
+                (webhookData.tier_name && (
+                    t.koFiTierName?.toLowerCase() === webhookData.tier_name.toLowerCase() || 
+                    t.name?.toLowerCase() === webhookData.tier_name.toLowerCase()
+                )) ||
+                (webhookData.type === 'Shop' && webhookData.shop_items?.some((item: any) => 
+                    item.direct_link_code?.toLowerCase() === t.koFiTierName?.toLowerCase() || 
+                    item.name?.toLowerCase() === t.name?.toLowerCase()
+                ))
+            );
 
-            if (tier && tier.cosmetics && tier.cosmetics.length > 0) {
-                // 2. Unlock in minecraft_users
-                const { data: mcUser } = await supabaseAdmin
-                    .from('minecraft_users')
-                    .select('unlocked_cosmetics')
-                    .eq('uuid', mUuid)
-                    .maybeSingle();
+            const rewards = tier?.rewards || [];
 
-                const current = mcUser?.unlocked_cosmetics || [];
-                const newSet = new Set([...current, ...tier.cosmetics]);
+            if (tier && rewards.length > 0) {
+                console.log(`Granting ${rewards.length} rewards for tier: ${tier.name} to ${mUuid}`);
                 
-                await supabaseAdmin.from('minecraft_users').upsert({
-                    uuid: mUuid,
-                    unlocked_cosmetics: Array.from(newSet),
-                    updated_at: new Date().toISOString()
-                });
+                // 1. Separate cosmetic IDs for minecraft_users table
+                const cosmeticIds = rewards
+                    .filter((r: any) => r.type === 'cosmetic')
+                    .map((r: any) => r.id || r.itemId) // items might use id or itemId
+                    .filter(Boolean);
 
-                // 3. Record in user_rewards (visible on website)
+                if (cosmeticIds.length > 0) {
+                    const { data: mcUser } = await supabaseAdmin
+                        .from('minecraft_users')
+                        .select('unlocked_cosmetics')
+                        .eq('uuid', mUuid)
+                        .maybeSingle();
+
+                    const current = mcUser?.unlocked_cosmetics || [];
+                    const newSet = new Set([...current, ...cosmeticIds]);
+                    
+                    const { error: mcUpdateError } = await supabaseAdmin.from('minecraft_users').upsert({
+                        uuid: mUuid,
+                        unlocked_cosmetics: Array.from(newSet),
+                        updated_at: new Date().toISOString()
+                    });
+                    if (mcUpdateError) console.error("Failed to update minecraft_users cosms:", mcUpdateError);
+                }
+
+                // 2. Record full reward objects in user_rewards (visible on website)
                 const rewardId = `kofi-${webhookData.message_id || Date.now()}`;
-                await supabaseAdmin.from('user_rewards').insert({
+                const { error: rewardError } = await supabaseAdmin.from('user_rewards').insert({
                     id: rewardId,
                     user_id: user.id,
                     minecraft_uuid: mUuid,
                     source: 'kofi',
                     source_id: webhookData.message_id || webhookData.kofi_transaction_id,
-                    rewards: tier.cosmetics.map((id: string) => ({ type: 'cosmetic', id })),
+                    rewards: rewards,
                     granted_at: now
                 });
+                if (rewardError) console.error("Failed to record reward history:", rewardError);
+                
+                console.log(`Successfully processed rewards for ${user.username}`);
+            } else {
+                console.log(`No matching tier or rewards found for "${webhookData.tier_name}" (Type: ${webhookData.type})`);
             }
+        } else if (!mUuid) {
+            console.log("User found but no Minecraft UUID linked. Skipping reward sync.");
         }
     }
 

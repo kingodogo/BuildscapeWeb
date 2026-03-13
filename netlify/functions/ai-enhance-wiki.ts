@@ -1,60 +1,35 @@
+import { corsResponse, requireAdmin } from './lib/supabaseHelpers';
+
 export const handler = async (event: any, context: any) => {
   // Handle CORS
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
-      },
-      body: '',
-    };
+    return corsResponse(200, {});
   }
 
   if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ error: 'Method not allowed' }),
-    };
-  }
-
-  const API_KEY = process.env.GEMINI_API_KEY || '';
-  
-  if (!API_KEY) {
-    return {
-      statusCode: 503,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ 
-        error: "Gemini API key not configured",
-        enhancedTitle: null,
-        enhancedDescription: null,
-        enhancedDetails: null,
-        suggestedType: null
-      }),
-    };
+    return corsResponse(405, { error: 'Method not allowed' });
   }
 
   try {
-    const body = JSON.parse(event.body || '{}');
-    const { title, description, descriptionType, categories, subcategories, mcVersions, modVersions, details } = body;
+    const { authorized, response, profile } = await requireAdmin(event);
+    if (!authorized) return response;
+    
+    const role = profile?.role?.toLowerCase();
+    if (role !== 'admin' && role !== 'owner') {
+        return corsResponse(403, { error: 'Administrative privileges required for AI features.' });
+    }
+
+    const API_KEY = process.env.GEMINI_API_KEY || '';
+  
+    if (!API_KEY) {
+        return corsResponse(503, { error: "Gemini API key not configured" });
+    }
+
+    const jsonBody = JSON.parse(event.body || '{}');
+    const { title, description, descriptionType, categories, subcategories, mcVersions, modVersions, details } = jsonBody;
 
     if (!title || !description) {
-      return {
-        statusCode: 400,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ error: 'Title and description are required' }),
-      };
+      return corsResponse(400, { error: 'Title and description are required' });
     }
 
     const { GoogleGenAI } = await import('@google/genai');
@@ -112,35 +87,17 @@ Return a JSON object with:
       }
     }
 
-    return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        enhancedTitle: parsedResponse.enhancedTitle || title,
-        enhancedDescription: parsedResponse.enhancedDescription || description,
-        enhancedDetails: parsedResponse.enhancedDetails || details || [],
-        suggestedType: parsedResponse.suggestedType || descriptionType || 'markdown'
-      }),
-    };
+    return corsResponse(200, {
+      enhancedTitle: parsedResponse.enhancedTitle || title,
+      enhancedDescription: parsedResponse.enhancedDescription || description,
+      enhancedDetails: parsedResponse.enhancedDetails || details || [],
+      suggestedType: parsedResponse.suggestedType || descriptionType || 'markdown'
+    });
   } catch (error: any) {
     console.error('Wiki enhancement error:', error);
-    return {
-      statusCode: 500,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        error: error.message || 'Failed to enhance wiki entry',
-        enhancedTitle: null,
-        enhancedDescription: null,
-        enhancedDetails: null,
-        suggestedType: null
-      }),
-    };
+    return corsResponse(500, {
+      error: error.message || 'Failed to enhance wiki entry'
+    });
   }
 };
 

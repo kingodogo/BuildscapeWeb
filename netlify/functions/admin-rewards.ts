@@ -30,7 +30,7 @@ export const handler = async (event: any, context: any) => {
          
          const newReward = {
              id: rewardId,
-             user_id: userId || 'manual',
+             user_id: (userId && userId !== 'manual') ? userId : null,
              minecraft_uuid: minecraftUuid || null,
              source: 'admin_grant',
              source_id: adminProfile.username,
@@ -41,7 +41,10 @@ export const handler = async (event: any, context: any) => {
          };
 
          const { error } = await supabaseAdmin.from('user_rewards').insert(newReward);
-         if (error) throw error;
+         if (error) {
+             console.error("Failed to insert admin reward:", error);
+             throw error;
+         }
 
          return corsResponse(200, { 
              success: true, 

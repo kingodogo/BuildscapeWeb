@@ -22,7 +22,7 @@ export default function SuggestionsForm({ onSubmit, onCancel, mcVersions, modVer
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    author: "",
+    author: currentUser?.username || "",
     tags: ""
   });
   
@@ -164,7 +164,7 @@ export default function SuggestionsForm({ onSubmit, onCancel, mcVersions, modVer
                                                 ? 'bg-red-900/10 border-red-500/30 text-red-300'
                                                 : pri === 'Medium'
                                                 ? 'bg-amber-900/10 border-amber-800/30 text-amber-400'
-                                                : 'bg-[#00FFFF]/10 border-[#00FFFF]/30 text-[#00FFFF]'
+                                                : 'bg-green-600/20 border-green-500 text-green-400'
                                             : 'bg-[#121212] border-gray-700 text-gray-400 hover:border-gray-500'
                                     }`}
                                 >
@@ -296,7 +296,7 @@ export default function SuggestionsForm({ onSubmit, onCancel, mcVersions, modVer
                 <div className="flex gap-4 pt-4 border-t border-gray-800">
                     <button 
                         type="submit" 
-                        className="px-6 py-2.5 rounded-lg font-medium bg-[#00FFFF] hover:bg-[#00fbff] text-black shadow-lg shadow-[#00FFFF]/20 transition-all transform hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2 btn-shine"
+                        className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg transition-all transform hover:-translate-y-0.5 active:translate-y-0 flex items-center justify-center gap-2 shadow-lg shadow-green-900/20 btn-shine"
                     >
                         <Sparkles size={18} />
                         Submit Suggestion
@@ -326,7 +326,7 @@ export default function SuggestionsForm({ onSubmit, onCancel, mcVersions, modVer
                 </button>
                 <button 
                     onClick={confirmSubmit} 
-                    className="px-4 py-2 rounded-lg bg-[#00FFFF] hover:bg-[#00fbff] text-black transition-colors flex items-center gap-2 font-medium shadow-lg btn-shine"
+                    className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white transition-colors flex items-center gap-2 font-medium shadow-lg btn-shine"
                 >
                     <Check size={16} /> Confirm
                 </button>

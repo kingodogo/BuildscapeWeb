@@ -280,5 +280,53 @@ export const StorageService = {
                 'NETWORK_ERROR'
             );
         }
+    },
+
+    async saveReports(reports: BugReport[]): Promise<void> {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+
+            const res = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ reports })
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new StorageError(errorData.error || `Failed to save reports: ${res.status}`, 'SERVER_ERROR');
+            }
+        } catch (e: any) {
+            if (e instanceof StorageError) throw e;
+            throw new StorageError("Failed to save reports. Please check your internet connection.", 'NETWORK_ERROR');
+        }
+    },
+
+    async saveSuggestions(suggestions: Suggestion[]): Promise<void> {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
+
+            const res = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ suggestions })
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new StorageError(errorData.error || `Failed to save suggestions: ${res.status}`, 'SERVER_ERROR');
+            }
+        } catch (e: any) {
+            if (e instanceof StorageError) throw e;
+            throw new StorageError("Failed to save suggestions. Please check your internet connection.", 'NETWORK_ERROR');
+        }
     }
 };

@@ -68,6 +68,8 @@ CREATE TABLE IF NOT EXISTS public.reports (
   title TEXT NOT NULL,
   description TEXT NOT NULL,
   steps_to_reproduce TEXT DEFAULT '',
+  expected_behavior TEXT DEFAULT '',
+  actual_behavior TEXT DEFAULT '',
   versions TEXT[] DEFAULT '{}',
   mc_versions TEXT[] DEFAULT '{}',
   author TEXT NOT NULL,
@@ -176,7 +178,7 @@ CREATE INDEX IF NOT EXISTS idx_kofi_payments_user_id ON kofi_payments(user_id);
 
 CREATE TABLE IF NOT EXISTS public.kofi_manual_rewards (
   id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
+  user_id TEXT,
   minecraft_uuid TEXT,
   rewards JSONB NOT NULL DEFAULT '[]',
   reason TEXT DEFAULT '',
@@ -223,7 +225,7 @@ CREATE INDEX IF NOT EXISTS idx_code_redemptions_code_id ON code_redemptions(code
 
 CREATE TABLE IF NOT EXISTS public.user_rewards (
   id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
+  user_id TEXT,
   minecraft_uuid TEXT,
   source TEXT NOT NULL,
   source_id TEXT,

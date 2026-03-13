@@ -60,8 +60,8 @@ export const handler = async (event: any, context: any) => {
 
         const newReward = {
             id: reward.id || crypto.randomUUID(),
-            user_id: reward.userId,
-            minecraft_uuid: reward.minecraftUuid,
+            user_id: (reward.userId && reward.userId !== 'manual') ? reward.userId : null,
+            minecraft_uuid: reward.minecraftUuid || null,
             rewards: reward.rewards || [],
             reason: reward.reason,
             granted_by: reward.grantedBy || 'admin',
@@ -70,11 +70,14 @@ export const handler = async (event: any, context: any) => {
         };
 
         const { error } = await supabaseAdmin.from('kofi_manual_rewards').insert(newReward);
-        if (error) throw error;
+        if (error) {
+            console.error("Failed to insert manual reward:", error);
+            throw error;
+        }
 
         // Sync to user_rewards if created as granted
         if (newReward.granted) {
-            await supabaseAdmin.from('user_rewards').upsert({
+            const { error: syncError } = await supabaseAdmin.from('user_rewards').upsert({
                 id: `manual-${newReward.id}`,
                 user_id: newReward.user_id,
                 minecraft_uuid: newReward.minecraft_uuid,
@@ -83,6 +86,7 @@ export const handler = async (event: any, context: any) => {
                 rewards: newReward.rewards,
                 granted_at: newReward.granted_at
             });
+            if (syncError) console.error("Failed to sync reward to user_rewards:", syncError);
         }
 
         return corsResponse(200, { success: true, reward: newReward });
@@ -106,22 +110,26 @@ export const handler = async (event: any, context: any) => {
         if (updates.rewards !== undefined) mappedUpdates.rewards = updates.rewards;
         if (updates.reason !== undefined) mappedUpdates.reason = updates.reason;
 
-        const { error } = await supabaseAdmin.from('kofi_manual_rewards').update(mappedUpdates).eq('id', id);
-        if (error) throw error;
+        const { error: patchError } = await supabaseAdmin.from('kofi_manual_rewards').update(mappedUpdates).eq('id', id);
+        if (patchError) {
+            console.error("Failed to update manual reward:", patchError);
+            throw patchError;
+        }
 
         // Sync to user_rewards if granting
         if (updates.granted === true) {
             const finalRewards = updates.rewards || existing?.rewards || [];
             const rId = `manual-${id}`;
-            await supabaseAdmin.from('user_rewards').upsert({
+            const { error: syncError } = await supabaseAdmin.from('user_rewards').upsert({
                 id: rId,
-                user_id: existing?.user_id,
+                user_id: (existing?.user_id && existing?.user_id !== 'manual') ? existing.user_id : null,
                 minecraft_uuid: existing?.minecraft_uuid,
                 source: 'manual',
                 source_id: id,
                 rewards: finalRewards,
                 granted_at: Date.now()
             });
+            if (syncError) console.error("Failed to sync reward to user_rewards:", syncError);
         } else if (updates.granted === false && existing?.granted === true) {
             // Revoke
             await supabaseAdmin.from('user_rewards').delete().eq('id', `manual-${id}`);

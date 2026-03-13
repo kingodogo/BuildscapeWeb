@@ -1,5 +1,5 @@
 
-import { corsResponse } from './lib/supabaseHelpers';
+import { corsResponse, verifyAuthToken } from './lib/supabaseHelpers';
 
 export const handler = async (event: any, context: any) => {
   if (event.httpMethod === 'OPTIONS') {
@@ -11,6 +11,11 @@ export const handler = async (event: any, context: any) => {
   }
 
   try {
+    const { user, error: authError } = await verifyAuthToken(event);
+    if (authError || !user) {
+      return corsResponse(401, { error: 'Authentication required to upload images.' });
+    }
+
     const IMGBB_API_KEY = process.env.IMGBB_API_KEY || '';
     if (!IMGBB_API_KEY) {
       return corsResponse(500, { error: 'Image upload service not configured.' });

@@ -214,11 +214,11 @@ export default function BugDetailModal({
                                 ${bug.severity === 'Critical' ? 'text-red-400 border-red-500/30 bg-red-500/10' : 
                                 bug.severity === 'High' ? 'text-orange-400 border-orange-500/30 bg-orange-500/10' :
                                 bug.severity === 'Medium' ? 'text-yellow-400 border-yellow-500/30 bg-yellow-500/10' : 
-                                'text-[#00FFFF] border-[#00FFFF]/30 bg-[#00FFFF]/10'}`}>
+                                'text-green-400 border-green-500/30 bg-green-500/10'}`}>
                                 {bug.severity}
                             </span>
                             <div className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full border
-                                ${bug.status === 'Resolved' ? 'bg-[#00FFFF]/10 border-[#00FFFF]/30 text-[#00FFFF]' : 
+                                ${bug.status === 'Resolved' ? 'bg-green-900/10 border-green-500/30 text-green-400' : 
                                 bug.status === 'In Progress' ? 'bg-[#00fbff]/10 border-[#00fbff]/30 text-[#00fbff]' : 
                                 'bg-gray-800/50 border-gray-700/50 text-gray-300'}`}>
                                 {bug.status === 'Resolved' ? <CheckCircle size={12} /> : 
@@ -247,7 +247,7 @@ export default function BugDetailModal({
                                     ${bug.status === 'Resolved' 
                                     ? 'bg-gray-800 hover:bg-gray-700 border-gray-700 text-yellow-500 hover:text-yellow-400' 
                                     : bug.status === 'In Progress'
-                                    ? 'bg-gray-800 hover:bg-gray-700 border-gray-700 text-[#00FFFF] hover:text-[#00fbff]'
+                                    ? 'bg-gray-800 hover:bg-gray-700 border-gray-700 text-green-500 hover:text-green-400'
                                     : 'bg-gray-800 hover:bg-gray-700 border-gray-700 text-[#00fbff] hover:text-[#00fbff]'}`}
                             >
                                 {bug.status === 'Open' ? 'Start Progress' : 
@@ -379,7 +379,7 @@ export default function BugDetailModal({
                                         <div className="text-[10px] text-gray-500 font-bold uppercase mb-1.5">Minecraft Version</div>
                                         <div className="flex flex-wrap gap-2">
                                             {bug.mcVersions.map(v => (
-                                                <span key={v} className="bg-[#00FFFF]/10 text-[#00FFFF] border border-[#00FFFF]/30 px-2 md:px-2.5 py-1 rounded text-xs font-mono font-medium whitespace-nowrap">{v}</span>
+                                                <span key={v} className="bg-green-900/10 text-green-400 border border-green-800/30 px-2 md:px-2.5 py-1 rounded text-xs font-mono font-medium whitespace-nowrap">{v}</span>
                                             ))}
                                         </div>
                                     </div>
@@ -387,7 +387,7 @@ export default function BugDetailModal({
                                         <div className="text-[10px] text-gray-500 font-bold uppercase mb-1.5">Mod Version</div>
                                         <div className="flex flex-wrap gap-2">
                                             {bug.versions.map(v => (
-                                                <span key={v} className="bg-[#00fbff]/10 text-[#00fbff] border border-[#00fbff]/30 px-2 md:px-2.5 py-1 rounded text-xs font-mono font-medium whitespace-nowrap">v{v}</span>
+                                                <span key={v} className="bg-green-900/10 text-green-400 border border-green-800/30 px-2 md:px-2.5 py-1 rounded text-xs font-mono font-medium whitespace-nowrap">v{v}</span>
                                             ))}
                                         </div>
                                     </div>
@@ -469,12 +469,12 @@ export default function BugDetailModal({
                                         ))}
                                     </select>
                                 ) : assignedTo ? (
-                                    <div className="bg-[#00FFFF]/5 border border-[#00FFFF]/20 rounded-lg p-3 md:p-4 flex items-center gap-2 md:gap-3 min-w-0">
+                                    <div className="bg-green-600/5 border border-green-500/20 rounded-lg p-3 md:p-4 flex items-center gap-2 md:gap-3 min-w-0">
                                         {(() => {
                                             const assignedUser = allUsers?.find(u => u.username === assignedTo);
                                             const hasIcon = assignedUser?.profileIcon && assignedUser.profileIcon.trim() && assignedUser.profileIcon !== 'null';
                                             return (
-                                                <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-[#00FFFF]/20 flex items-center justify-center text-[#00FFFF] font-bold text-xs md:text-sm border border-[#00FFFF]/30 flex-shrink-0 overflow-hidden">
+                                                <div className="w-8 h-8 md:w-9 md:h-9 rounded-full bg-green-600/20 flex items-center justify-center text-green-400 font-bold text-xs md:text-sm border border-green-500/30 flex-shrink-0 overflow-hidden">
                                                     {hasIcon ? (
                                                         <img 
                                                             src={assignedUser.profileIcon} 
@@ -497,7 +497,7 @@ export default function BugDetailModal({
                                             );
                                         })()}
                                         <div className="flex-1 min-w-0">
-                                            <div className="text-xs md:text-sm text-[#00fbff] font-bold truncate">{assignedTo}</div>
+                                            <div className="text-xs md:text-sm text-green-400 font-bold truncate">{assignedTo}</div>
                                         </div>
                                     </div>
                                 ) : (

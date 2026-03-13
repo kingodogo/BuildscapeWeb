@@ -579,6 +579,42 @@ export default function App() {
       handleNotify("Configuration updated");
   };
 
+  const updateReports = async (updatedReports: BugReport[]) => {
+    try {
+      await StorageService.saveReports(updatedReports);
+      setReports(prev => {
+        const next = [...prev];
+        updatedReports.forEach(updated => {
+          const idx = next.findIndex(r => r.id === updated.id);
+          if (idx !== -1) next[idx] = updated;
+        });
+        return next;
+      });
+      handleNotify(`Updated ${updatedReports.length} reports`);
+    } catch (e: any) {
+      console.error("Failed to bulk update reports:", e);
+      handleNotify("Failed to update reports.", 'error');
+    }
+  };
+
+  const updateSuggestions = async (updatedSuggestions: Suggestion[]) => {
+    try {
+      await StorageService.saveSuggestions(updatedSuggestions);
+      setSuggestions(prev => {
+        const next = [...prev];
+        updatedSuggestions.forEach(updated => {
+          const idx = next.findIndex(s => s.id === updated.id);
+          if (idx !== -1) next[idx] = updated;
+        });
+        return next;
+      });
+      handleNotify(`Updated ${updatedSuggestions.length} suggestions`);
+    } catch (e: any) {
+      console.error("Failed to bulk update suggestions:", e);
+      handleNotify("Failed to update suggestions.", 'error');
+    }
+  };
+
   const handleRestoreData = (restoredReports: BugReport[], restoredSuggestions: Suggestion[], restoredConfig: AppConfig) => {
       setReports(restoredReports);
       setSuggestions(restoredSuggestions);
@@ -587,56 +623,80 @@ export default function App() {
       handleNotify("System restored and synced!");
   };
 
-  const toggleStatus = (id: string) => {
-    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'owner')) return; 
-    setReports(prev => prev.map(bug => {
-      if (bug.id === id) {
-        let newStatus: BugReport['status'];
-        if (bug.status === 'Open') newStatus = 'In Progress';
-        else if (bug.status === 'In Progress') newStatus = 'Resolved';
-        else newStatus = 'Open';
+  const toggleStatus = async (id: string) => {
+    if (!currentUser || (currentUser.role?.toLowerCase() !== 'admin' && currentUser.role?.toLowerCase() !== 'owner')) return; 
+    
+    const bug = reports.find(r => r.id === id);
+    if (!bug) return;
 
-        const updatedBug = { ...bug, status: newStatus };
-        // Set resolvedBy when marking as Resolved, clear it when reopening
-        if (newStatus === 'Resolved') {
-          updatedBug.resolvedBy = currentUser.username;
-        } else if (newStatus === 'Open') {
-          updatedBug.resolvedBy = undefined;
-        }
+    let newStatus: BugReport['status'];
+    if (bug.status === 'Open') newStatus = 'In Progress';
+    else if (bug.status === 'In Progress') newStatus = 'Resolved';
+    else newStatus = 'Open';
 
-        handleNotify(`Bug Marked as ${newStatus}`);
-        return updatedBug;
-      }
-      return bug;
-    }));
+    const updatedBug = { ...bug, status: newStatus };
+    // Set resolvedBy when marking as Resolved, clear it when reopening
+    if (newStatus === 'Resolved') {
+      updatedBug.resolvedBy = currentUser.username;
+    } else if (newStatus === 'Open') {
+      updatedBug.resolvedBy = undefined;
+    }
+
+    try {
+      await StorageService.saveReport(updatedBug);
+      setReports(prev => prev.map(r => r.id === id ? updatedBug : r));
+      handleNotify(`Bug Marked as ${newStatus}`);
+    } catch (e: any) {
+      console.error("Failed to update bug status:", e);
+      handleNotify("Failed to update status. Please try again.", 'error');
+    }
   };
 
-  const handleAddComment = (bugId: string, text: string, images: string[] = []) => {
+  const handleAddComment = async (bugId: string, text: string, images: string[] = []) => {
     if (!currentUser) return;
-    setReports(prev => prev.map(bug => {
-      if (bug.id === bugId) {
-        const newComment = {
-          id: crypto.randomUUID(),
-          author: currentUser.username,
-          role: currentUser.role,
-          text,
-          images,
-          timestamp: Date.now()
-        };
-        return { ...bug, comments: [...(bug.comments || []), newComment] };
-      }
-      return bug;
-    }));
+    const bug = reports.find(r => r.id === bugId);
+    if (!bug) return;
+
+    const newComment = {
+      id: crypto.randomUUID(),
+      author: currentUser.username,
+      role: currentUser.role,
+      text,
+      images,
+      timestamp: Date.now()
+    };
+    
+    const updatedBug = { 
+      ...bug, 
+      comments: [...(bug.comments || []), newComment] 
+    };
+
+    try {
+      await StorageService.saveReport(updatedBug);
+      setReports(prev => prev.map(r => r.id === bugId ? updatedBug : r));
+    } catch (e: any) {
+      console.error("Failed to save comment:", e);
+      handleNotify("Failed to add comment. Please try again.", 'error');
+    }
   };
 
-  const handleDeleteComment = (bugId: string, commentId: string) => {
-     setReports(prev => prev.map(bug => {
-        if (bug.id === bugId) {
-           return { ...bug, comments: (bug.comments || []).filter(c => c.id !== commentId) };
-        }
-        return bug;
-     }));
-     handleNotify("Comment deleted");
+  const handleDeleteComment = async (bugId: string, commentId: string) => {
+    const bug = reports.find(r => r.id === bugId);
+    if (!bug) return;
+
+    const updatedBug = { 
+      ...bug, 
+      comments: (bug.comments || []).filter(c => c.id !== commentId) 
+    };
+
+    try {
+      await StorageService.saveReport(updatedBug);
+      setReports(prev => prev.map(r => r.id === bugId ? updatedBug : r));
+      handleNotify("Comment deleted");
+    } catch (e: any) {
+      console.error("Failed to delete comment:", e);
+      handleNotify("Failed to delete comment. Please try again.", 'error');
+    }
   };
 
   const handleLogin = (user: User) => {
@@ -721,7 +781,7 @@ export default function App() {
   };
 
   const toggleSuggestionStatus = async (id: string) => {
-    if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'owner')) return; 
+    if (!currentUser || (currentUser.role?.toLowerCase() !== 'admin' && currentUser.role?.toLowerCase() !== 'owner')) return; 
     const suggestion = suggestions.find(s => s.id === id);
     if (!suggestion) return;
 
@@ -847,7 +907,7 @@ export default function App() {
                 reports={reports} 
                 onToggleStatus={toggleStatus}
                 onUpdateReport={updateReport}
-                isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'owner'}
+                isAdmin={currentUser?.role?.toLowerCase() === 'admin' || currentUser?.role?.toLowerCase() === 'owner'}
                 mcVersions={config.mcVersions}
                 modVersions={config.modVersions}
                 currentUser={currentUser}
@@ -928,7 +988,7 @@ export default function App() {
               <SuggestionsList 
                 suggestions={suggestions} 
                 onToggleStatus={toggleSuggestionStatus} 
-                isAdmin={currentUser?.role === 'admin' || currentUser?.role === 'owner'} 
+                isAdmin={currentUser?.role?.toLowerCase() === 'admin' || currentUser?.role?.toLowerCase() === 'owner'} 
                 mcVersions={config.mcVersions}
                 modVersions={config.modVersions}
                 currentUser={currentUser}
@@ -963,8 +1023,10 @@ export default function App() {
                     reports={reports}
                     suggestions={suggestions}
                     onUpdateReport={updateReport}
+                    onUpdateReports={updateReports}
                     onDeleteReport={deleteReport}
                     onUpdateSuggestion={updateSuggestion}
+                    onUpdateSuggestions={updateSuggestions}
                     onDeleteSuggestion={deleteSuggestion}
                     config={config}
                     onUpdateConfig={handleUpdateConfig}

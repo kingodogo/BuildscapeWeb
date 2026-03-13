@@ -58,51 +58,83 @@ export const handler = async (event: any, context: any) => {
       
       const { reports, suggestions, config, report, suggestion, changelogs } = body;
 
-      // Single Report or Suggestion submission: Allow any authenticated user
+      // Single Report or Suggestion submission: Allow guests for NEW ones, Authenticated for updates
       if ((report || suggestion) && !reports && !suggestions && !config && !changelogs) {
-          const { user, profile, error } = await verifyAuthToken(event);
-          if (error || !user) {
-              return corsResponse(401, { error: error || 'Authentication required to submit reports' });
-          }
-          
-          const isAdmin = profile && (profile.role?.toLowerCase() === 'admin' || profile.role?.toLowerCase() === 'owner');
+          const { user, profile } = await verifyAuthToken(event);
+          const userRole = profile?.role?.toLowerCase() || 'user';
+          const isAdmin = userRole === 'admin' || userRole === 'owner';
           
           if (report) {
-              const snakeReport = mapToSnakeCase(report);
-              // Ensure user owns the report if updating
-              if (snakeReport.id) {
-                 const { data: existing } = await supabaseAdmin.from('reports').select('author_id').eq('id', snakeReport.id).maybeSingle();
-                 if (existing && existing.author_id !== user.id && !isAdmin) {
-                     return corsResponse(403, { error: "You do not have permission to update this report" });
-                 }
-                 if (existing) {
-                     snakeReport.author_id = existing.author_id;
-                 } else {
-                     snakeReport.author_id = user.id;
-                 }
-              } else {
-                 snakeReport.author_id = user.id;
+              // VALIDATION
+              if (!report.title || report.title.length < 5 || report.title.length > 200) {
+                  return corsResponse(400, { error: "Title must be between 5 and 200 characters" });
               }
+              if (report.description?.length > 10000) {
+                  return corsResponse(400, { error: "Description too long" });
+              }
+              
+              // Trusted Domains Validation for links
+              const TRUSTED_DOMAINS = ['pastebin.com', 'imgur.com', 'youtube.com', 'youtu.be', 'github.com', 'githubusercontent.com', 'discordapp.com', 'discord.com', 'mediafire.com', 'google.com', 'drive.google.com', 'dropbox.com'];
+              if (report.links && Array.isArray(report.links)) {
+                  for (const link of report.links) {
+                      try {
+                          if (link.startsWith('javascript:')) throw new Error('Invalid protocol');
+                          const url = new URL(link);
+                          const isTrusted = TRUSTED_DOMAINS.some(domain => url.hostname.includes(domain));
+                          if (!isTrusted) return corsResponse(400, { error: `Untrusted link: ${url.hostname}` });
+                      } catch (e) {
+                          return corsResponse(400, { error: "Invalid link format" });
+                      }
+                  }
+              }
+
+              const snakeReport = mapToSnakeCase(report);
+              let existing = null;
+              if (snakeReport.id) {
+                  const { data } = await supabaseAdmin.from('reports').select('author_id').eq('id', snakeReport.id).maybeSingle();
+                  existing = data;
+              }
+
+              if (existing) {
+                  if (!user) return corsResponse(401, { error: 'Authentication required to update reports' });
+                  if (existing.author_id !== user.id && !isAdmin) {
+                      return corsResponse(403, { error: "You do not have permission to update this report" });
+                  }
+                  snakeReport.author_id = existing.author_id;
+              } else {
+                  snakeReport.author_id = user?.id || null;
+              }
+              
               const { error: upsertError } = await supabaseAdmin.from('reports').upsert(snakeReport);
               if (upsertError) throw upsertError;
           }
            
           if (suggestion) {
-              const snakeSuggestion = mapToSnakeCase(suggestion);
-              // Ensure user owns the suggestion if updating
-              if (snakeSuggestion.id) {
-                 const { data: existing } = await supabaseAdmin.from('suggestions').select('author_id').eq('id', snakeSuggestion.id).maybeSingle();
-                 if (existing && existing.author_id !== user.id && !isAdmin) {
-                     return corsResponse(403, { error: "You do not have permission to update this suggestion" });
-                 }
-                 if (existing) {
-                     snakeSuggestion.author_id = existing.author_id;
-                 } else {
-                     snakeSuggestion.author_id = user.id;
-                 }
-              } else {
-                 snakeSuggestion.author_id = user.id;
+              // VALIDATION
+              if (!suggestion.title || suggestion.title.length < 5 || suggestion.title.length > 200) {
+                  return corsResponse(400, { error: "Title must be between 5 and 200 characters" });
               }
+              if (suggestion.description?.length > 5000) {
+                  return corsResponse(400, { error: "Description too long" });
+              }
+
+              const snakeSuggestion = mapToSnakeCase(suggestion);
+              let existing = null;
+              if (snakeSuggestion.id) {
+                  const { data } = await supabaseAdmin.from('suggestions').select('author_id').eq('id', snakeSuggestion.id).maybeSingle();
+                  existing = data;
+              }
+
+              if (existing) {
+                  if (!user) return corsResponse(401, { error: 'Authentication required to update suggestions' });
+                  if (existing.author_id !== user.id && !isAdmin) {
+                      return corsResponse(403, { error: "You do not have permission to update this suggestion" });
+                  }
+                  snakeSuggestion.author_id = existing.author_id;
+              } else {
+                  snakeSuggestion.author_id = user?.id || null;
+              }
+
               const { error: upsertError } = await supabaseAdmin.from('suggestions').upsert(snakeSuggestion);
               if (upsertError) throw upsertError;
           }
@@ -110,10 +142,13 @@ export const handler = async (event: any, context: any) => {
       }
 
       // Bulk or Sensitive updates: require Admin
-      const { authorized, response } = await requireAdmin(event);
+      const { authorized, response, profile: adminProfile } = await requireAdmin(event);
       if (!authorized) return response;
+      const adminRole = adminProfile?.role?.toLowerCase();
+      const isActuallyAdmin = adminRole === 'admin' || adminRole === 'owner';
+      if (!isActuallyAdmin) return corsResponse(403, { error: "Administrative privileges required" });
 
-      // Single Report Update
+      // Single Report Update (Admin override)
       if (report) {
          const snakeReport = mapToSnakeCase(report);
          const { error } = await supabaseAdmin.from('reports').upsert(snakeReport);
@@ -121,7 +156,7 @@ export const handler = async (event: any, context: any) => {
          return corsResponse(200, { success: true });
       }
 
-      // Single Suggestion Update
+      // Single Suggestion Update (Admin override)
       if (suggestion) {
          const snakeSuggestion = mapToSnakeCase(suggestion);
          const { error } = await supabaseAdmin.from('suggestions').upsert(snakeSuggestion);
@@ -147,7 +182,6 @@ export const handler = async (event: any, context: any) => {
       if (config) {
         const { changelogs: configChangelogs, ...configWithoutChangelogs } = config;
         
-        // Update main_config
         const { error } = await supabaseAdmin.from('config').upsert({
            id: 'main_config',
            data: configWithoutChangelogs,
@@ -155,9 +189,7 @@ export const handler = async (event: any, context: any) => {
         });
         if (error) throw error;
 
-        // Handle nested changelogs if provided and top-level changelogs not present
         if (!changelogs && configChangelogs && Array.isArray(configChangelogs)) {
-           // Delete all and insert new
            await supabaseAdmin.from('changelogs').delete().neq('id', 'placeholder_impossible_id');
            if (configChangelogs.length > 0) {
               const snakeChangelogs = configChangelogs.map(mapToSnakeCase);
@@ -182,8 +214,10 @@ export const handler = async (event: any, context: any) => {
 
     // DELETE: Delete Item (Admin only)
     if (event.httpMethod === 'DELETE') {
-      const { authorized, response } = await requireAdmin(event);
+      const { authorized, response, profile: adminProfile } = await requireAdmin(event);
       if (!authorized) return response;
+      const adminRole = adminProfile?.role?.toLowerCase();
+      if (adminRole !== 'admin' && adminRole !== 'owner') return corsResponse(403, { error: "Administrative privileges required" });
 
       const { id, type } = event.queryStringParameters || {};
       if (!id) return corsResponse(400, { error: "ID required" });

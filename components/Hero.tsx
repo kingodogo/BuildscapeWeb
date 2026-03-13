@@ -95,26 +95,22 @@ export default function Hero({ onReportClick, onSuggestionsClick, config, links 
           {config.description}
         </p>
         <div className="mt-8 max-w-md mx-auto sm:flex sm:justify-center md:mt-10 gap-4">
-          <div className="rounded-md shadow">
-            <button 
-              onClick={onReportClick}
-              className="w-full flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-lg text-black bg-[#00FFFF] hover:bg-[#00fbff] md:py-4 md:text-lg md:px-10 transition-all shadow-lg hover:shadow-[#00FFFF]/30 transform hover:-translate-y-0.5 h-[48px] md:h-[56px] whitespace-nowrap btn-shine"
-            >
-              <span className="text-center">Report a Bug</span>
-              <ArrowRight className="ml-2 h-5 w-5 flex-shrink-0" />
-            </button>
-          </div>
-          {onSuggestionsClick && (
-            <div className="mt-3 rounded-md shadow sm:mt-0">
+              <button 
+                onClick={onReportClick}
+                className="w-full sm:w-auto px-8 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-green-900/20 transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-2 group btn-shine"
+              >
+                <ArrowRight className="group-hover:rotate-12 transition-transform" />
+                Report a Bug
+              </button>
+              {onSuggestionsClick && (
               <button 
                 onClick={onSuggestionsClick}
-                className="w-full flex items-center justify-center px-8 py-3 border border-[#00FFFF]/50 text-[#00FFFF] bg-[#00FFFF]/10 hover:bg-[#00FFFF]/20 md:py-4 md:text-lg md:px-10 transition-all hover:border-[#00FFFF] transform hover:-translate-y-0.5 h-[48px] md:h-[56px] whitespace-nowrap btn-hover-glow"
+                className="w-full sm:w-auto px-8 py-4 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold text-lg border border-gray-700 transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-2 group"
               >
-                <Lightbulb className="mr-2 h-5 w-5 flex-shrink-0" />
-                <span className="text-center">Suggestions</span>
+                <Lightbulb className="text-green-500 group-hover:scale-110 transition-transform" />
+                Suggestions
               </button>
-            </div>
-          )}
+              )}
           <div className="mt-3 rounded-md shadow sm:mt-0">
             <a 
               href={`${links.curseforge}/files`}

@@ -402,7 +402,7 @@ export const handler = async (event: any, context: any) => {
         ? parts[0].slice(0, 2) + '*'.repeat(parts[0].length - 2) + '@' + parts[1]
         : '***@' + parts[1];
 
-      return corsResponse(200, { success: true, maskedEmail, username: legacy.username, email: legacy.email });
+      return corsResponse(200, { success: true, maskedEmail, username: legacy.username });
     }
 
     // --- Authenticated Endpoints (Require valid JWT) ---
@@ -411,13 +411,12 @@ export const handler = async (event: any, context: any) => {
     const { user: authUser, profile, error: authError } = await verifyAuthToken(event);
     
     if (authError || !authUser) {
-       // Allow "getAllUsers" if it's strictly admin-only handled later? 
-       // No, verifyToken fails regardless.
-       // However, if the action wasn't matched above, it implies it needs auth or doesn't exist.
        return corsResponse(401, { error: "Unauthorized: " + authError });
     }
 
     const userId = authUser.id; // Correct user ID from token
+    const userRole = profile?.role?.toLowerCase() || 'user';
+    const isAdmin = userRole === 'admin' || userRole === 'owner';
 
     // Update Profile
     if (requestAction === 'updateProfile') {
@@ -457,7 +456,6 @@ export const handler = async (event: any, context: any) => {
         });
         forceResetFlag = false;
       } else {
-        // Fetch current meta to return accurate state
         const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(userId);
         forceResetFlag = !!user?.user_metadata?.force_password_reset;
       }
@@ -472,14 +470,12 @@ export const handler = async (event: any, context: any) => {
     if (requestAction === 'updateKofiUsername') {
       const { kofiUsername } = body;
       
-      // Basic validation
       if (kofiUsername && !/^[a-zA-Z0-9 \._-]+$/.test(kofiUsername)) {
         return corsResponse(400, { error: "Invalid Ko-fi username format" });
       }
 
       const updates: any = { kofi_username: kofiUsername || null };
       
-      // 1. Try to find and claim any past payments
       if (kofiUsername) {
         // Find unclaimed payments for this name
         const { data: pastPayments } = await supabaseAdmin
@@ -490,8 +486,6 @@ export const handler = async (event: any, context: any) => {
           .order('timestamp', { ascending: false });
 
         if (pastPayments && pastPayments.length > 0) {
-          console.log(`Linking ${pastPayments.length} past payments to user ${userId}`);
-          
           // Link them
           await supabaseAdmin
             .from('kofi_payments')
@@ -535,14 +529,12 @@ export const handler = async (event: any, context: any) => {
       const { minecraftUsername } = body;
       if (!minecraftUsername) return corsResponse(400, { error: "Minecraft username required" });
 
-      // Mojang lookup
       const mojangRes = await fetch(`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(minecraftUsername)}`);
       if (!mojangRes.ok) return corsResponse(400, { error: "Minecraft account not found" });
       
       const mojangData = await mojangRes.json();
-      const uuid = mojangData.id; // No dashes usually from this endpoint? actually it returns no dashes.
+      const uuid = mojangData.id;
       
-      // Check if linked to another user
       const { data: existing } = await supabaseAdmin
         .from('profiles')
         .select('id')
@@ -564,24 +556,20 @@ export const handler = async (event: any, context: any) => {
 
       if (updateError) throw updateError;
       
-      // Sync rewards
       await syncMinecraftRewards(userId, uuid);
 
       return corsResponse(200, { success: true, user: mapProfileToUser(updatedProfile) });
     }
 
-    // --- Minecraft OAuth Endpoints ---
+    // --- Minecraft & Twitch OAuth ---
     
     if (requestAction === 'getMinecraftLoginUrl') {
       const { redirectUri } = body;
       if (!redirectUri) return corsResponse(400, { error: "Redirect URI required" });
       try {
         const url = getMicrosoftLoginUrl(redirectUri);
-        console.log(`[AUTH_DEBUG] Generated URL: ${url}`);
         return corsResponse(200, { url });
-      } catch (e: any) {
-        return corsResponse(500, { error: e.message });
-      }
+      } catch (e: any) { return corsResponse(500, { error: e.message }); }
     }
 
     if (requestAction === 'linkMinecraftOAuth') {
@@ -590,50 +578,20 @@ export const handler = async (event: any, context: any) => {
       
       try {
         const mcProfile = await getMinecraftProfileFromCode(code, redirectUri);
-        
-        // Check if already linked to another user
-        const { data: existing } = await supabaseAdmin
-          .from('profiles')
-          .select('id')
-          .eq('minecraft_uuid', mcProfile.id)
-          .neq('id', userId)
-          .maybeSingle();
-
+        const { data: existing } = await supabaseAdmin.from('profiles').select('id').eq('minecraft_uuid', mcProfile.id).neq('id', userId).maybeSingle();
         if (existing) return corsResponse(400, { error: "Minecraft account already linked to another user" });
 
-        const { data: updatedProfile, error: updateError } = await supabaseAdmin
-          .from('profiles')
-          .update({
-            minecraft_username: mcProfile.name,
-            minecraft_uuid: mcProfile.id
-          })
-          .eq('id', userId)
-          .select()
-          .single();
-
+        const { data: updatedProfile, error: updateError } = await supabaseAdmin.from('profiles').update({ minecraft_username: mcProfile.name, minecraft_uuid: mcProfile.id }).eq('id', userId).select().single();
         if (updateError) throw updateError;
-
-        // Sync rewards
         await syncMinecraftRewards(userId, mcProfile.id);
-
         return corsResponse(200, { success: true, user: mapProfileToUser(updatedProfile) });
-      } catch (e: any) {
-        console.error('linkMinecraftOAuth error:', e);
-        return corsResponse(400, { error: e.message || 'Failed to link Minecraft account via Microsoft' });
-      }
+      } catch (e: any) { return corsResponse(400, { error: e.message || 'Failed to link Minecraft account via Microsoft' }); }
     }
-
-    // --- Twitch OAuth Endpoints ---
 
     if (requestAction === 'getTwitchLoginUrl') {
         const { redirectUri } = body;
         if (!redirectUri) return corsResponse(400, { error: "Redirect URI required" });
-        try {
-            const url = getTwitchLoginUrl(redirectUri);
-            return corsResponse(200, { url });
-        } catch (e: any) {
-            return corsResponse(500, { error: e.message });
-        }
+        try { return corsResponse(200, { url: getTwitchLoginUrl(redirectUri) }); } catch (e: any) { return corsResponse(500, { error: e.message }); }
     }
 
     if (requestAction === 'linkTwitchOAuth') {
@@ -643,87 +601,38 @@ export const handler = async (event: any, context: any) => {
         try {
             const twitchProfile = await getTwitchProfileFromCode(code, redirectUri);
             
-            // twitchProfile structure: { id, login, display_name, profile_image_url, email }
             const twitchUsername = twitchProfile.login;
 
-            const { data: updatedProfile, error: updateError } = await supabaseAdmin
-                .from('profiles')
-                .update({
-                    twitch_username: twitchUsername,
-                    twitch_id: twitchProfile.id
-                })
-                .eq('id', userId)
-                .select()
-                .single();
-
+            const { data: updatedProfile, error: updateError } = await supabaseAdmin.from('profiles').update({ twitch_username: twitchUsername, twitch_id: twitchProfile.id }).eq('id', userId).select().single();
             if (updateError) throw updateError;
-
             return corsResponse(200, { success: true, user: mapProfileToUser(updatedProfile) });
-        } catch (e: any) {
-            console.error('linkTwitchOAuth error:', e);
-            return corsResponse(400, { error: e.message || 'Failed to link Twitch account' });
-        }
+        } catch (e: any) { return corsResponse(400, { error: e.message || 'Failed to link Twitch account' }); }
     }
 
     if (requestAction === 'unlinkTwitch') {
-        const { data: updatedProfile, error: updateError } = await supabaseAdmin
-            .from('profiles')
-            .update({
-                twitch_username: null,
-                twitch_subscription_data: null
-            })
-            .eq('id', userId)
-            .select()
-            .single();
-
+        const { data: updatedProfile, error: updateError } = await supabaseAdmin.from('profiles').update({ twitch_username: null, twitch_subscription_data: null }).eq('id', userId).select().single();
         if (updateError) throw updateError;
         return corsResponse(200, { success: true, user: mapProfileToUser(updatedProfile) });
     }
 
-    // Unlink Minecraft Account
     if (requestAction === 'unlinkMinecraft') {
-      const { data: updatedProfile, error: updateError } = await supabaseAdmin
-        .from('profiles')
-        .update({
-          minecraft_username: null,
-          minecraft_uuid: null
-        })
-        .eq('id', userId)
-        .select()
-        .single();
-
+      const { data: updatedProfile, error: updateError } = await supabaseAdmin.from('profiles').update({ minecraft_username: null, minecraft_uuid: null }).eq('id', userId).select().single();
       if (updateError) throw updateError;
       return corsResponse(200, { success: true, user: mapProfileToUser(updatedProfile) });
     }
 
     // --- Admin Endpoints ---
     
-    // Get All Users (Admin)
     if (requestAction === 'getAllUsers') {
-      if (profile.role !== 'admin' && profile.role !== 'owner') {
-         return corsResponse(403, { error: "Forbidden" });
-      }
-
-      const { data: users, error } = await supabaseAdmin
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-
+      if (!isAdmin) return corsResponse(403, { error: "Forbidden" });
+      const { data: users, error } = await supabaseAdmin.from('profiles').select('*').order('created_at', { ascending: false });
       if (error) throw error;
       return corsResponse(200, { users: users.map(mapProfileToUser) });
     }
 
-    // Get Legacy Users (Admin)
     if (requestAction === 'getLegacyUsers') {
-      if (profile.role !== 'admin' && profile.role !== 'owner') {
-         return corsResponse(403, { error: "Forbidden" });
-      }
-
-      const { data: users, error } = await supabaseAdmin
-        .from('legacy_users')
-        .select('*')
-        .order('created_at', { ascending: false });
-
+      if (!isAdmin) return corsResponse(403, { error: "Forbidden" });
+      const { data: users, error } = await supabaseAdmin.from('legacy_users').select('*').order('created_at', { ascending: false });
       if (error) throw error;
       return corsResponse(200, { 
         users: (users || []).map(u => ({
@@ -738,34 +647,20 @@ export const handler = async (event: any, context: any) => {
       });
     }
 
-    // Delete Legacy User (Admin)
     if (requestAction === 'deleteLegacyUser') {
-      if (profile.role !== 'admin' && profile.role !== 'owner') {
-         return corsResponse(403, { error: "Forbidden" });
-      }
+      if (!isAdmin) return corsResponse(403, { error: "Forbidden" });
       const targetEmail = body.email;
       if (!targetEmail) return corsResponse(400, { error: "Email required" });
-
-      const { error } = await supabaseAdmin
-        .from('legacy_users')
-        .delete()
-        .eq('email', targetEmail);
-
+      const { error } = await supabaseAdmin.from('legacy_users').delete().eq('email', targetEmail);
       if (error) throw error;
       return corsResponse(200, { success: true });
     }
 
-    // Create Legacy User (Admin)
     if (requestAction === 'createLegacyUser') {
-      if (profile.role !== 'admin' && profile.role !== 'owner') {
-         return corsResponse(403, { error: "Forbidden" });
-      }
+      if (!isAdmin) return corsResponse(403, { error: "Forbidden" });
       const { user } = body;
       if (!user || !user.email || !user.username) return corsResponse(400, { error: "Email and username required" });
-
-      const { error } = await supabaseAdmin
-        .from('legacy_users')
-        .insert({
+      const { error } = await supabaseAdmin.from('legacy_users').insert({
           email: user.email.toLowerCase(),
           username: user.username,
           old_role: user.role || 'user',
@@ -773,16 +668,12 @@ export const handler = async (event: any, context: any) => {
           old_minecraft_uuid: user.minecraftUuid || null,
           old_kofi_username: user.kofiUsername || null
         });
-
       if (error) throw error;
       return corsResponse(200, { success: true });
     }
 
-    // Send Reset Link (Admin)
     if (requestAction === 'sendResetLink') {
-      if (profile.role !== 'admin' && profile.role !== 'owner') {
-         return corsResponse(403, { error: "Forbidden" });
-      }
+      if (!isAdmin) return corsResponse(403, { error: "Forbidden" });
       const { id: targetId } = body;
       if (!targetId) return corsResponse(400, { error: "User ID required" });
 
@@ -804,7 +695,7 @@ export const handler = async (event: any, context: any) => {
           targetProfile.email,
           "Reset Your Password - Buildscape",
           "Password Reset Requested",
-          `Hi ${targetProfile.username}, an administrator has initiated a password reset for your account. Please use the link below to set a new password.`,
+          `Hi ${targetProfile.username}, an administrator has initiated a password reset for your account. Please check your email for the reset link or click the button below.`,
           "Reset Password",
           data.properties.action_link
         );
@@ -817,16 +708,13 @@ export const handler = async (event: any, context: any) => {
       return corsResponse(200, { 
         success: true, 
         emailSent, 
-        emailError,
-        recoveryLink: data.properties.action_link 
+        emailError
+        // recoveryLink removed for SECURITY: admin shouldn't be able to bypass user's email access
       });
     }
 
-    // Force Reset Password with Dummy (Admin)
     if (requestAction === 'forceResetPassword') {
-      if (profile.role !== 'admin' && profile.role !== 'owner') {
-         return corsResponse(403, { error: "Forbidden" });
-      }
+      if (!isAdmin) return corsResponse(403, { error: "Forbidden" });
       const { id: targetId } = body;
       if (!targetId) return corsResponse(400, { error: "User ID required" });
 
@@ -865,22 +753,20 @@ export const handler = async (event: any, context: any) => {
       return corsResponse(200, { 
         success: true, 
         emailSent, 
-        emailError,
-        dummyPassword // Only returned because this is restricted to Admin/Owner
+        emailError
+        // dummyPassword removed for SECURITY: admin shouldn't see the password directly
       });
     }
 
     // Update User Role (Admin) - But Owner role is protected
     if (requestAction === 'updateRole') {
-      if (profile.role !== 'admin' && profile.role !== 'owner') {
-         return corsResponse(403, { error: "Forbidden" });
-      }
+      if (!isAdmin) return corsResponse(403, { error: "Forbidden" });
       
       const { id: targetId, role: newRole } = body;
       
       // Protect Owner
       const { data: targetProfile } = await supabaseAdmin.from('profiles').select('role').eq('id', targetId).single();
-      if (targetProfile?.role === 'owner') return corsResponse(403, { error: "Cannot modify Owner" });
+      if (targetProfile?.role?.toLowerCase() === 'owner') return corsResponse(403, { error: "Cannot modify Owner" });
 
       const { error } = await supabaseAdmin
         .from('profiles')
@@ -893,14 +779,12 @@ export const handler = async (event: any, context: any) => {
 
     // Delete User (Admin)
     if (event.httpMethod === 'DELETE' || requestAction === 'deleteUser') {
-      if (profile.role !== 'admin' && profile.role !== 'owner') {
-         return corsResponse(403, { error: "Forbidden" });
-      }
+      if (!isAdmin) return corsResponse(403, { error: "Forbidden" });
       const targetId = event.queryStringParameters?.id || body.id;
 
-      // Protect Owner
+       // Protect Owner
        const { data: targetProfile } = await supabaseAdmin.from('profiles').select('role').eq('id', targetId).single();
-       if (targetProfile?.role === 'owner') return corsResponse(403, { error: "Cannot delete Owner" });
+       if (targetProfile?.role?.toLowerCase() === 'owner') return corsResponse(403, { error: "Cannot delete Owner" });
 
       // Delete from auth.users (cascades to profiles)
       const { error } = await supabaseAdmin.auth.admin.deleteUser(targetId);
@@ -967,28 +851,23 @@ export const handler = async (event: any, context: any) => {
 // Helper to sync rewards to Minecraft UUID
 async function syncMinecraftRewards(userId: string, mUuid: string) {
   try {
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('kofi_subscription')
-      .eq('id', userId)
-      .single();
-
+    const { data: profile } = await supabaseAdmin.from('profiles').select('kofi_subscription').eq('id', userId).single();
     if (profile?.kofi_subscription?.isActive && profile.kofi_subscription.tierName) {
-      const { data: tier } = await supabaseAdmin
-        .from('support_tiers')
-        .select('*')
-        .ilike('name', profile.kofi_subscription.tierName)
-        .maybeSingle();
+      // Use config kofiTiers instead ofsupport_tiers table for consistency
+      const { data: configRes } = await supabaseAdmin.from('config').select('data').eq('id', 'main_config').maybeSingle();
+      const config = configRes?.data;
+      
+      const tier = config?.kofiTiers?.find((t: any) => 
+        t.enabled && (t.koFiTierName?.toLowerCase() === profile.kofi_subscription.tierName.toLowerCase() || t.name?.toLowerCase() === profile.kofi_subscription.tierName.toLowerCase())
+      );
 
-      if (tier?.cosmetics && tier.cosmetics.length > 0) {
-        const { data: mcUser } = await supabaseAdmin
-            .from('minecraft_users')
-            .select('unlocked_cosmetics')
-            .eq('uuid', mUuid)
-            .maybeSingle();
+      const rewards = tier?.rewards || [];
+      const cosmeticIds = rewards.filter((r: any) => r.type === 'cosmetic').map((r: any) => r.id || r.itemId).filter(Boolean);
 
+      if (cosmeticIds.length > 0) {
+        const { data: mcUser } = await supabaseAdmin.from('minecraft_users').select('unlocked_cosmetics').eq('uuid', mUuid).maybeSingle();
         const current = mcUser?.unlocked_cosmetics || [];
-        const newSet = new Set([...current, ...tier.cosmetics]);
+        const newSet = new Set([...current, ...cosmeticIds]);
         
         await supabaseAdmin.from('minecraft_users').upsert({
             uuid: mUuid,
@@ -1003,7 +882,7 @@ async function syncMinecraftRewards(userId: string, mUuid: string) {
             minecraft_uuid: mUuid,
             source: 'kofi_sync',
             source_id: profile.kofi_subscription.tierName,
-            rewards: tier.cosmetics.map((id: string) => ({ type: 'cosmetic', id })),
+            rewards: rewards,
             granted_at: Date.now()
         });
       }

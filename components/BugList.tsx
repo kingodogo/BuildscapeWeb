@@ -138,10 +138,10 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
             </span>
             {activeTab === 'active' ? (
               <>
-                <span className="bg-[#00FFFF]/10 border border-[#00FFFF]/30 text-[#00FFFF] px-2.5 sm:px-3 py-1 rounded-full whitespace-nowrap">
+                <span className="bg-green-600/10 border border-green-500/20 text-green-400 px-2.5 sm:px-3 py-1 rounded-full whitespace-nowrap">
                   Active: {openCount}
                 </span>
-                <span className="bg-[#00fbff]/10 border border-[#00fbff]/30 text-[#00fbff] px-2.5 sm:px-3 py-1 rounded-full whitespace-nowrap">
+                <span className="bg-blue-600/10 border border-blue-500/20 text-blue-400 px-2.5 sm:px-3 py-1 rounded-full whitespace-nowrap">
                   Assigned: {assignedCount}
                 </span>
                 <span className="bg-amber-900/10 border border-amber-900/30 text-amber-400 px-2.5 sm:px-3 py-1 rounded-full whitespace-nowrap">
@@ -149,7 +149,7 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
                 </span>
               </>
             ) : (
-              <span className="bg-[#00FFFF]/10 border border-[#00FFFF]/30 text-[#00FFFF] px-2.5 sm:px-3 py-1 rounded-full whitespace-nowrap">
+              <span className="bg-green-900/10 border border-green-900/30 text-green-400 px-2.5 sm:px-3 py-1 rounded-full whitespace-nowrap">
                 Resolved: {resolvedCount}
               </span>
             )}
@@ -241,7 +241,7 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
                     <div className="flex flex-wrap items-center gap-y-1 text-xs text-gray-500">
                         <span className="mr-2">•</span>
                         <span className={`px-2 py-0.5 rounded text-xs ${
-                          bug.status === 'Resolved' ? 'bg-[#00FFFF]/10 text-[#00FFFF]' : 
+                          bug.status === 'Resolved' ? 'bg-green-900/10 text-green-400' : 
                           bug.status === 'In Progress' ? 'bg-[#00fbff]/10 text-[#00fbff]' : 
                           'bg-gray-800 text-gray-300'
                         }`}>{bug.status}</span>
@@ -250,7 +250,7 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
                           bug.severity === 'Critical' ? 'bg-red-900/10 text-red-400' :
                           bug.severity === 'High' ? 'bg-orange-900/10 text-orange-400' :
                           bug.severity === 'Medium' ? 'bg-amber-900/10 text-amber-400' :
-                          'bg-[#00FFFF]/10 text-[#00FFFF]'
+                          'bg-green-900/10 text-green-400'
                         }`}>{bug.severity}</span>
                         {bug.assignedTo && (
                           <>
@@ -300,7 +300,7 @@ export default function BugList({ reports, onToggleStatus, onUpdateReport, isAdm
 
                 <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-3 pl-0 sm:pl-4 border-t sm:border-t-0 border-gray-800 pt-3 sm:pt-0 mt-1 sm:mt-0">
                     <div className={`flex items-center gap-1.5 text-sm font-medium px-2.5 py-1 rounded-full border
-                        ${bug.status === 'Resolved' ? 'bg-[#00FFFF]/10 border-[#00FFFF]/30 text-[#00FFFF]' : 
+                        ${bug.status === 'Resolved' ? 'bg-green-600/10 border-green-500/20 text-green-400' : 
                         bug.status === 'In Progress' ? 'bg-[#00fbff]/10 border-[#00fbff]/30 text-[#00fbff]' : 
                         'bg-gray-800/50 border-gray-700/50 text-gray-300'}`}>
                         {bug.status === 'Resolved' ? <CheckCircle size={14} /> : 
