@@ -94,34 +94,34 @@ export default function Hero({ onReportClick, onSuggestionsClick, config, links 
         <p className="mt-6 max-w-md mx-auto text-base text-gray-400 sm:text-lg md:mt-8 md:text-xl md:max-w-4xl leading-relaxed">
           {config.description}
         </p>
-        <div className="mt-8 max-w-md mx-auto sm:flex sm:justify-center md:mt-10 gap-4">
-              <button 
-                onClick={onReportClick}
-                className="w-full sm:w-auto px-8 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-green-900/20 transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-2 group btn-shine"
-              >
-                <ArrowRight className="group-hover:rotate-12 transition-transform" />
-                Report a Bug
-              </button>
-              {onSuggestionsClick && (
-              <button 
-                onClick={onSuggestionsClick}
-                className="w-full sm:w-auto px-8 py-4 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold text-lg border border-gray-700 transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-2 group"
-              >
-                <Lightbulb className="text-green-500 group-hover:scale-110 transition-transform" />
-                Suggestions
-              </button>
-              )}
-          <div className="mt-3 rounded-md shadow sm:mt-0">
-            <a 
-              href={`${links.curseforge}/files`}
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="w-full flex items-center justify-center px-8 py-3 border border-gray-700 text-base font-medium rounded-lg text-gray-300 bg-[#1e1e1e] hover:bg-gray-800 md:py-4 md:text-lg md:px-10 transition-all hover:border-gray-500 h-[48px] md:h-[56px] whitespace-nowrap"
+        <div className="mt-8 max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-center md:mt-10 gap-4 px-4">
+          <button 
+            onClick={onReportClick}
+            className="w-full sm:w-auto px-8 py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-lg shadow-lg shadow-green-900/20 transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-3 group btn-shine whitespace-nowrap min-w-[200px]"
+          >
+            <ArrowRight className="w-5 h-5 group-hover:rotate-12 transition-transform" />
+            Report a Bug
+          </button>
+          
+          {onSuggestionsClick && (
+            <button 
+              onClick={onSuggestionsClick}
+              className="w-full sm:w-auto px-8 py-4 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-bold text-lg border border-gray-700 transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-3 group whitespace-nowrap min-w-[200px]"
             >
-              <Download className="mr-2 h-5 w-5 flex-shrink-0" />
-              <span className="text-center">Download Mod</span>
-            </a>
-          </div>
+              <Lightbulb className="w-5 h-5 text-green-500 group-hover:scale-110 transition-transform" />
+              Suggestions
+            </button>
+          )}
+
+          <a 
+            href={`${links.curseforge}/files`}
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="w-full sm:w-auto px-8 py-4 bg-[#1e1e1e] hover:bg-gray-800 text-gray-300 rounded-xl font-bold text-lg border border-gray-700 transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-3 group whitespace-nowrap min-w-[200px]"
+          >
+            <Download className="w-5 h-5 transition-transform group-hover:translate-y-0.5" />
+            Download Mod
+          </a>
         </div>
         
         <div className="mt-12 flex justify-center space-x-8 text-gray-500 text-sm font-mono">
